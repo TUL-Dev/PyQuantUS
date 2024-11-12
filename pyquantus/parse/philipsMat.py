@@ -23,7 +23,7 @@ class AnalysisParamsStruct():
         self.frame = frame
 
 
-def philips2dMatParser(filepath: str, refpath: str, frame: int) \
+def philips2dRfMatParser(filepath: str, refpath: str, frame: int) \
         -> Tuple[DataOutputStruct, InfoStruct, DataOutputStruct, InfoStruct]:
     AnalysisParams = AnalysisParamsStruct(frame)
 

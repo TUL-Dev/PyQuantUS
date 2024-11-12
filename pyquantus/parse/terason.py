@@ -67,7 +67,7 @@ def readFileImg(b_data_Zone1, b_data_Zone2, focalDepthZone0, OmniOn, Info: InfoS
     return Data, Info
 
 
-def terasonParser(filePath, phantomPath, OmniOn=1):
+def terasonRfParser(filePath, phantomPath, OmniOn=1):
     # Credit: Steven R. Broadstone, D.Sc., Teratech Corporation dba Terason
     # Parser inspired by MATLAB code writen by Steven
     # Written to parse RF data taken with two focal zones

@@ -78,7 +78,7 @@ def readIQ(filename):
 
     return bmode, iq, digitizingRateHz, numSamplesDrOut, decimationFactor
 
-def canonParser(imgPath: str, refPath: str):
+def canonIqParser(imgPath: str, refPath: str):
     imgInfo, refInfo, imgData, refData = getData(imgPath, refPath)
     return imgData, imgInfo, refData, refInfo
 
