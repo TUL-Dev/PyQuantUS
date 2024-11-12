@@ -328,7 +328,7 @@ def getData(imgPath: str, phantomPath: str):
     
     return imgInfo, refInfo, imgData, refData
 
-def readFileImg(Info: InfoStruct, focus, imgPath: str):
+def readFileImg(info: InfoStruct, focus, imgPath: str):
     file_obj = open(imgPath, 'rb')
     FileHeader = readHeader(imgPath)
     if Path(imgPath).name == 'uri_SpV2232_VpF512_FpA90_20210129103529.rfd':
@@ -350,20 +350,24 @@ def readFileImg(Info: InfoStruct, focus, imgPath: str):
             bmode[frame,:,i] = 20*np.log10(abs(hilbert(echoData[frame,:,i])))
 
     modeIM = echoData
-    Info.axialRes = (1/(Info.samplingFrequency*2))*1540 # speed of sound in tissue
-    Info.axialRes *= 1000 # m -> mm
-    Info.lateralRes = 10/Info.lineDensity
-    Info.width = Info.lateralRes*bmode.shape[2] # mm
-    Info.depth = Info.axialRes*bmode.shape[1] # mm
-    Info.clipFact = 0.95
-    Info.dynRange = 55
+    info.axialRes = (1/(info.samplingFrequency*2))*1540 # speed of sound in tissue
+    info.axialRes *= 1000 # m -> mm
+    info.lateralRes = 10/info.lineDensity
+    info.width = info.lateralRes*bmode.shape[2] # mm
+    info.depth = info.axialRes*bmode.shape[1] # mm
+    info.clipFact = 0.95
+    info.dynRange = 55
+    info.minFrequency = 2000000
+    info.maxFrequency = 13000000
+    info.lowBandFreq = 4500000
+    info.upBandFreq = 9500000
 
     Data = DataOutputStruct()
     Data.rf = modeIM
     Data.bMode = bmode
     Data.widthPixels = bmode.shape[2]
     Data.depthPixels = bmode.shape[1]
-    return Data, Info
+    return Data, info
 
 
 def splitData(imgData, focus):
