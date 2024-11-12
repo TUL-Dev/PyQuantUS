@@ -45,10 +45,10 @@ def getData(filepath: Path, refpath: Path, AnalysisParams: AnalysisParamsStruct)
 
 def readFileInfo():   
     Info = InfoStruct()
-    Info.minFrequency = 3000000
-    Info.maxFrequency = 15000000
-    Info.lowBandFreq = 1000000
-    Info.upBandFreq = 6000000
+    Info.minFrequency = 2000000
+    Info.maxFrequency = 8000000
+    Info.lowBandFreq = 3000000
+    Info.upBandFreq = 7000000
     Info.centerFrequency = 9000000 #Hz
     Info.depthOffset = 0.04 # probeStruct.transmitoffset
     Info.depth = 0.16 #m
