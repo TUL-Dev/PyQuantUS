@@ -320,8 +320,8 @@ def readImg(filename: str, tgc_path: str, info_path: str, version="6.0.3", isPha
 
     info.yResRF =  info.endDepth1*1000 / scBmodeStruct.scArr.shape[0]
     info.xResRF = info.yResRF * (scBmodeStruct.scArr.shape[0]/scBmodeStruct.scArr.shape[1]) # placeholder
-    info.yRes = hCm1*10 / scBmodeStruct.scArr.shape[0]
-    info.xRes = wCm1*10 / scBmodeStruct.scArr.shape[1]
+    info.axialRes = hCm1*10 / scBmodeStruct.scArr.shape[0]
+    info.lateralRes = wCm1*10 / scBmodeStruct.scArr.shape[1]
     info.depth = hCm1*10 #mm
     info.width = wCm1*10 #mm
 
