@@ -101,10 +101,10 @@ class SpectralAnalysis:
                     newWindow.bottom = int(axial[axialInd + axialPixSize - 1])
                     self.roiWindows.append(newWindow)
     
-    def computeSpecWindows(self):
+    def computeSpecWindows(self) -> int:
         if not len(self.roiWindows):
             print("Run 'generateRoiWindows' first")
-            return
+            return -1
     
         fs = self.config.samplingFrequency
         f0 = self.config.transducerFreqBand[0]
@@ -146,6 +146,8 @@ class SpectralAnalysis:
         self.backScatterCoef = self.computeBackscatterCoefficient(imgWindow, refWindow)
         self.nakagamiParams = self.computeNakagamiParams(imgWindow, refWindow) # computing for entire ROI, but could also be easily computed for each window
         self.effectiveScattererDiameter, self.effectiveScattererConcentration = self.computeEsdac(imgWindow, refWindow, apertureRadiusCm=6)
+        
+        return 0
 
     def computeAttenuationCoef(self, rfData, refRfData, verasonics=False):
         samplingFrequency = self.config.samplingFrequency
