@@ -21,7 +21,7 @@ jobs:
           pip install sphinx furo
       - name: Sphinx build
         run: |
-          sphinx-build docs docs/build/html
+          sphinx-build docs/source docs/build/html
           cp docs/source/transducer.png docs/build/html/_images/transducer.png
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
