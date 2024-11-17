@@ -14,7 +14,9 @@ release = '1.0'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['sphinx.ext.duration', 'sphinx.ext.intersphinx']
+extensions = [
+    'sphinx.ext.duration', 'sphinx.ext.intersphinx',
+    'sphinx.ext.githubpages']
 extensions.append("sphinx_wagtail_theme")
 
 templates_path = ['_templates']
@@ -24,7 +26,7 @@ html_sidebars = {"**": [
     "globaltoc.html"
 ]}
 exclude_patterns = []
-html_baseurl = 'https://tul-dev.github.io/QuantUS/'
+html_baseurl = 'https://tul-dev.github.io/PyQuantUS/'
 
 
 
@@ -35,10 +37,10 @@ html_theme = 'sphinx_wagtail_theme'
 html_theme_options = dict( # Wagtail
     project_name = "QuantUS",
     logo = "../_images/transducer.png",
-    github_url = "https://github.com/TUL-Dev/QuantUS/blob/main/docs/source/",
+    github_url = "https://github.com/TUL-Dev/PyQuantUS/blob/main/docs/source/",
     logo_alt = "QuantUS",
     logo_height = 59,
-    logo_url = "/QuantUS/",
+    logo_url = "/PyQuantUS/",
     logo_width = 45,
     # header_links = "Top 1|http://example.com/one, Top 2|http://example.com/two",
     footer_links = ",".join([
