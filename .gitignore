@@ -5,3 +5,4 @@ dist/
 *.egg-info/
 fixed_wheels/
 .vscode/
+.DS_Store
