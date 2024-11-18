@@ -18,12 +18,11 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -e .
-          pip install sphinx furo sphinx_rtd_theme
+          pip install sphinx sphinx_rtd_theme
       - name: Sphinx build
         run: |
           sphinx-apidoc --output-dir docs/source pyquantus/ --separate
           sphinx-build docs/source docs/build/html
-          cp docs/source/transducer.png docs/build/html/_images/transducer.png
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
