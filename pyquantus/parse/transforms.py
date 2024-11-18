@@ -1,10 +1,12 @@
 import numpy as np
 from numpy.matlib import repmat
+import scipy.signal as ssg    
+from typing import Tuple
 
 from pyquantus.parse.objects import OutImStruct
 
 def iqToRf(iqData, rxFrequency, decimationFactor, carrierFrequency):
-    import scipy.signal as ssg    
+    """Convert IQ data to RF data."""
     iqData = ssg.resample_poly(iqData, decimationFactor, 1) # up-sample by decimation factor
     rfData = np.zeros(iqData.shape)
     t = [i*(1/rxFrequency) for i in range(iqData.shape[0])]
@@ -12,21 +14,22 @@ def iqToRf(iqData, rxFrequency, decimationFactor, carrierFrequency):
         rfData[:,i] = np.real(np.multiply(iqData[:,i], np.exp(1j*(2*np.pi*carrierFrequency*np.transpose(t)))))
     return rfData
 
-def scanConvert(inIm, width, tilt, startDepth, stopDepth, desiredHeight=500):
-    # ScanConvert sector image
-    # Inputs:
-    #      InIm          Input image
-    #      Width         Sector width of input image in degrees 
-    #      Tilt          Tilt of sector image in degrees  
-    #      StartDepth    Axial depth of first sample in meters 
-    #      EndDepth      Axial depth of last sample in meters   
-    #      DesiredHeight Desired vertical size of output image in pixels 
-    #      (default 500)
-    # 
-    #    Outputs:
-    #      OutIm         Output (scanconverted) image(s)  
-    #      HCm,WCm       Height and Width of image in centimeters 
-
+def scanConvert(inIm: np.ndarray, width: float, tilt: float, startDepth: float, stopDepth: float,
+                desiredHeight=500) -> Tuple[OutImStruct, float, float]:
+    """ScanConvert sector image
+    
+    Args:
+        inIm (np.ndarray): Input image.
+        width (float): Sector width of desired scan conversion image in degrees.
+        tilt (float): Tilt of sector image in degrees.
+        startDepth (float): Axial depth of first sample in meters.
+        stopDepth (float): Axial depth of last sample in meters.
+        desiredHeight (int): Desired vertical size of output image in pixels (default 500).
+        
+    Returns:
+        OutImStruct, float, float: Output image, height, and width in centimeters.
+    """
+    
     #Convert to radians
     samples, beams = inIm.shape
     depthIncrement = (stopDepth-startDepth)/(samples - 1)

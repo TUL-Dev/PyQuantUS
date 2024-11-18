@@ -5,6 +5,7 @@ import yaml
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.signal import hilbert
+from typing import Tuple
 
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
 from pyquantus.parse.transforms import scanConvert
@@ -18,7 +19,16 @@ class ClariusInfo(InfoStruct):
         self.sampleSize: int # bytes
 
 
-def read_tgc_file(file_timestamp, rf_timestamps):
+def read_tgc_file(file_timestamp: str, rf_timestamps: np.ndarray) -> list | None:
+    """Read TGC file and extract TGC data for inputted file.
+
+    Args:
+        file_timestamp (str): Timestamp of the inputted RF file.
+        rf_timestamps (np.ndarray): Given RF timestamps.
+
+    Returns:
+        list | None: Extracted TGC data corresponding to the RF timestamps, or None if the TGC file is not found.
+    """
     tgc_file_name_dottgc = file_timestamp + "_env.tgc"
     tgc_file_name_dotyml = file_timestamp + "_env.tgc.yml"
 
@@ -55,14 +65,25 @@ def read_tgc_file(file_timestamp, rf_timestamps):
 
 
 def clean_and_convert(value):
+    """Clean and convert a string value to a float."""
     clean_value = ''.join([char for char in value if char.isdigit() or char in ['.', '-']])
     return float(clean_value)
 
 def extract_tgc_data_from_line(line):
+    """Extract TGC data from a line."""
     tgc_pattern = r'\{([^}]+)\}'
     return re.findall(tgc_pattern, line)
 
 def read_tgc_file_v2(tgc_path, rf_timestamps):
+    """Read TGC file and extract TGC data for inputted file.
+    
+    Args:
+        tgc_path (str): Path to the TGC file.
+        rf_timestamps (np.ndarray): Given RF timestamps.
+        
+    Returns:
+        list | None: Extracted TGC data corresponding to the RF timestamps, or None if no corresponding data is found.
+    """
     with open(tgc_path, 'r') as file:
         data_str = file.read()
     
@@ -110,7 +131,16 @@ def read_tgc_file_v2(tgc_path, rf_timestamps):
 
     return filtered_frames_data
 
-def generate_default_tgc_matrix(num_frames, info: ClariusInfo):
+def generate_default_tgc_matrix(num_frames: int, info: ClariusInfo) -> np.ndarray:
+    """Generate a default TGC matrix for the inputted number of frames and Clarius file metadata.
+    
+    Args:
+        num_frames (int): Number of frames.
+        info (ClariusInfo): Clarius file metadata.
+        
+    Returns:
+        numpy.ndarray: Default TGC matrix.
+    """
     # image_depth_mm = 150
     # num_samples = 2928
     image_depth_mm = info.endDepth1
@@ -145,7 +175,21 @@ def generate_default_tgc_matrix(num_frames, info: ClariusInfo):
 
     return linear_default_tgc_matrix_transpose
 
-def generate_tgc_matrix(file_timestamp, tgc_path, rf_timestamps, num_frames, info: InfoStruct, isPhantom):
+def generate_tgc_matrix(file_timestamp: str, tgc_path: str, rf_timestamps: np.ndarray, num_frames: int, 
+                        info: InfoStruct, isPhantom: bool) -> np.ndarray:
+    """Generate a TGC matrix for the inputted file timestamp, TGC path, RF timestamps, number of frames, and Clarius file metadata.
+
+    Args:
+        file_timestamp (str): Timestamp of the inputted RF file.
+        tgc_path (str): Path to the TGC file.
+        rf_timestamps (np.ndarray): Given RF timestamps.
+        num_frames (int): Number of frames.
+        info (InfoStruct): Clarius file metadata.
+        isPhantom (bool): Indicates if the data is phantom (True) or patient data (False).
+
+    Returns:
+        np.ndarray: TGC matrix.
+    """
     # image_depth_mm = 150
     # num_samples = 2928
     image_depth_mm = info.endDepth1
@@ -207,7 +251,8 @@ def convert_env_to_rf_ntgc(x, linear_tgc_matrix):
     y = y / linear_tgc_matrix
     return y 
 
-def readImg(filename: str, tgc_path: str, info_path: str, version="6.0.3", isPhantom=False):
+def readImg(filename: str, tgc_path: str, info_path: str, 
+            version="6.0.3", isPhantom=False) -> Tuple[DataOutputStruct, ClariusInfo]:
     """Read RF data contained in Clarius file
     Args:
         filename (string)): where is the Clarius file
@@ -215,7 +260,7 @@ def readImg(filename: str, tgc_path: str, info_path: str, version="6.0.3", isPha
         isPhantom (bool, optional): indicated if it is phantom (True) or patient data (False)
 
     Returns:
-        numpy.ndarray: Corrected RF data processed from RF data contained in filename (depth: 2928, width: 192, nframes)
+        Tuple: Corrected RF data processed from RF data contained in filename and as well as metadata
     """
 
     if version != "6.0.3":
@@ -334,7 +379,22 @@ def readImg(filename: str, tgc_path: str, info_path: str, version="6.0.3", isPha
     return data, info
 
 def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str, 
-            phantomFilename: str, phantomTgcFilename: str, phantomInfoFilename: str, version="6.0.3"):
+            phantomFilename: str, phantomTgcFilename: str, phantomInfoFilename: str, 
+            version="6.0.3") -> Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo]:
+    """Parse Clarius RF data and metadata from inputted files.
+
+    Args:
+        imgFilename (str): File path of the RF data.
+        imgTgcFilename (str): File path of the TGC data.
+        infoFilename (str): File path of the metadata.
+        phantomFilename (str): File path of the phantom RF data.
+        phantomTgcFilename (str): File path of the phantom TGC data.
+        phantomInfoFilename (str): File path of the phantom metadata.
+        version (str, optional): Defaults to "6.0.3".
+
+    Returns:
+        Tuple: Image data, image metadata, phantom data, and phantom metadata.
+    """
     imgData, imgInfo = readImg(imgFilename, imgTgcFilename, infoFilename, version, isPhantom=False)
     refData, refInfo = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
     return imgData, imgInfo, refData, refInfo

@@ -1,9 +1,22 @@
 import numpy as np
+from typing import Tuple
 from numpy.matlib import repmat
 
 NUM_FOURIER_POINTS = 8192
 
-def computeHanningPowerSpec(rfData, startFrequency, endFrequency, samplingFrequency):
+def computeHanningPowerSpec(rfData: np.ndarray, startFrequency: int, endFrequency: int, 
+                            samplingFrequency: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Compute the power spectrum of the RF data using a Hanning window.
+
+    Args:
+        rfData (np.ndarray): RF data from the ultrasound image.
+        startFrequency (int): lower bound of the frequency range (Hz).
+        endFrequency (int): upper bound of the frequency range (Hz).
+        samplingFrequency (int): sampling frequency of the RF data (Hz).
+
+    Returns:
+        Tuple: frequency range and power spectrum.
+    """
     # Create Hanning Window Function
     unrmWind = np.hanning(rfData.shape[0])
     windFuncComputations = unrmWind * np.sqrt(len(unrmWind) / sum(np.square(unrmWind)))
@@ -28,7 +41,19 @@ def computeHanningPowerSpec(rfData, startFrequency, endFrequency, samplingFreque
     return freqChop, ps
 
 
-def spectralAnalysisDefault6db(npsNormalized, f, db6LowF, db6HighF):
+def spectralAnalysisDefault6db(npsNormalized: np.ndarray, f: np.ndarray, 
+                               db6LowF: int, db6HighF: int) -> Tuple[float, np.ndarray, np.ndarray, np.ndarray]:
+    """Perform spectral analysis on the normalized power spectrum.
+    
+    Args:
+        npsNormalized (np.ndarray): normalized power spectrum.
+        f (np.ndarray): frequency array (Hz).
+        db6LowF (int): lower bound of the 6dB window (Hz).
+        db6HighF (int): upper bound of the 6dB window (Hz).
+        
+    Returns:
+        Tuple: midband fit, frequency range, linear fit, and linear regression coefficients.
+    """
     # 1. in one scan / run-through of data file's f array, find the data points on
     # the frequency axis closest to reference file's 6dB window's LOWER bound and UPPER bounds
     smallestDiffDb6LowF = 999999999
@@ -55,24 +80,12 @@ def spectralAnalysisDefault6db(npsNormalized, f, db6LowF, db6HighF):
     )
     npsLinfit = np.polyval(p, fBand)  # y_linfit is a column vecotr
 
-    # # Compute linear regression residuals
-    # npsResid = (
-    #     npsNormalized[smallestDiffIndexDb6LowF:smallestDiffIndexDb6HighF] - npsLinfit
-    # )
-    # npsSsResid = sum(np.square(npsResid))
-    # npsSsTotal = (len(npsNormalized - 1)) * np.var(npsNormalized)
-    # rsqu = 1 - (npsSsResid / npsSsTotal)
-
-    # # Compute spectral parameters
-    # ib = 0
-    # for i in range(smallestDiffIndexDb6LowF, smallestDiffIndexDb6HighF):
-    #     ib += npsNormalized[i] * i
-
     mbfit = p[0] * fBand[round(fBand.shape[0] / 2)] + p[1]
 
     return mbfit, fBand, npsLinfit, p #, rsqu, ib
 
 def int32torgb(color):
+    """Convert int32 to rgb tuple"""
     rgb = []
     for _ in range(3):
         rgb.append(color&0xff)

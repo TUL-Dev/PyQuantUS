@@ -3,6 +3,8 @@ from typing import List
 import numpy as np
 
 class SpectralResults:
+    """Class to store analysis results from QUS analysis of an image.
+    """
     def __init__(self):
         self.mbf: float  # midband fit
         self.ss: float  # spectral slope
@@ -14,6 +16,8 @@ class SpectralResults:
         self.f: np.ndarray  # frequency array
 
 class Window:
+    """Class to store window data for QUS analysis.
+    """
     def __init__(self):
         self.left: int 
         self.right: int 
@@ -22,6 +26,8 @@ class Window:
         self.results = SpectralResults()
 
 class AnalysisConfig:
+    """Class to store configuration data for QUS analysis.
+    """
     def __init__(self):
         self.transducerFreqBand: List[int]  # [min, max] (Hz)
         self.analysisFreqBand: List[int]  # [lower, upper] (Hz)
@@ -34,6 +40,8 @@ class AnalysisConfig:
         self.centerFrequency: float  # Hz
 
 class UltrasoundImage:
+    """Class to store ultrasound image and RF data.
+    """
     def __init__(self):
         self.scBmode: np.ndarray # rgb
         self.bmode: np.ndarray # rgb

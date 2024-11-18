@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy.signal import hilbert
+from typing import Tuple
 
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
 
@@ -309,7 +310,16 @@ class FileHeaderStruct():
         self.frh0 = None
 
 
-def siemensRfParser(imgPath: str, phantomPath: str):
+def siemensRfParser(imgPath: str, phantomPath: str) -> Tuple[DataOutputStruct, InfoStruct, DataOutputStruct, InfoStruct]:
+    """Parse Siemens RF data. Entry-point of entire parser.
+    
+    Args:
+        imgPath (str): The file path of the Siemens RF data.
+        phantomPath (str): The file path of the Siemens RF phantom data.
+        
+    Returns:
+        Tuple: Image data, image info, phantom data, and phantom info.
+    """
 
     imgInfo, refInfo, imgData, refData = getData(imgPath, phantomPath)
 
@@ -319,6 +329,15 @@ def siemensRfParser(imgPath: str, phantomPath: str):
     return bmode, imgData, imgInfo, refData, refInfo
 
 def getData(imgPath: str, phantomPath: str):
+    """Get the image and phantom data.
+    
+    Args:
+        imgPath (str): The file path of the Siemens RF data.
+        phantomPath (str): The file path of the Siemens RF phantom data.
+        
+    Returns:
+        Tuple: Image info, phantom info, image data, and phantom data.
+    """
     focus = 0 # hard-coded for now
     imgInfo = readFileInfo(imgPath)
     [imgData, imgInfo] = readFileImg(imgInfo, focus, imgPath)
@@ -328,7 +347,17 @@ def getData(imgPath: str, phantomPath: str):
     
     return imgInfo, refInfo, imgData, refData
 
-def readFileImg(info: InfoStruct, focus, imgPath: str):
+def readFileImg(info: InfoStruct, focus: int, imgPath: str) -> Tuple[DataOutputStruct, InfoStruct]:
+    """Read Siemens RF data and parse it.
+
+    Args:
+        info (InfoStruct): Siemens RF file metadata
+        focus (int): focus mode of the data
+        imgPath (str): The file path of the Siemens RF data.
+
+    Returns:
+        Tuple: Image data and image metadata.
+    """
     file_obj = open(imgPath, 'rb')
     FileHeader = readHeader(imgPath)
     if Path(imgPath).name == 'uri_SpV2232_VpF512_FpA90_20210129103529.rfd':
@@ -371,6 +400,7 @@ def readFileImg(info: InfoStruct, focus, imgPath: str):
 
 
 def splitData(imgData, focus):
+    """Split the data into two channels based on the focus mode."""
     newData = np.zeros((imgData.shape[0], imgData.shape[1], int(imgData.shape[2]/2)))
     if focus == 1:
         for i in range(0, int(imgData.shape[2]), 2):
@@ -406,6 +436,7 @@ def extractFrameData(file_obj, FileHeader, frameNum):
     return tmp, tmp2
 
 def readFileInfo(filepath):
+    """Read values for Siemens RF file metadata."""
     FileHeader = readHeader(filepath)
 
     # Add final parameters to info struct

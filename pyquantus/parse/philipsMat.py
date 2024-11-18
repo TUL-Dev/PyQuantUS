@@ -8,42 +8,32 @@ import numpy as np
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
 from pyquantus.parse.transforms import scanConvert
 
-class AnalysisParamsStruct():
-    def __init__(self, frame):
-        self.frame = frame
-        self.t_tilt= 0
-        self.t_width = 70
-        self.startDepth = 0.04
-        self.endDepth = 0.16
-        self.endHeight = 500
-        self.clip_fact = 0.95
-        self.dyn_range = 55
-        self.depth = 0.16
-        self.width = 0.265
-        self.frame = frame
-
 
 def philips2dRfMatParser(filepath: str, refpath: str, frame: int) \
         -> Tuple[DataOutputStruct, InfoStruct, DataOutputStruct, InfoStruct]:
-    AnalysisParams = AnalysisParamsStruct(frame)
-
-    [ImgInfo, RefInfo, ImgData, RefData] = getData(Path(filepath), Path(refpath), AnalysisParams)
+    """Parse Philips 2D RF data from a .mat file.
     
-    return ImgData, ImgInfo, RefData, RefInfo
+    Args:
+        filepath (str): The file path of the Philips 2D RF data.
+        refpath (str): The file path of the reference data.
+        frame (int): The frame number.
+        
+    Returns:
+        Tuple: The image data, image metadata, reference data, and reference metadata.
+    """
 
-
-def getData(filepath: Path, refpath: Path, AnalysisParams: AnalysisParamsStruct):
     input = loadmat(filepath.__str__())
     ImgInfo = readFileInfo()
-    [ImgData, ImgInfo] = readFileImg(ImgInfo, AnalysisParams.frame, input)
+    ImgData, ImgInfo = readFileImg(ImgInfo, frame, input)
 
     input = loadmat(refpath.__str__())
     RefInfo = readFileInfo()
-    [RefData, RefInfo] = readFileImg(RefInfo, AnalysisParams.frame, input)
+    RefData, RefInfo = readFileImg(RefInfo, frame, input)
 
-    return [ImgInfo, RefInfo, ImgData, RefData]
+    return ImgInfo, RefInfo, ImgData, RefData
 
-def readFileInfo():   
+def readFileInfo() -> InfoStruct:  
+    """Read default metadata values for a Philips 2D RF data.""" 
     Info = InfoStruct()
     Info.minFrequency = 2000000
     Info.maxFrequency = 8000000
@@ -69,7 +59,17 @@ def readFileInfo():
 
     return Info
 
-def readFileImg(Info: InfoStruct, frame: int, input):
+def readFileImg(Info: InfoStruct, frame: int, input) -> Tuple[DataOutputStruct, InfoStruct]:
+    """Read Philips 2D RF data, parse it, and complete scan conversion.
+    
+    Args:
+        Info (InfoStruct): Philips 2D RF data metadata.
+        frame (int): The frame number.
+        input: The .mat file data.
+        
+    Returns:
+        Tuple: The image data and image metadata.
+    """
     echoData = input["rf_data_all_fund"]# indexing works by frame, angle, image
     while not(len(echoData[0].shape) > 1 and echoData[0].shape[0]>40 and echoData[0].shape[1]>40):
         echoData = echoData[0]

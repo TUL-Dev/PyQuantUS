@@ -1,10 +1,19 @@
 import numpy as np
 from scipy.io import loadmat
 from scipy.signal import hilbert
+from typing import Tuple
 
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
 
-def readFileInfo(path):
+def readFileInfo(path: str) -> Tuple[InfoStruct, float, np.ndarray, np.ndarray]:
+    """Reads the metadata and RF data from a Terason .mat file.
+    
+    Args:
+        path (str): Path to the .mat file.
+        
+    Returns:
+        Tuple[InfoStruct, float, np.ndarray, np.ndarray]: Metadata, focal depth, and RF data.
+    """
     input = loadmat(path)
     b_data_Zone1 = np.array(input["b_data_Zone1"])
     b_data_Zone2 = np.array(input["b_data_Zone2"])
@@ -26,7 +35,20 @@ def readFileInfo(path):
 
     return Info, focalDepthZone0, b_data_Zone1, b_data_Zone2
 
-def readFileImg(b_data_Zone1, b_data_Zone2, focalDepthZone0, OmniOn, Info: InfoStruct):
+def readFileImg(b_data_Zone1: np.ndarray, b_data_Zone2: np.ndarray, focalDepthZone0: float, 
+                OmniOn: int, Info: InfoStruct) -> Tuple[DataOutputStruct, InfoStruct]:
+    """Reads the RF data and adds to scan metadata.
+    
+    Args:
+        b_data_Zone1 (np.ndarray): RF data from zone 1.
+        b_data_Zone2 (np.ndarray): RF data from zone 2.
+        focalDepthZone0 (float): Focal depth of zone 0.
+        OmniOn (int): Whether the Omni is on.
+        Info (InfoStruct): RF Scan Metadata.
+        
+    Returns:
+        Tuple[DataOutputStruct, InfoStruct]: RF data and metadata.
+    """   
     # Blend the zones overlap
     M, N = b_data_Zone1.shape
     if OmniOn == 1:
@@ -67,7 +89,18 @@ def readFileImg(b_data_Zone1, b_data_Zone2, focalDepthZone0, OmniOn, Info: InfoS
     return Data, Info
 
 
-def terasonRfParser(filePath, phantomPath, OmniOn=1):
+def terasonRfParser(filePath: str, phantomPath: str, OmniOn=1) \
+    -> Tuple[DataOutputStruct, InfoStruct, DataOutputStruct, InfoStruct]:
+    """Parses Terason RF data and metadata take with two focal zones.
+    
+    Args:
+        filePath (str): Path to the RF data.
+        phantomPath (str): Path to the phantom data.
+        OmniOn (int): Whether the Omni is on.
+    
+    Returns:
+        Tuple: RF data and metadata for image and phantom.
+    """
     # Credit: Steven R. Broadstone, D.Sc., Teratech Corporation dba Terason
     # Parser inspired by MATLAB code writen by Steven
     # Written to parse RF data taken with two focal zones

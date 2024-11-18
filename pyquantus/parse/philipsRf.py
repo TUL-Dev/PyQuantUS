@@ -10,16 +10,8 @@ from scipy.io import savemat
 from philipsRfParser import getPartA, getPartB
 
 
-class Parsed_result:
-    def __init__(self):
-        self.rfData = None
-        self.NumFrame = None
-        self.pt = None
-        self.multilinefactor = None
-        self.NumSonoCTAngles = None
-        self.txBeamperFrame = None
-
 class HeaderInfoStruct:
+    """Philips-specific structure containing information from the headers."""
     def __init__(self):
         self.RF_CaptureVersion: list
         self.Tap_Point: list
@@ -42,6 +34,7 @@ class HeaderInfoStruct:
         self.RF_Sample_Rate: list
 
 class dbParams:
+    """Philips-specific structure containing signal properties of the scan."""
     def __init__(self):
         self.acqNumActiveScChannels2d: list
         self.azimuthMultilineFactorXbrOut: list
@@ -68,6 +61,7 @@ class dbParams:
         self.tapPoint: list
 
 class Rfdata:
+    """Philips-specific structure containing donstructed RF data."""
     def __init__(self):
         self.lineData: np.ndarray # Array containing interleaved line data (Data x XmitEvents)
         self.lineHeader: np.ndarray # Array containing qualifier bits of the interleaved line data (Qualifiers x XmitEvents)
@@ -93,7 +87,6 @@ def callGetPartB(numClumps: int, filename: str, offset: int) -> np.ndarray:
     return partB
 
 def pruneData(lineData, lineHeader, ML_Capture):
-
     # Remove false gate data at beginning of the line
     numSamples = lineData.shape[0]
     referenceLine = int(np.ceil(lineData.shape[1]*0.2))-1    
@@ -133,7 +126,6 @@ def pruneData(lineData, lineHeader, ML_Capture):
     return prunedData
 
 def SortRF(RFinput, Stride, ML, CRE=1, isVoyager=True):
-
     # Initialize default parameters
     N = RFinput.shape[0]
     xmitEvents = RFinput.shape[1]
@@ -231,7 +223,6 @@ def SortRF(RFinput, Stride, ML, CRE=1, isVoyager=True):
      
 
 def parseDataF(rawrfdata, headerInfo):
-
     # Definitions
     minNeg = 2**18 # Used to convert integers to 2's complement
 
@@ -613,6 +604,7 @@ def parseFileHeader(file_obj, endianness):
 
 
 def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
+    """Open and parse RF data file"""
     # Remember to make sure .c files have been compiled before running
 
     rfdata = Rfdata()
@@ -961,7 +953,8 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
     return rfdata
 
 
-def philipsRfParser(filepath, ML_out=2, ML_in=32, used_os=2256):
+def philipsRfParser(filepath: str, ML_out=2, ML_in=32, used_os=2256) -> np.ndarray:
+    """Parse Philips RF data file, save as .mat file, and return shape of data."""
     rf = parseRF(filepath, 0, 2000)
 
     if (rf.headerInfo.Line_Index[249] == rf.headerInfo.Line_Index[250]):
