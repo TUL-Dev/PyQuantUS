@@ -8,7 +8,6 @@ Note it also suffices to follow the `README`_ for our repository as it contains 
 .. toctree::
     :maxdepth: 2
 
-    requirements
     environment
     building
     running
