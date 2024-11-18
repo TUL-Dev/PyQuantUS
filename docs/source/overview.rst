@@ -18,10 +18,12 @@ The QUS feature of QuantUS also supports a CLI for Terason and Canon transducers
 .. _scCanonQus.ipynb: https://github.com/TUL-DEV/QuantUS/blob/main/CLI-Demos/scCanonQus.ipynb
 .. _terasonQus.ipynb: https://github.com/TUL-DEV/QUantUS/blob/main/CLI-Demos/terasonQus.ipynb
 .. _El Kaffas et al.: https://pubmed.ncbi.nlm.nih.gov/26233222/
-.. image:: mbfSc.png
+.. image:: paramapIllustration.png
    :width: 600
    :alt: MBF Parametric Map Example
    :align: center
+
+|
 
 DCE-US Overview
 ===============
@@ -35,3 +37,5 @@ From here, a lognormal curve is fitted, returning the area under the curve (AUC)
    :width: 600
    :alt: 3D DCE-US Parametric Map Example
    :align: center
+
+|

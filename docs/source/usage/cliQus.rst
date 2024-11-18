@@ -198,11 +198,9 @@ creates a large single window instead of a detailed parametric map.
 
 Examples of sample outputted visualizations from this pipeline are below.
 
-+-----------------------------------------+-----------------------------------------+------------------------------------------------+
-| .. figure:: scSingleWindow.png          | .. figure:: scMultiWindow.png           | .. figure:: psGraph.png                        |
-|   :alt: Scan converted single window    |   :alt: Scan converted multi-window map |   :alt: Power spectrum graph                   |
-|   :width: 240px                         |   :width: 500px                         |                                                |
-|                                         |                                         |                                                |
-|   Scan converted parametric map with    |   Scan converted parametric map with    |   This annotated power spectrum graph          |
-|   single window from the above example. |   multiple windows.                     |   was used to perform spectral analysis above. |
-+-----------------------------------------+-----------------------------------------+------------------------------------------------+
+.. image:: cliResults.png
+    :alt: Scan converted single window results
+    :width: 750
+    :align: center
+
+|

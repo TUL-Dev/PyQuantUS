@@ -12,5 +12,5 @@ This dataset can be installed locally using our Python virtual environment. Spec
 
 .. code-block:: shell
 
-   [conda activate QuantUS-env | source venv/bin/activate | call venv\Scripts\activate.bat]
+   [source venv/bin/activate | call venv\Scripts\activate.bat]
    python sampleData.py
