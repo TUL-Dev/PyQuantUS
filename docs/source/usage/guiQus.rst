@@ -11,9 +11,9 @@ For reference, the sample data used in this example can be found here.
 Image Selection
 ===============
 
-After opening the QuantUS GUI, we can begin by selecting **Quantitative Ultrasound Spectroscopy (QUS)** from the main menu.
-From here, we can select the **Canon IQ** button to choose the appropriate parser for this set of analysis.
-Once inputting the image and phantom data file path, click **Generate Image** to parse the data.
+After opening the QuantUS GUI, we can begin by selecting `Quantitative Ultrasound Spectroscopy (QUS)` from the main menu.
+From here, we can select the `Canon IQ` button to choose the appropriate parser for this set of analysis.
+Once we input the image and phantom data file path, we click `Generate Image` to parse the data.
 
 After the ultrasound parser loads, the image will be displayed in the main window, as shown below.
 

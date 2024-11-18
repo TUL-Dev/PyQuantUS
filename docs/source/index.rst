@@ -30,7 +30,7 @@ Getting Started
 
 .. toctree::
    :caption: Overview
-   :maxdepth: 1
+   :maxdepth: 2
    
    overview
    usage/index

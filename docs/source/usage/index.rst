@@ -7,4 +7,5 @@ Examples
 
     cliQus
     guiQus
-    guiDceus
+    guiDceus2d
+    guiDceus3d

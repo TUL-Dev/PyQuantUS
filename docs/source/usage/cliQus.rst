@@ -172,7 +172,8 @@ location of our image.
     scConfig.endDepth = imgInfoStruct.endDepth1
 
 From here, we can display our results in the form of a parametric map on our initial image. 
-As specified in the :ref:`Analysis Parameters for QUS Parameterization`, this analysis only 
+As specified in the `Analysis Parameters for QUS Parameterization` section of this page, we choose a large enough
+axial and lateral window size with a small enough window threshold such that this analysis only 
 creates a large single window instead of a detailed parametric map.
 
 .. code-block:: python
