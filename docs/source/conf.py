@@ -69,6 +69,11 @@ html_context = {
 #     ]),
 # )
 
+html_logo = "logo.png"
+html_theme_options = {
+    'logo_only': True,
+    'display_version': False,
+}
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 html_last_updated_fmt = "%b %d, %Y"
