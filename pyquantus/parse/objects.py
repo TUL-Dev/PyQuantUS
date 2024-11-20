@@ -4,7 +4,6 @@ class OutImStruct():
     """Output image structure for scan converted images."""
     def __init__(self):
         self.scArr: np.ndarray
-        self.preScArr: np.ndarray
         self.xmap: np.ndarray # sc (y,x) --> preSC x
         self.ymap: np.ndarray # sc (y,x) --> preSC y
         

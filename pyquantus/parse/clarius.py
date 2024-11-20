@@ -326,6 +326,9 @@ def readImg(filename: str, tgc_path: str, info_path: str,
     info.maxFrequency = info.centerFrequency*2
     info.lowBandFreq = int(info.centerFrequency/2)
     info.upBandFreq = int(info.centerFrequency*1.5)
+    
+    info.clipFact = 0.95
+    info.dynRange = 255
 
     data = data.astype(np.float64)
     file_timestamp = filename.split("_rf.raw")[0]
@@ -374,6 +377,15 @@ def readImg(filename: str, tgc_path: str, info_path: str,
     data.scBmodeStruct = scBmodeStruct
     data.scBmode = scBmodes
     data.bMode = np.transpose(bmode, (2, 0, 1))
+    
+    clippedMax = info.clipFact*np.amax(data.scBmode)
+    scBmode = np.clip(data.scBmode, clippedMax-info.dynRange, clippedMax) * (255/clippedMax)
+    data.scBmode = scBmode
+        
+    clippedMax = info.clipFact*np.amax(data.bMode)
+    bmode = np.clip(data.bMode, clippedMax-info.dynRange, clippedMax) * (255/clippedMax)
+    data.bMode = bmode
+    
     data.rf = np.transpose(rf_atgc, (2, 0, 1))
 
     return data, info

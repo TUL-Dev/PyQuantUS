@@ -111,6 +111,9 @@ def readFileInfo() -> InfoStruct:
     # Scan Convert Settings
     Info.tilt1 = 0
     Info.width1 = 70 #degrees
+    
+    Info.clipFact = 1.2
+    Info.dynRange = 255
 
     return Info
 
@@ -151,9 +154,18 @@ def readFileImg(Info: InfoStruct, filePath: str) -> Tuple[DataOutputStruct, Info
 
     Data = DataOutputStruct()
     Data.scBmodeStruct = scBmodeStruct
-    Data.scBmode = scBmodeStruct.scArr * (255/np.amax(scBmodeStruct.scArr))
+    scBmode = scBmodeStruct.scArr * (255/np.amax(scBmodeStruct.scArr))
     Data.rf = rfData
-    Data.bMode = bmode * (255/np.amax(bmode))
+    bmode *= (255/np.amax(bmode))
+    
+    clippedMax = Info.clipFact*np.amax(bmode)
+    bmode = np.clip(bmode, clippedMax-Info.dynRange, clippedMax) * (255/clippedMax)
+    Data.bMode = bmode
+    
+    clippedMax = Info.clipFact*np.amax(scBmode)
+    scBmode = np.clip(scBmode, clippedMax-Info.dynRange, clippedMax) * (255/clippedMax)
+    Data.scBmodeStruct.scArr = scBmode
+    Data.scBmode = scBmode
 
     return Data, Info
 

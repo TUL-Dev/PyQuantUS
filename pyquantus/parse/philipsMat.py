@@ -30,7 +30,7 @@ def philips2dRfMatParser(filepath: str, refpath: str, frame: int) \
     RefInfo = readFileInfo()
     RefData, RefInfo = readFileImg(RefInfo, frame, input)
 
-    return ImgInfo, RefInfo, ImgData, RefData
+    return ImgData, ImgInfo, RefData, RefInfo
 
 def readFileInfo() -> InfoStruct:  
     """Read default metadata values for a Philips 2D RF data.""" 
@@ -52,6 +52,7 @@ def readFileInfo() -> InfoStruct:
     Info.endDepth1 = 0.16
     Info.endHeight = 500
     Info.clipFact = 0.95
+    Info.dynRange = 255
     
     Info.yResRF = 1
     Info.xResRF = 1
@@ -93,6 +94,15 @@ def readFileImg(Info: InfoStruct, frame: int, input) -> Tuple[DataOutputStruct, 
     Data.scBmodeStruct = scBmodeStruct
     Data.scBmode = scBmodeStruct.scArr
     Data.rf = ModeIM
+    Data.bMode = bmode
+    
+    clippedMax = Info.clipFact*np.amax(Data.scBmode)
+    scBmode = np.clip(Data.scBmode, clippedMax-Info.dynRange, clippedMax) * (255/clippedMax)
+    Data.scBmodeStruct.scArr = scBmode
+    Data.scBmode = scBmode
+        
+    clippedMax = Info.clipFact*np.amax(Data.bMode)
+    bmode = np.clip(Data.bMode, clippedMax-Info.dynRange, clippedMax) * (255/clippedMax)
     Data.bMode = bmode
 
     return Data, Info

@@ -325,6 +325,7 @@ def siemensRfParser(imgPath: str, phantomPath: str) -> Tuple[DataOutputStruct, I
 
     clippedMax = imgInfo.clipFact*np.amax(imgData.bMode)
     bmode = np.clip(imgData.bMode, clippedMax-imgInfo.dynRange, clippedMax) * (255/clippedMax)
+    imgData.bMode = bmode
 
     return bmode, imgData, imgInfo, refData, refInfo
 
