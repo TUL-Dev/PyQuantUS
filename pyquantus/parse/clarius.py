@@ -328,7 +328,7 @@ def readImg(filename: str, tgc_path: str, info_path: str,
     info.upBandFreq = int(info.centerFrequency*1.5)
     
     info.clipFact = 0.95
-    info.dynRange = 255
+    info.dynRange = 50
 
     data = data.astype(np.float64)
     file_timestamp = filename.split("_rf.raw")[0]
@@ -361,7 +361,12 @@ def readImg(filename: str, tgc_path: str, info_path: str,
     bmode = np.zeros_like(rf_atgc)
     for f in range(rf_atgc.shape[2]):
         for i in range(rf_atgc.shape[1]):
-            bmode[:,i, f] = 20*np.log10(abs(hilbert(rf_atgc[:,i, f])))      
+            bmode[:,i, f] = 20*np.log10(abs(hilbert(rf_atgc[:,i, f])))   
+            
+    clippedMax = info.clipFact*np.amax(bmode)
+    bmode = np.clip(bmode, clippedMax-info.dynRange, clippedMax) 
+    bmode -= np.amin(bmode)
+    bmode *= (255/np.amax(bmode))
     
     scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, info.endDepth1, desiredHeight=2000)
     scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, info.endDepth1, desiredHeight=2000)[0].scArr for i in range(rf_atgc.shape[2])])
@@ -377,15 +382,6 @@ def readImg(filename: str, tgc_path: str, info_path: str,
     data.scBmodeStruct = scBmodeStruct
     data.scBmode = scBmodes
     data.bMode = np.transpose(bmode, (2, 0, 1))
-    
-    clippedMax = info.clipFact*np.amax(data.scBmode)
-    scBmode = np.clip(data.scBmode, clippedMax-info.dynRange, clippedMax) * (255/clippedMax)
-    data.scBmode = scBmode
-        
-    clippedMax = info.clipFact*np.amax(data.bMode)
-    bmode = np.clip(data.bMode, clippedMax-info.dynRange, clippedMax) * (255/clippedMax)
-    data.bMode = bmode
-    
     data.rf = np.transpose(rf_atgc, (2, 0, 1))
 
     return data, info

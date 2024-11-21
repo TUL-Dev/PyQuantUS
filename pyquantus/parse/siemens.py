@@ -385,7 +385,7 @@ def readFileImg(info: InfoStruct, focus: int, imgPath: str) -> Tuple[DataOutputS
     info.lateralRes = 10/info.lineDensity
     info.width = info.lateralRes*bmode.shape[2] # mm
     info.depth = info.axialRes*bmode.shape[1] # mm
-    info.clipFact = 0.95
+    info.clipFact = 1
     info.dynRange = 55
     info.minFrequency = 2000000
     info.maxFrequency = 13000000

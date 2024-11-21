@@ -28,6 +28,8 @@ def readFileInfo(path: str) -> Tuple[InfoStruct, float, np.ndarray, np.ndarray]:
     Info.lines = input["NumberOfLines"][0][0]
     Info.depth = input["SectorDepthCM"][0][0] * 10 #mm
     Info.samplingFrequency = input["FPS"][0][0] * 1000000 #Hz
+    Info.clipFact = 1
+    Info.dynRange = 40
 
     focalDepthZone0 = input["FocalDepthZone0"][0][0]
 
@@ -69,8 +71,8 @@ def readFileImg(b_data_Zone1: np.ndarray, b_data_Zone2: np.ndarray, focalDepthZo
     for i in range(rfData.shape[1]):
         bmode[:,i] = 20*np.log10(abs(hilbert(rfData[:,i]))) # type: ignore
 
-    # dynrange of 40
-    bmode = np.clip(bmode, np.amax(bmode)-40, np.amax(bmode))
+    clippedMax = Info.clipFact*np.amax(bmode)
+    bmode = np.clip(bmode, clippedMax-Info.dynRange, clippedMax)
     bmode -= np.amin(bmode)
     bmode *= (255/np.amax(bmode))
 

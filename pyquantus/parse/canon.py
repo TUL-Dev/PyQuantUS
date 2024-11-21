@@ -112,8 +112,8 @@ def readFileInfo() -> InfoStruct:
     Info.tilt1 = 0
     Info.width1 = 70 #degrees
     
-    Info.clipFact = 1.2
-    Info.dynRange = 255
+    Info.clipFact = 1
+    Info.dynRange = 55
 
     return Info
 
@@ -141,7 +141,12 @@ def readFileImg(Info: InfoStruct, filePath: str) -> Tuple[DataOutputStruct, Info
     rfData = iqToRf(iqData, Info.samplingFrequency, decimationFactor, Info.centerFrequency)
     bmode = np.zeros(rfData.shape)
     for i in range(rfData.shape[1]):
-        bmode[:,i] = 20*np.log10(abs(hilbert(rfData[:,i])))           
+        bmode[:,i] = 20*np.log10(abs(hilbert(rfData[:,i])))  
+        
+    clippedMax = Info.clipFact*np.amax(bmode)
+    bmode = np.clip(bmode, clippedMax-Info.dynRange, clippedMax)
+    bmode -= np.amin(bmode)
+    bmode *= (255/np.amax(bmode))     
 
     Info.endDepth1 = Info.depth/1000 #m
     Info.startDepth1 = Info.endDepth1/4 #m
@@ -154,18 +159,10 @@ def readFileImg(Info: InfoStruct, filePath: str) -> Tuple[DataOutputStruct, Info
 
     Data = DataOutputStruct()
     Data.scBmodeStruct = scBmodeStruct
-    scBmode = scBmodeStruct.scArr * (255/np.amax(scBmodeStruct.scArr))
     Data.rf = rfData
-    bmode *= (255/np.amax(bmode))
     
-    clippedMax = Info.clipFact*np.amax(bmode)
-    bmode = np.clip(bmode, clippedMax-Info.dynRange, clippedMax) * (255/clippedMax)
     Data.bMode = bmode
-    
-    clippedMax = Info.clipFact*np.amax(scBmode)
-    scBmode = np.clip(scBmode, clippedMax-Info.dynRange, clippedMax) * (255/clippedMax)
-    Data.scBmodeStruct.scArr = scBmode
-    Data.scBmode = scBmode
+    Data.scBmode = Data.scBmodeStruct.scArr
 
     return Data, Info
 

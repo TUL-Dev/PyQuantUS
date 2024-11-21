@@ -22,11 +22,19 @@ def philips2dRfMatParser(filepath: str, refpath: str, frame: int) \
         Tuple: The image data, image metadata, reference data, and reference metadata.
     """
 
-    input = loadmat(filepath.__str__())
+    try:
+        input = loadmat(filepath.__str__())
+    except NotImplementedError:
+        import mat73
+        input = mat73.loadmat(filepath.__str__())
     ImgInfo = readFileInfo()
     ImgData, ImgInfo = readFileImg(ImgInfo, frame, input)
 
-    input = loadmat(refpath.__str__())
+    try:
+        input = loadmat(refpath.__str__())
+    except NotImplementedError:
+        import mat73
+        input = mat73.loadmat(refpath.__str__())
     RefInfo = readFileInfo()
     RefData, RefInfo = readFileImg(RefInfo, frame, input)
 
@@ -52,7 +60,7 @@ def readFileInfo() -> InfoStruct:
     Info.endDepth1 = 0.16
     Info.endHeight = 500
     Info.clipFact = 0.95
-    Info.dynRange = 255
+    Info.dynRange = 55
     
     Info.yResRF = 1
     Info.xResRF = 1
@@ -83,6 +91,10 @@ def readFileImg(Info: InfoStruct, frame: int, input) -> Tuple[DataOutputStruct, 
         bmode[:,i] = 20*np.log10(abs(hilbert(echoData[:,i]))) # type: ignore
 
     ModeIM = echoData
+    clippedMax = Info.clipFact*np.amax(bmode)
+    bmode = np.clip(bmode, clippedMax-Info.dynRange, clippedMax) 
+    bmode -= np.amin(bmode)
+    bmode *= (255/np.amax(bmode))
 
     scBmodeStruct, hCm1, wCm1 = scanConvert(bmode, Info.width1, Info.tilt1, Info.startDepth1, Info.endDepth1, Info.endHeight.__int__())
     Info.depth = hCm1
@@ -92,17 +104,8 @@ def readFileImg(Info: InfoStruct, frame: int, input) -> Tuple[DataOutputStruct, 
 
     Data = DataOutputStruct()
     Data.scBmodeStruct = scBmodeStruct
-    Data.scBmode = scBmodeStruct.scArr
     Data.rf = ModeIM
-    Data.bMode = bmode
-    
-    clippedMax = Info.clipFact*np.amax(Data.scBmode)
-    scBmode = np.clip(Data.scBmode, clippedMax-Info.dynRange, clippedMax) * (255/clippedMax)
-    Data.scBmodeStruct.scArr = scBmode
-    Data.scBmode = scBmode
-        
-    clippedMax = Info.clipFact*np.amax(Data.bMode)
-    bmode = np.clip(Data.bMode, clippedMax-Info.dynRange, clippedMax) * (255/clippedMax)
+    Data.scBmode = scBmodeStruct.scArr
     Data.bMode = bmode
 
     return Data, Info
