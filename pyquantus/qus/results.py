@@ -100,7 +100,7 @@ class SpectralData:
             self.convertImagesToRGB()
         self.mbfIm = self.spectralAnalysis.ultrasoundImage.bmode.copy()
         self.ssIm = self.mbfIm.copy(); self.siIm = self.ssIm.copy()
-        self.windowIdxMap = np.zeros_like(self.mbfIm).astype(int)
+        self.windowIdxMap = np.zeros((self.mbfIm.shape[0], self.mbfIm.shape[1])).astype(int)
 
         for i, window in enumerate(self.spectralAnalysis.roiWindows):
             mbfColorIdx = int((255 / (self.maxMbf-self.minMbf))*(window.results.mbf-self.minMbf)) if self.minMbf != self.maxMbf else 125
