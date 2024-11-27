@@ -54,9 +54,11 @@ class SpectralData:
         self.mbfIm: np.ndarray
         self.ssIm: np.ndarray
         self.siIm: np.ndarray
+        self.windowIdxMap: np.ndarray
         self.scMbfIm: np.ndarray
         self.scSsIm: np.ndarray
         self.scSiIm: np.ndarray
+        self.scWindowIdxMap: np.ndarray
 
         self.minMbf: float; self.maxMbf: float; self.mbfArr: List[float]
         self.minSs: float; self.maxSs: float; self.ssArr: List[float]
@@ -98,14 +100,16 @@ class SpectralData:
             self.convertImagesToRGB()
         self.mbfIm = self.spectralAnalysis.ultrasoundImage.bmode.copy()
         self.ssIm = self.mbfIm.copy(); self.siIm = self.ssIm.copy()
+        self.windowIdxMap = np.zeros_like(self.mbfIm)
 
-        for window in self.spectralAnalysis.roiWindows:
+        for i, window in enumerate(self.spectralAnalysis.roiWindows):
             mbfColorIdx = int((255 / (self.maxMbf-self.minMbf))*(window.results.mbf-self.minMbf)) if self.minMbf != self.maxMbf else 125
             ssColorIdx = int((255 / (self.maxSs-self.minSs))*(window.results.ss-self.minSs)) if self.minSs != self.maxSs else 125
             siColorIdx = int((255 / (self.maxSi-self.minSi))*(window.results.si-self.minSi)) if self.minSi != self.maxSi else 125
             self.mbfIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.mbfCmap[mbfColorIdx])*255
             self.ssIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.ssCmap[ssColorIdx])*255
             self.siIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.siCmap[siColorIdx])*255
+            self.windowIdxMap[window.top: window.bottom+1, window.left: window.right+1] = i+1
 
     def scanConvertRGB(self, image: np.ndarray) -> np.ndarray:
         """Converts a scan-converted grayscale image to RGB.
@@ -133,6 +137,11 @@ class SpectralData:
         self.scMbfIm = self.scanConvertRGB(self.mbfIm)
         self.scSsIm = self.scanConvertRGB(self.ssIm)
         self.scSiIm = self.scanConvertRGB(self.siIm)
+
+        scStruct, _, _ = scanConvert(self.windowIdxMap, self.scConfig.width, self.scConfig.tilt,
+                                        self.scConfig.startDepth, self.scConfig.endDepth, desiredHeight=self.scBmode.shape[0])
+        self.scWindowIdxMap = scStruct.scArr
+
 
     def plotPsData(self):
         """Plots the power spectrum data for each window in the ROI.
@@ -359,3 +368,10 @@ class SpectralData:
         if hasattr(self, "scConfig"):
             return self.scSiIm
         return self.siIm
+    
+    @property
+    def finalWindowIdxMap(self):
+        """Getter for final window index map regardless of scan conversion."""
+        if hasattr(self, "scConfig"):
+            return self.scWindowIdxMap
+        return self.windowIdxMap
