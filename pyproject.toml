@@ -78,6 +78,4 @@ dependencies = [
 ext-modules = [
   {name = "philipsRfParser", sources = ["pyquantus/parse/philips_rf_parser.c"]}
 ]
-
-[tool.setuptools.packages]
-find = {}  # Scan the project directory with the default parameters
+packages = {find = {where = ["pyquantus"]}}   # Scan the project directory with the default parameters
