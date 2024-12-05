@@ -8,7 +8,17 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+
+#ifdef _WIN32 // Windows-specific includes and definitions
+#include <io.h>
+#define open _open
+#define close _close
+#define lseek _lseek
+#define read _read
+typedef long ssize_t;
+#else // Unix-like includes and definitions
 #include <unistd.h>
+#endif
 
 int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
     long long i = 0;
