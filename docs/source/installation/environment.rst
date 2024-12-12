@@ -2,9 +2,6 @@
 Environment
 ===========
 
-Python
-======
-
 First, download `Python3.11.81`_ (non-Conda version) from the Python
 website. Once installed, note its path. We will refer to this path as :code:`$PYTHON`
 in the following sections.
