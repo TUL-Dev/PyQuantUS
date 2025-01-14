@@ -9,7 +9,7 @@ def computeHanningPowerSpec(rfData: np.ndarray, startFrequency: int, endFrequenc
     """Compute the power spectrum of the RF data using a Hanning window.
 
     Args:
-        rfData (np.ndarray): RF data from the ultrasound image.
+        rfData (np.ndarray): RF data from the ultrasound image (n lines x m samples).
         startFrequency (int): lower bound of the frequency range (Hz).
         endFrequency (int): upper bound of the frequency range (Hz).
         samplingFrequency (int): sampling frequency of the RF data (Hz).
@@ -41,42 +41,42 @@ def computeHanningPowerSpec(rfData: np.ndarray, startFrequency: int, endFrequenc
     return freqChop, ps
 
 
-def spectralAnalysisDefault6db(npsNormalized: np.ndarray, f: np.ndarray, 
-                               db6LowF: int, db6HighF: int) -> Tuple[float, np.ndarray, np.ndarray, np.ndarray]:
+def computeSpectralParams(nps: np.ndarray, f: np.ndarray, 
+                               lowF: int, highF: int) -> Tuple[float, np.ndarray, np.ndarray, np.ndarray]:
     """Perform spectral analysis on the normalized power spectrum.
     
     Args:
-        npsNormalized (np.ndarray): normalized power spectrum.
+        nps (np.ndarray): normalized power spectrum.
         f (np.ndarray): frequency array (Hz).
-        db6LowF (int): lower bound of the 6dB window (Hz).
-        db6HighF (int): upper bound of the 6dB window (Hz).
+        lowF (int): lower bound of the frequency window for analysis (Hz).
+        highF (int): upper bound of the frequency window for analysis (Hz).
         
     Returns:
         Tuple: midband fit, frequency range, linear fit, and linear regression coefficients.
     """
     # 1. in one scan / run-through of data file's f array, find the data points on
-    # the frequency axis closest to reference file's 6dB window's LOWER bound and UPPER bounds
-    smallestDiffDb6LowF = 999999999
-    smallestDiffDb6HighF = 999999999
+    # the frequency axis closest to reference file's analysis window's LOWER bound and UPPER bounds
+    smallestDiffLowF = 999999999
+    smallestDiffHighF = 999999999
 
     for i in range(len(f)):
-        currentDiffDb6LowF = abs(db6LowF - f[i])
-        currentDiffDb6HighF = abs(db6HighF - f[i])
+        currentDiffLowF = abs(lowF - f[i])
+        currentDiffHighF = abs(highF - f[i])
 
-        if currentDiffDb6LowF < smallestDiffDb6LowF:
-            smallestDiffDb6LowF = currentDiffDb6LowF
-            smallestDiffIndexDb6LowF = i
+        if currentDiffLowF < smallestDiffLowF:
+            smallestDiffLowF = currentDiffLowF
+            smallestDiffIndexLowF = i
 
-        if currentDiffDb6HighF < smallestDiffDb6HighF:
-            smallestDiffDb6HighF = currentDiffDb6HighF
-            smallestDiffIndexDb6HighF = i
+        if currentDiffHighF < smallestDiffHighF:
+            smallestDiffHighF = currentDiffHighF
+            smallestDiffIndexHighF = i
 
-    # 2. compute linear regression within the 6dB window
+    # 2. compute linear regression within the analysis window
     fBand = f[
-        smallestDiffIndexDb6LowF:smallestDiffIndexDb6HighF
+        smallestDiffIndexLowF:smallestDiffIndexHighF
     ]  # transpose row vector f in order for it to have same dimensions as column vector nps
     p = np.polyfit(
-        fBand, npsNormalized[smallestDiffIndexDb6LowF:smallestDiffIndexDb6HighF], 1
+        fBand, nps[smallestDiffIndexLowF:smallestDiffIndexHighF], 1
     )
     npsLinfit = np.polyval(p, fBand)  # y_linfit is a column vecotr
 

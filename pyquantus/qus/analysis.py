@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw
 from scipy.signal import hilbert
 
 from pyquantus.qus.objects import UltrasoundImage, AnalysisConfig, Window
-from pyquantus.qus.transforms import computeHanningPowerSpec, spectralAnalysisDefault6db
+from pyquantus.qus.transforms import computeHanningPowerSpec, computeSpectralParams
 
 class SpectralAnalysis:
     """Complete QUS analysis of an ultrasound image given a corresponding phantom image.
@@ -165,7 +165,7 @@ class SpectralAnalysis:
             window.results.f = np.asarray(f)
 
             # Compute QUS parameters
-            mbf, _, _, p = spectralAnalysisDefault6db(nps, f, lowFreq, upFreq)
+            mbf, _, _, p = computeSpectralParams(nps, f, lowFreq, upFreq)
             window.results.mbf = mbf
             window.results.ss = p[0]
             window.results.si = p[1]
@@ -184,13 +184,12 @@ class SpectralAnalysis:
         
         return 0
 
-    def computeAttenuationCoef(self, rfData: np.ndarray, refRfData: np.ndarray, verasonics=False) -> Tuple[float, float]:
+    def computeAttenuationCoef(self, rfData: np.ndarray, refRfData: np.ndarray) -> Tuple[float, float]:
         """Compute the attenuation coefficient of the ROI.
 
         Args:
-            rfData (np.ndarray): RF data of the ROI.
-            refRfData (np.ndarray): RF data of the phantom.
-            verasonics (bool, optional): whether or not transducer is Verasonics (not currently used). Defaults to False.
+            rfData (np.ndarray): RF data of the ROI (n lines x m samples).
+            refRfData (np.ndarray): RF data of the phantom (n lines x m samples).
         """
         samplingFrequency = self.config.samplingFrequency
         startFrequency = self.config.analysisFreqBand[0]
@@ -222,8 +221,8 @@ class SpectralAnalysis:
         """Compute the backscatter coefficient of the ROI.
 
         Args:
-            rfData (np.ndarray): RF data of the ROI.
-            refRfData (np.ndarray): RF data of the phantom.
+            rfData (np.ndarray): RF data of the ROI (n lines x m samples).
+            refRfData (np.ndarray): RF data of the phantom (n lines x m samples).
             
         Returns:
             float: Backscatter coefficient of the ROI.
@@ -243,8 +242,8 @@ class SpectralAnalysis:
         """Compute Nakagami parameters for the ROI.
 
         Args:
-            rfData (np.ndarray): RF data of the ROI.
-            refRfData (np.ndarray): RF data of the phantom.
+            rfData (np.ndarray): RF data of the ROI (n lines x m samples).
+            refRfData (np.ndarray): RF data of the phantom (n lines x m samples).
             
         Returns:
             Tuple: Nakagami parameters (w, u) for the ROI.
@@ -264,8 +263,8 @@ class SpectralAnalysis:
         """Compute the effective scatterer diameter and concentration of the ROI.
         
         Args:
-            rfData (np.ndarray): RF data of the ROI.
-            refRfData (np.ndarray): RF data of the phantom.
+            rfData (np.ndarray): RF data of the ROI (n lines x m samples).
+            refRfData (np.ndarray): RF data of the phantom (n lines x m samples).
             apertureRadiusCm (float): Aperture radius in cm.
             
         Returns:
