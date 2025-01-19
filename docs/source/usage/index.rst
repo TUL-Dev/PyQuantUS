@@ -5,7 +5,7 @@ Examples
 .. toctree::
     :maxdepth: 2
 
-    cliQus
-    guiQus
+    cliUtc
+    guiUtc
     guiDceus2d
     guiDceus3d

@@ -1,7 +1,7 @@
-pyquantus.qus.objects module
+pyquantus.utc.objects module
 ============================
 
-.. automodule:: pyquantus.qus.objects
+.. automodule:: pyquantus.utc.objects
    :members:
    :undoc-members:
    :show-inheritance:

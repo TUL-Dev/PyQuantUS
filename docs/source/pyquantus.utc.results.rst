@@ -1,7 +1,7 @@
-pyquantus.qus.results module
+pyquantus.utc.results module
 ============================
 
-.. automodule:: pyquantus.qus.results
+.. automodule:: pyquantus.utc.results
    :members:
    :undoc-members:
    :show-inheritance:

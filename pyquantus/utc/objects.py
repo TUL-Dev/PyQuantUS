@@ -3,7 +3,7 @@ from typing import List
 import numpy as np
 
 class SpectralResults:
-    """Class to store analysis results from QUS analysis of an image.
+    """Class to store analysis results from UTC analysis of an image.
     """
     def __init__(self):
         self.mbf: float  # midband fit
@@ -16,7 +16,7 @@ class SpectralResults:
         self.f: np.ndarray  # frequency array
 
 class Window:
-    """Class to store window data for QUS analysis.
+    """Class to store window data for UTC analysis.
     """
     def __init__(self):
         self.left: int 
@@ -26,7 +26,7 @@ class Window:
         self.results = SpectralResults()
 
 class AnalysisConfig:
-    """Class to store configuration data for QUS analysis.
+    """Class to store configuration data for UTC analysis.
     """
     def __init__(self):
         self.transducerFreqBand: List[int]  # [min, max] (Hz)

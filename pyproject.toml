@@ -78,4 +78,4 @@ dependencies = [
 ext-modules = [
   {name = "philipsRfParser", sources = ["pyquantus/parse/philips_rf_parser.c"]}
 ]
-packages = ["pyquantus", "pyquantus.parse", "pyquantus.qus"]
+packages = ["pyquantus", "pyquantus.parse", "pyquantus.utc"]

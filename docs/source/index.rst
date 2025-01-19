@@ -3,8 +3,8 @@ QuantUS
 
 **QuantUS** is an open-source quantitative ultrasound analysis tool designed to
 facilitate the standardization and reproducibility of ultrasound data.
-Both a desktop application and command line interface (CLI), the software supports 
-quantitative ultrasound spectroscopy (QUS) on radiofrequency (RF) and in-phase and 
+Both a desktop application and command line interface, the software supports 
+quantitative ultrasound tissue characterization (UTC) on radiofrequency (RF) and in-phase and 
 quadrature (IQ) data. It also features 2D/3D dynamic contrast-enhanced ultrasound 
 (DCE-US) time intensity curve (TIC) analysis for monitoring bolus injections of 
 contrast over time.
