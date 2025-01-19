@@ -4,13 +4,13 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pyquantus.qus.analysis import SpectralAnalysis
-from pyquantus.qus.transforms import condenseArr, expandArr
+from pyquantus.utc.analysis import SpectralAnalysis
+from pyquantus.utc.transforms import condenseArr, expandArr
 from pyquantus.parse.objects import ScConfig
 from pyquantus.parse.transforms import scanConvert
 
 class SpectralData:
-    """Class to store spectral data and images after QUS analysis.
+    """Class to store spectral data and images after UTC analysis.
     
     This class supports both scan converted and non-scan converted images. 
     Once analysis is completed in the SpectralAnalysis class, the results are 

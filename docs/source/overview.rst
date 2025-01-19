@@ -1,22 +1,38 @@
-===========
+========
 Overview
-===========
+========
 
-QuantUS is a free, standalone, native graphical user interface (GUI) facilitating ultrasound research compatible on Mac OS X, Windows, and Linux. The tool provides an end-to-end workflow for analysis using radiomics approaches including:
+QuantUS is an open-source quantitative analysis tool designed for ultrasonic tissue characterization 
+and contrast enhanced imaging analysis. This software provides an ultrasound system-independent platform 
+for standardized, interactive, and scalable quantitative ultrasound research. QuantUS follows a two-tier 
+architecture that separates core functionality in the [backend](https://github.com/TUL-Dev/PyQuantUS) 
+from user interaction support in the frontend. The software is compatible on Mac OS X, Windows, and Linux. 
 
-* 2D Quantitative Ultrasound Spectroscopy (QUS) via spectral analysis of radiofrequency (RF) and in-phase and quadrature (IQ) data
+The primary features of QuantUS include:
+
+* 2D Ultrasound Tissue Characterization (UTC) via spectral analysis of RF and IQ data
 * 2D Dynamic Contrast-Enhanced Ultrasound (DCE-US) Perfusion Imaging Analysis with optional Motion Compensation
 * 3D DCE-US Perfusion Imaging Analysis
 
-QUS Overview
+Notably, QuantUS addresses shortcomings in existing state-of-the-art tools by supporting 3D parametric map generation, 
+motion compensation for 2D DCE-US analysis, an ultrasound system-independent approach, and by providing a standardized 
+and reproducible platform for quantitative ultrasound research.
+
+UTC Overview
 ============
 
-Given user-inputted RF or IQ ultrasound data, this feature runs spectral analysis to compute quantitative ultrasound parameters and parametric maps on a custom region of interest (ROI). In QuantUS, the midband fit (MBF), spectral slope (SS), and spectral intercept (SI) spectral parameters as described by `El Kaffas et al.`_ have been validated and used in numerous ultrasound studies. Additionally, the backscatter coefficient, attenuation coefficient, Nakagami parameter, effective scatterer size, and effecive scatterer concentration have all been implemented into the UI and are in the validation process.
+Given user-inputted RF or IQ ultrasound data, this feature runs spectral analysis to compute quantitative ultrasound 
+parameters and parametric maps on a custom region of interest (ROI). In QuantUS, the midband fit (MBF), spectral 
+slope (SS), and spectral intercept (SI) spectral parameters as described by `El Kaffas et al.`_ have been validated 
+and used in numerous ultrasound studies. Additionally, the backscatter coefficient, attenuation coefficient, 
+Nakagami parameter, effective scatterer size, and effecive scatterer concentration have all been implemented into 
+the UI and are in the validation process.
 
-The QUS feature of QuantUS also supports a CLI for Terason and Canon transducers. More information and an example can be found in the Jupyter notebooks `scCanonQus.ipynb`_ and `terasonQus.ipynb`_ within our codebase.
+The UTC feature of QuantUS also supports a CLI for Terason and Canon transducers. More information and an example 
+can be found in the Jupyter notebooks `scCanonUtc.ipynb`_ and `terasonUtc.ipynb`_ within our codebase.
 
-.. _scCanonQus.ipynb: https://github.com/TUL-DEV/QuantUS/blob/main/CLI-Demos/scCanonQus.ipynb
-.. _terasonQus.ipynb: https://github.com/TUL-DEV/QUantUS/blob/main/CLI-Demos/terasonQus.ipynb
+.. _scCanonUtc.ipynb: https://github.com/TUL-DEV/QuantUS/blob/main/CLI-Demos/scCanonUtc.ipynb
+.. _terasonUtc.ipynb: https://github.com/TUL-DEV/QUantUS/blob/main/CLI-Demos/terasonUtc.ipynb
 .. _El Kaffas et al.: https://pubmed.ncbi.nlm.nih.gov/26233222/
 .. image:: paramapIllustration.png
    :width: 600

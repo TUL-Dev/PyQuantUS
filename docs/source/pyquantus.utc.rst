@@ -1,4 +1,4 @@
-pyquantus.qus package
+pyquantus.utc package
 =====================
 
 Submodules
@@ -7,15 +7,15 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   pyquantus.qus.analysis
-   pyquantus.qus.objects
-   pyquantus.qus.results
-   pyquantus.qus.transforms
+   pyquantus.utc.analysis
+   pyquantus.utc.objects
+   pyquantus.utc.results
+   pyquantus.utc.transforms
 
 Module contents
 ---------------
 
-.. automodule:: pyquantus.qus
+.. automodule:: pyquantus.utc
    :members:
    :undoc-members:
    :show-inheritance:

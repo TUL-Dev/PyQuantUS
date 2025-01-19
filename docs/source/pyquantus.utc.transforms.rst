@@ -1,7 +1,7 @@
-pyquantus.qus.transforms module
+pyquantus.utc.transforms module
 ===============================
 
-.. automodule:: pyquantus.qus.transforms
+.. automodule:: pyquantus.utc.transforms
    :members:
    :undoc-members:
    :show-inheritance:

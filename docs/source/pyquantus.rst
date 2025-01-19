@@ -8,7 +8,7 @@ Subpackages
    :maxdepth: 4
 
    pyquantus.parse
-   pyquantus.qus
+   pyquantus.utc
 
 Module contents
 ---------------

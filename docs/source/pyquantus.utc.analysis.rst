@@ -1,7 +1,7 @@
-pyquantus.qus.analysis module
+pyquantus.utc.analysis module
 =============================
 
-.. automodule:: pyquantus.qus.analysis
+.. automodule:: pyquantus.utc.analysis
    :members:
    :undoc-members:
    :show-inheritance:
