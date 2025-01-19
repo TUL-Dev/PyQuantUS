@@ -34,7 +34,7 @@ def computeHanningPowerSpec(rfData: np.ndarray, startFrequency: int, endFrequenc
     fft = np.square(
         abs(np.fft.fft(np.transpose(np.multiply(rfData, windFunc)), NUM_FOURIER_POINTS) * rfData.size)
     )
-    fullPS = 20 * np.log10(np.mean(fft, axis=0))
+    fullPS = np.mean(fft, axis=0)
 
     ps = fullPS[fLow:fHigh]
 
