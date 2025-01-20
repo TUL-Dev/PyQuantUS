@@ -2,7 +2,7 @@
 Environment
 ===========
 
-First, download `Python3.11.8`_ (non-Conda version) from the Python
+First, download `Python 3.11.8`_ (non-Conda version) from the Python
 website. Once installed, note its path. We will refer to this path as :code:`$PYTHON`
 in the following sections.
 
@@ -21,7 +21,7 @@ run on MacOS or Linux while lines commented with :code:`# Windows` should only b
    pip install -r requirements.txt
 
 
-.. _Python3.11.8: https://www.python.org/downloads/release/python-3118/
+.. _Python 3.11.8: https://www.python.org/downloads/release/python-3118/
 
 Following this example, this environment can be accessed via the :code:`source .venv/bin/activate`
-command from the repository directory on Unix systems, and by :code:`.venv\Scripts\activate` on Windows.
+command from the repository directory on Unix systems, and by :code:`.venv\\Scripts\\activate` on Windows.
