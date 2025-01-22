@@ -34,7 +34,7 @@ def computeHanningPowerSpec(rfData: np.ndarray, startFrequency: int, endFrequenc
     fft = np.square(
         abs(np.fft.fft(np.transpose(np.multiply(rfData, windFunc)), NUM_FOURIER_POINTS) * rfData.size)
     )
-    fullPS = 20 * np.log10(np.mean(fft, axis=0))
+    fullPS = np.mean(fft, axis=0)
 
     ps = fullPS[fLow:fHigh]
 
@@ -44,6 +44,7 @@ def computeHanningPowerSpec(rfData: np.ndarray, startFrequency: int, endFrequenc
 def computeSpectralParams(nps: np.ndarray, f: np.ndarray, 
                                lowF: int, highF: int) -> Tuple[float, np.ndarray, np.ndarray, np.ndarray]:
     """Perform spectral analysis on the normalized power spectrum.
+    source: Lizzi et al. https://doi.org/10.1016/j.ultrasmedbio.2006.09.002
     
     Args:
         nps (np.ndarray): normalized power spectrum.
@@ -72,6 +73,7 @@ def computeSpectralParams(nps: np.ndarray, f: np.ndarray,
             smallestDiffIndexHighF = i
 
     # 2. compute linear regression within the analysis window
+    f
     fBand = f[
         smallestDiffIndexLowF:smallestDiffIndexHighF
     ]  # transpose row vector f in order for it to have same dimensions as column vector nps
@@ -82,7 +84,7 @@ def computeSpectralParams(nps: np.ndarray, f: np.ndarray,
 
     mbfit = p[0] * fBand[round(fBand.shape[0] / 2)] + p[1]
 
-    return mbfit, fBand, npsLinfit, p #, rsqu, ib
+    return mbfit, fBand, npsLinfit, p
 
 def int32torgb(color):
     """Convert int32 to rgb tuple"""

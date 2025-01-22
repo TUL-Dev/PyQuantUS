@@ -322,10 +322,7 @@ def siemensRfParser(imgPath: str, phantomPath: str) -> Tuple[DataOutputStruct, I
     """
 
     imgInfo, refInfo, imgData, refData = getData(imgPath, phantomPath)
-
-    clippedMax = imgInfo.clipFact*np.amax(imgData.bMode)
-    bmode = np.clip(imgData.bMode, clippedMax-imgInfo.dynRange, clippedMax) * (255/clippedMax)
-    imgData.bMode = bmode
+    bmode = imgData.bMode
 
     return bmode, imgData, imgInfo, refData, refInfo
 
@@ -372,25 +369,36 @@ def readFileImg(info: InfoStruct, focus: int, imgPath: str) -> Tuple[DataOutputS
             [data[frame], _]  = extractFrameData(file_obj, FileHeader, frame)
     echoData = splitData(data.astype(np.double), focus)
     
-    bmode = np.zeros(echoData.shape).astype(np.int32)
-
-    # Do Hilbert Transform on each column
-    for frame in range(echoData.shape[0]):
-        for i in range(echoData.shape[2]):
-            bmode[frame,:,i] = 20*np.log10(abs(hilbert(echoData[frame,:,i])))
-
+    bmode = np.zeros(echoData.shape).astype(np.uint8)
     modeIM = echoData
     info.axialRes = (1/(info.samplingFrequency*2))*1540 # speed of sound in tissue
     info.axialRes *= 1000 # m -> mm
     info.lateralRes = 10/info.lineDensity
     info.width = info.lateralRes*bmode.shape[2] # mm
     info.depth = info.axialRes*bmode.shape[1] # mm
-    info.clipFact = 1
-    info.dynRange = 55
+    info.clipFact = 0.5
+    info.dynRange = 110
     info.minFrequency = 2000000
     info.maxFrequency = 13000000
     info.lowBandFreq = 4500000
     info.upBandFreq = 9500000
+
+    # Do Hilbert Transform on each column
+    for frame in range(echoData.shape[0]):
+        for i in range(echoData.shape[2]):
+            bmode[frame,:,i] = 20*np.log10(abs(hilbert(echoData[frame,:,i])))
+            
+        frameBmode = bmode[frame]
+        clippedMax = info.clipFact*np.amax(frameBmode)
+        frameBmode = np.clip(frameBmode, clippedMax-info.dynRange, clippedMax).astype(np.float64)
+        frameBmode -= np.amin(frameBmode)
+        frameBmode *= (255/np.amax(frameBmode))
+        clippedMax = info.clipFact*np.amax(frameBmode)
+        frameBmode = np.clip(frameBmode, clippedMax-info.dynRange, clippedMax).astype(np.float64)
+        frameBmode -= np.amin(frameBmode)
+        frameBmode *= (255/np.amax(frameBmode))
+        
+        bmode[frame] = frameBmode
 
     Data = DataOutputStruct()
     Data.rf = modeIM

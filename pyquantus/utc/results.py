@@ -4,20 +4,20 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-from pyquantus.utc.analysis import SpectralAnalysis
+from pyquantus.utc.analysis import UtcAnalysis
 from pyquantus.utc.transforms import condenseArr, expandArr
 from pyquantus.parse.objects import ScConfig
 from pyquantus.parse.transforms import scanConvert
 
-class SpectralData:
-    """Class to store spectral data and images after UTC analysis.
+class UtcData:
+    """Class to store UTC data and images after analysis.
     
     This class supports both scan converted and non-scan converted images. 
-    Once analysis is completed in the SpectralAnalysis class, the results are 
+    Once analysis is completed in the UtcAnalysis class, the results are 
     stored in this class for further evaluation and visualization.
     
     Attributes:
-        spectralAnalysis (SpectralAnalysis): Spectral analysis object
+        utcAnalysis (UtcAnalysis): UTC analysis object
         depth (float): Depth of the image in mm
         width (float): Width of the image in mm
         roiWidthScale (int): Width of the ROI window in pixels
@@ -44,7 +44,7 @@ class SpectralData:
         siCmap (list): Spectral intercept colormap used for parametric maps        
     """
     def __init__(self):
-        self.spectralAnalysis: SpectralAnalysis
+        self.utcAnalysis: UtcAnalysis
         self.depth: float # mm
         self.width: float # mm
         self.roiWidthScale: int
@@ -72,37 +72,37 @@ class SpectralData:
     def convertImagesToRGB(self):
         """Converts grayscale images to RGB for colormap application.
         """
-        self.spectralAnalysis.ultrasoundImage.bmode = cv2.cvtColor(
-            np.array(self.spectralAnalysis.ultrasoundImage.bmode).astype('uint8'),
+        self.utcAnalysis.ultrasoundImage.bmode = cv2.cvtColor(
+            np.array(self.utcAnalysis.ultrasoundImage.bmode).astype('uint8'),
             cv2.COLOR_GRAY2RGB
         )
-        if hasattr(self.spectralAnalysis.ultrasoundImage, 'scBmode'):
-            self.spectralAnalysis.ultrasoundImage.scBmode = cv2.cvtColor(
-                np.array(self.spectralAnalysis.ultrasoundImage.scBmode).astype('uint8'),
+        if hasattr(self.utcAnalysis.ultrasoundImage, 'scBmode'):
+            self.utcAnalysis.ultrasoundImage.scBmode = cv2.cvtColor(
+                np.array(self.utcAnalysis.ultrasoundImage.scBmode).astype('uint8'),
                 cv2.COLOR_GRAY2RGB
             )
 
     def drawCmaps(self):
         """Generates parametric maps for midband fit, spectral slope, and spectral intercept.
         """
-        if not len(self.spectralAnalysis.roiWindows):
+        if not len(self.utcAnalysis.roiWindows):
             print("No analyzed windows to color")
             return
         
-        self.mbfArr = [window.results.mbf for window in self.spectralAnalysis.roiWindows]
+        self.mbfArr = [window.results.mbf for window in self.utcAnalysis.roiWindows]
         self.minMbf = min(self.mbfArr); self.maxMbf = max(self.mbfArr)
-        self.ssArr = [window.results.ss for window in self.spectralAnalysis.roiWindows]
+        self.ssArr = [window.results.ss for window in self.utcAnalysis.roiWindows]
         self.minSs = min(self.ssArr); self.maxSs = max(self.ssArr)
-        self.siArr = [window.results.si for window in self.spectralAnalysis.roiWindows]
+        self.siArr = [window.results.si for window in self.utcAnalysis.roiWindows]
         self.minSi = min(self.siArr); self.maxSi = max(self.siArr)
 
-        if not len(self.spectralAnalysis.ultrasoundImage.bmode.shape) == 3:
+        if not len(self.utcAnalysis.ultrasoundImage.bmode.shape) == 3:
             self.convertImagesToRGB()
-        self.mbfIm = self.spectralAnalysis.ultrasoundImage.bmode.copy()
+        self.mbfIm = self.utcAnalysis.ultrasoundImage.bmode.copy()
         self.ssIm = self.mbfIm.copy(); self.siIm = self.ssIm.copy()
         self.windowIdxMap = np.zeros((self.mbfIm.shape[0], self.mbfIm.shape[1])).astype(int)
 
-        for i, window in enumerate(self.spectralAnalysis.roiWindows):
+        for i, window in enumerate(self.utcAnalysis.roiWindows):
             mbfColorIdx = int((255 / (self.maxMbf-self.minMbf))*(window.results.mbf-self.minMbf)) if self.minMbf != self.maxMbf else 125
             ssColorIdx = int((255 / (self.maxSs-self.minSs))*(window.results.ss-self.minSs)) if self.minSs != self.maxSs else 125
             siColorIdx = int((255 / (self.maxSi-self.minSi))*(window.results.si-self.minSi)) if self.minSi != self.maxSi else 125
@@ -152,11 +152,11 @@ class SpectralData:
         """
         _, ax = plt.subplots()
 
-        ssMean = np.mean(self.ssArr)
+        ssMean = np.mean(np.array(self.ssArr)/1e6)
         siMean = np.mean(self.siArr)
-        npsArr = [window.results.nps for window in self.spectralAnalysis.roiWindows]
+        npsArr = [window.results.nps for window in self.utcAnalysis.roiWindows]
         avNps = np.mean(npsArr, axis=0)
-        f = self.spectralAnalysis.roiWindows[0].results.f
+        f = self.utcAnalysis.roiWindows[0].results.f
         x = np.linspace(min(f), max(f), 100)
         y = ssMean*x + siMean
 
@@ -174,21 +174,21 @@ class SpectralData:
     def bmode(self) -> np.ndarray:
         """Getter for RGB B-mode image (no scan conversion).
         """
-        assert len(self.spectralAnalysis.ultrasoundImage.bmode.shape) == 3
-        return self.spectralAnalysis.ultrasoundImage.bmode
+        assert len(self.utcAnalysis.ultrasoundImage.bmode.shape) == 3
+        return self.utcAnalysis.ultrasoundImage.bmode
     
     @bmode.setter
     def bmode(self, value: np.ndarray):
         """Setter for RGB B-mode image (no scan conversion).
         """
-        self.spectralAnalysis.ultrasoundImage.bmode = value
+        self.utcAnalysis.ultrasoundImage.bmode = value
     
     @property
     def scBmode(self):
         """Getter for scan converted RGB B-mode image.
         """
-        assert len(self.spectralAnalysis.ultrasoundImage.scBmode.shape) == 3
-        return self.spectralAnalysis.ultrasoundImage.scBmode
+        assert len(self.utcAnalysis.ultrasoundImage.scBmode.shape) == 3
+        return self.utcAnalysis.ultrasoundImage.scBmode
     
     @property
     def finalBmode(self) -> np.ndarray:
@@ -202,125 +202,125 @@ class SpectralData:
     def finalBmode(self, value: np.ndarray):
         """Setter for RGB B-mode image regardless of scan conversion."""
         if hasattr(self, "scConfig"):
-            self.spectralAnalysis.ultrasoundImage.scBmode = value
+            self.utcAnalysis.ultrasoundImage.scBmode = value
         else:
-            self.spectralAnalysis.ultrasoundImage.bmode = value
+            self.utcAnalysis.ultrasoundImage.bmode = value
     
     @property
     def splineX(self):
         """Getter for spline X coordinates regardless of scan conversion.
         """
         if hasattr(self, "scConfig"):
-            return self.spectralAnalysis.scSplineX
-        return self.spectralAnalysis.splineX
+            return self.utcAnalysis.scSplineX
+        return self.utcAnalysis.splineX
     
     @splineX.setter
     def splineX(self, value: np.ndarray):
         """Setter for spline X coordinates regardless of scan conversion."""
         if hasattr(self, "scConfig"):
-            self.spectralAnalysis.scSplineX = value
+            self.utcAnalysis.scSplineX = value
         else:
-            self.spectralAnalysis.splineX = value
+            self.utcAnalysis.splineX = value
 
     @property
     def splineY(self):
         """Getter for spline Y coordinates regardless of scan conversion."""
         if hasattr(self, "scConfig"):
-            return self.spectralAnalysis.scSplineY
-        return self.spectralAnalysis.splineY
+            return self.utcAnalysis.scSplineY
+        return self.utcAnalysis.splineY
     
     @splineY.setter
     def splineY(self, value: np.ndarray):
         """Setter for spline Y coordinates regardless of scan conversion."""
         if hasattr(self, "scConfig"):
-            self.spectralAnalysis.scSplineY = value
+            self.utcAnalysis.scSplineY = value
         else:
-            self.spectralAnalysis.splineY = value
+            self.utcAnalysis.splineY = value
     
     @property
     def waveLength(self):
-        """Getter for wavelength of the ultrasound signal stored in the SpectralAnalysis class."""
-        return self.spectralAnalysis.waveLength
+        """Getter for wavelength of the ultrasound signal stored in the UtcAnalysis class."""
+        return self.utcAnalysis.waveLength
     
     @property
     def axWinSize(self):
-        """Getter for axial window size stored in the SpectralAnalysis class."""
-        return self.spectralAnalysis.config.axWinSize
+        """Getter for axial window size stored in the UtcAnalysis class."""
+        return self.utcAnalysis.config.axWinSize
     
     @axWinSize.setter
     def axWinSize(self, value: float):
-        """Setter for axial window size stored in the SpectralAnalysis class."""
-        self.spectralAnalysis.config.axWinSize = value
+        """Setter for axial window size stored in the UtcAnalysis class."""
+        self.utcAnalysis.config.axWinSize = value
 
     @property
     def latWinSize(self):
-        """Getter for lateral window size stored in the SpectralAnalysis class."""
-        return self.spectralAnalysis.config.latWinSize
+        """Getter for lateral window size stored in the UtcAnalysis class."""
+        return self.utcAnalysis.config.latWinSize
     
     @latWinSize.setter
     def latWinSize(self, value: float):
-        """Setter for lateral window size stored in the SpectralAnalysis class."""
-        self.spectralAnalysis.config.latWinSize = value
+        """Setter for lateral window size stored in the UtcAnalysis class."""
+        self.utcAnalysis.config.latWinSize = value
 
     @property
     def axOverlap(self):
-        """Getter for axial overlap stored in the SpectralAnalysis class."""
-        return self.spectralAnalysis.config.axialOverlap
+        """Getter for axial overlap stored in the UtcAnalysis class."""
+        return self.utcAnalysis.config.axialOverlap
     
     @axOverlap.setter
     def axOverlap(self, value: float):
-        """Setter for axial overlap stored in the SpectralAnalysis class."""
-        self.spectralAnalysis.config.axialOverlap = value
+        """Setter for axial overlap stored in the UtcAnalysis class."""
+        self.utcAnalysis.config.axialOverlap = value
     
     @property
     def latOverlap(self):
-        """Getter for lateral overlap stored in the SpectralAnalysis class."""
-        return self.spectralAnalysis.config.lateralOverlap
+        """Getter for lateral overlap stored in the UtcAnalysis class."""
+        return self.utcAnalysis.config.lateralOverlap
     
     @latOverlap.setter
     def latOverlap(self, value: float):
-        """Setter for lateral overlap stored in the SpectralAnalysis class."""
-        self.spectralAnalysis.config.lateralOverlap = value
+        """Setter for lateral overlap stored in the UtcAnalysis class."""
+        self.utcAnalysis.config.lateralOverlap = value
     
     @property
     def roiWindowThreshold(self):
-        """Getter for ROI window threshold stored in the SpectralAnalysis class."""
-        return self.spectralAnalysis.config.windowThresh
+        """Getter for ROI window threshold stored in the UtcAnalysis class."""
+        return self.utcAnalysis.config.windowThresh
     
     @roiWindowThreshold.setter
     def roiWindowThreshold(self, value: float):
-        """Setter for ROI window threshold stored in the SpectralAnalysis class."""
-        self.spectralAnalysis.config.windowThresh = value
+        """Setter for ROI window threshold stored in the UtcAnalysis class."""
+        self.utcAnalysis.config.windowThresh = value
     
     @property
     def analysisFreqBand(self):
-        """Getter for analysis frequency band stored in the SpectralAnalysis class."""
-        return self.spectralAnalysis.config.analysisFreqBand
+        """Getter for analysis frequency band stored in the UtcAnalysis class."""
+        return self.utcAnalysis.config.analysisFreqBand
     
     @analysisFreqBand.setter
     def analysisFreqBand(self, value: List[int]):
-        """Setter for analysis frequency band stored in the SpectralAnalysis class."""
-        self.spectralAnalysis.config.analysisFreqBand = value
+        """Setter for analysis frequency band stored in the UtcAnalysis class."""
+        self.utcAnalysis.config.analysisFreqBand = value
 
     @property
     def transducerFreqBand(self):
-        """Getter for transducer frequency band stored in the SpectralAnalysis class."""
-        return self.spectralAnalysis.config.transducerFreqBand
+        """Getter for transducer frequency band stored in the UtcAnalysis class."""
+        return self.utcAnalysis.config.transducerFreqBand
     
     @transducerFreqBand.setter
     def transducerFreqBand(self, value: List[int]):
-        """Setter for transducer frequency band stored in the SpectralAnalysis class."""
-        self.spectralAnalysis.config.transducerFreqBand = value
+        """Setter for transducer frequency band stored in the UtcAnalysis class."""
+        self.utcAnalysis.config.transducerFreqBand = value
     
     @property
     def samplingFrequency(self):
-        """Getter for sampling frequency stored in the SpectralAnalysis class."""
-        return self.spectralAnalysis.config.samplingFrequency
+        """Getter for sampling frequency stored in the UtcAnalysis class."""
+        return self.utcAnalysis.config.samplingFrequency
     
     @samplingFrequency.setter
     def samplingFrequency(self, value: int):
-        """Setter for sampling frequency stored in the SpectralAnalysis class."""
-        self.spectralAnalysis.config.samplingFrequency = value
+        """Setter for sampling frequency stored in the UtcAnalysis class."""
+        self.utcAnalysis.config.samplingFrequency = value
     
     @property
     def pixWidth(self):

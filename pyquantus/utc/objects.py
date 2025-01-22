@@ -6,14 +6,13 @@ class SpectralResults:
     """Class to store analysis results from UTC analysis of an image.
     """
     def __init__(self):
-        self.mbf: float  # midband fit
-        self.ss: float  # spectral slope
-        self.si: float  # spectral intercept
-        self.atCoef: float  # attenuation coefficient
+        self.mbf: float  # midband fit (dB)
+        self.ss: float  # spectral slope (dB/MHz)
+        self.si: float  # spectral intercept (dB)
         self.nps: np.ndarray  # normalized power spectrum
         self.ps: np.ndarray  # image power spectrum
         self.rPs: np.ndarray  # phantom power spectrum
-        self.f: np.ndarray  # frequency array
+        self.f: np.ndarray  # frequency array (Hz)
 
 class Window:
     """Class to store window data for UTC analysis.
