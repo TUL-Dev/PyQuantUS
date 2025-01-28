@@ -257,7 +257,7 @@ def convert_env_to_rf_ntgc(x, linear_tgc_matrix):
     return y 
 
 def readImg(filename: str, tgc_path: str | None, info_path: str, 
-            version="6.0.3", isPhantom=False) -> Tuple[DataOutputStruct, ClariusInfo]:
+            version="6.0.3", isPhantom=False) -> Tuple[DataOutputStruct, ClariusInfo, bool]:
     """Read RF data contained in Clarius file
     Args:
         filename (string)): where is the Clarius file
@@ -317,7 +317,11 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
     info = ClariusInfo()
     with open(info_path, 'r') as file:
         infoYml = yaml.safe_load(file)
-    info.width1 = infoYml["probe"]["radius"] * 2
+    try:
+        info.width1 = infoYml["probe"]["radius"] * 2
+        scanConverted = True
+    except KeyError:
+        scanConverted = False
     info.endDepth1 = float(infoYml["imaging depth"][:-2]) / 1000 #m
     info.startDepth1 = info.endDepth1 / 4 #m
     info.samplingFrequency = int(infoYml["sampling rate"][:-3]) * 1e6
@@ -373,43 +377,40 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
     bmode -= np.amin(bmode)
     bmode *= (255/np.amax(bmode))
     
-    scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, 
+    data = DataOutputStruct()
+    
+    if scanConverted:
+        scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, 
                                             info.endDepth1, desiredHeight=2000)
-    
-    # def callScanConvert(bmode):
-    #     return scanConvert(bmode.T , info.width1, info.tilt1, info.startDepth1, 
-    #                        info.endDepth1, desiredHeight=2000)[0].scArr
-    
-    # scBmodes = np.array(list(map(callScanConvert, list(bmode.T))))
-    
-    scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, 
+        scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, 
                                      info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf_atgc.shape[2]))])
 
-    info.yResRF =  info.endDepth1*1000 / scBmodeStruct.scArr.shape[0]
-    info.xResRF = info.yResRF * (scBmodeStruct.scArr.shape[0]/scBmodeStruct.scArr.shape[1]) # placeholder
-    info.axialRes = hCm1*10 / scBmodeStruct.scArr.shape[0]
-    info.lateralRes = wCm1*10 / scBmodeStruct.scArr.shape[1]
-    info.depth = hCm1*10 #mm
-    info.width = wCm1*10 #mm
-    
-    # info.yResRF = info.endDepth1*1000 / bmode.shape[0] # mm/pixel
-    # info.xResRF = info.yResRF * (bmode.shape[0]/bmode.shape[1]) # placeholder
-    # info.axialRes = info.yResRF #mm
-    # info.lateralRes = info.xResRF #mm
-    # info.depth = info.endDepth1*1000 #mm
-    # info.width = info.endDepth1*1000 #mm
+        info.yResRF =  info.endDepth1*1000 / scBmodeStruct.scArr.shape[0]
+        info.xResRF = info.yResRF * (scBmodeStruct.scArr.shape[0]/scBmodeStruct.scArr.shape[1]) # placeholder
+        info.axialRes = hCm1*10 / scBmodeStruct.scArr.shape[0]
+        info.lateralRes = wCm1*10 / scBmodeStruct.scArr.shape[1]
+        info.depth = hCm1*10 #mm
+        info.width = wCm1*10 #mm
+        data.scBmodeStruct = scBmodeStruct
+        data.scBmode = scBmodes
+        
+    else:
+        info.yResRF = info.endDepth1*1000 / bmode.shape[0] # mm/pixel
+        info.xResRF = info.yResRF * (bmode.shape[0]/bmode.shape[1]) # placeholder
+        info.axialRes = info.yResRF #mm
+        info.lateralRes = info.xResRF #mm
+        info.depth = info.endDepth1*1000 #mm
+        info.width = info.endDepth1*1000 #mm
 
-    data = DataOutputStruct()
-    data.scBmodeStruct = scBmodeStruct
-    data.scBmode = scBmodes
+    
     data.bMode = np.transpose(bmode, (2, 0, 1))
     data.rf = np.transpose(rf_atgc, (2, 0, 1))
 
-    return data, info
+    return data, info, scanConverted
 
 def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str, 
             phantomFilename: str, phantomTgcFilename: str, phantomInfoFilename: str, 
-            version="6.0.3") -> Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo]:
+            version="6.0.3") -> Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo, bool]:
     """Parse Clarius RF data and metadata from inputted files.
 
     Args:
@@ -424,6 +425,6 @@ def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str,
     Returns:
         Tuple: Image data, image metadata, phantom data, and phantom metadata.
     """
-    imgData, imgInfo = readImg(imgFilename, imgTgcFilename, infoFilename, version, isPhantom=False)
-    refData, refInfo = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
-    return imgData, imgInfo, refData, refInfo
+    imgData, imgInfo, scanConverted = readImg(imgFilename, imgTgcFilename, infoFilename, version, isPhantom=False)
+    refData, refInfo, scanConverted = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
+    return imgData, imgInfo, refData, refInfo, scanConverted
