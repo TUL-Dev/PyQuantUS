@@ -6,6 +6,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.signal import hilbert
 from typing import Tuple
+from tqdm import tqdm
 
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
 from pyquantus.parse.transforms import scanConvert
@@ -175,7 +176,7 @@ def generate_default_tgc_matrix(num_frames: int, info: ClariusInfo) -> np.ndarra
 
     return linear_default_tgc_matrix_transpose
 
-def generate_tgc_matrix(file_timestamp: str, tgc_path: str, rf_timestamps: np.ndarray, num_frames: int, 
+def generate_tgc_matrix(file_timestamp: str, tgc_path: str | None, rf_timestamps: np.ndarray, num_frames: int, 
                         info: InfoStruct, isPhantom: bool) -> np.ndarray:
     """Generate a TGC matrix for the inputted file timestamp, TGC path, RF timestamps, number of frames, and Clarius file metadata.
 
@@ -194,10 +195,14 @@ def generate_tgc_matrix(file_timestamp: str, tgc_path: str, rf_timestamps: np.nd
     # num_samples = 2928
     image_depth_mm = info.endDepth1
     num_samples = info.samplesPerLine
-    if isPhantom:
-        tgc_data = read_tgc_file(file_timestamp, rf_timestamps)
+    if tgc_path is not None:
+        if isPhantom:
+            tgc_data = read_tgc_file(file_timestamp, rf_timestamps)
+        else:
+            tgc_data = read_tgc_file_v2(tgc_path, rf_timestamps)
     else:
-        tgc_data = read_tgc_file_v2(tgc_path, rf_timestamps)
+        tgc_data = None
+        
 
     if tgc_data == None:
         return generate_default_tgc_matrix(num_frames, info)
@@ -251,7 +256,7 @@ def convert_env_to_rf_ntgc(x, linear_tgc_matrix):
     y = y / linear_tgc_matrix
     return y 
 
-def readImg(filename: str, tgc_path: str, info_path: str, 
+def readImg(filename: str, tgc_path: str | None, info_path: str, 
             version="6.0.3", isPhantom=False) -> Tuple[DataOutputStruct, ClariusInfo]:
     """Read RF data contained in Clarius file
     Args:
@@ -299,14 +304,14 @@ def readImg(filename: str, tgc_path: str, info_path: str,
         )
         return []
 
-    # Check if the ROI is full
-    if header["w"] != 192 or header["h"] != 2928:
-        print(
-            "The ROI is not full. The size of RF matrix is {}*{} thus returning an empty list.".format(
-                header["w"], header["h"]
-            )
-        )
-        return []
+    # # Check if the ROI is full
+    # if header["w"] != 192 or header["h"] != 2928:
+    #     print(
+    #         "The ROI is not full. The size of RF matrix is {}*{} thus returning an empty list.".format(
+    #             header["w"], header["h"]
+    #         )
+    #     )
+    #     return []
     
 
     info = ClariusInfo()
@@ -368,8 +373,17 @@ def readImg(filename: str, tgc_path: str, info_path: str,
     bmode -= np.amin(bmode)
     bmode *= (255/np.amax(bmode))
     
-    scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, info.endDepth1, desiredHeight=2000)
-    scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, info.endDepth1, desiredHeight=2000)[0].scArr for i in range(rf_atgc.shape[2])])
+    scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, 
+                                            info.endDepth1, desiredHeight=2000)
+    
+    # def callScanConvert(bmode):
+    #     return scanConvert(bmode.T , info.width1, info.tilt1, info.startDepth1, 
+    #                        info.endDepth1, desiredHeight=2000)[0].scArr
+    
+    # scBmodes = np.array(list(map(callScanConvert, list(bmode.T))))
+    
+    scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, 
+                                     info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf_atgc.shape[2]))])
 
     info.yResRF =  info.endDepth1*1000 / scBmodeStruct.scArr.shape[0]
     info.xResRF = info.yResRF * (scBmodeStruct.scArr.shape[0]/scBmodeStruct.scArr.shape[1]) # placeholder
@@ -377,6 +391,13 @@ def readImg(filename: str, tgc_path: str, info_path: str,
     info.lateralRes = wCm1*10 / scBmodeStruct.scArr.shape[1]
     info.depth = hCm1*10 #mm
     info.width = wCm1*10 #mm
+    
+    # info.yResRF = info.endDepth1*1000 / bmode.shape[0] # mm/pixel
+    # info.xResRF = info.yResRF * (bmode.shape[0]/bmode.shape[1]) # placeholder
+    # info.axialRes = info.yResRF #mm
+    # info.lateralRes = info.xResRF #mm
+    # info.depth = info.endDepth1*1000 #mm
+    # info.width = info.endDepth1*1000 #mm
 
     data = DataOutputStruct()
     data.scBmodeStruct = scBmodeStruct
