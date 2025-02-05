@@ -342,6 +342,10 @@ class UtcAnalysis:
         
     def computeNakagamiParams(self, rfData: np.ndarray) -> Tuple[float, float]:
         """Compute Nakagami parameters for the ROI.
+        source: Tsui, P. H., Wan, Y. L., Huang, C. C. & Wang, M. C. 
+        Effect of adaptive threshold filtering on ultrasonic Nakagami 
+        parameter to detect variation in scatterer concentration. Ultrason. 
+        Imaging 32, 229–242 (2010). https://doi.org/10.1177%2F016173461003200403
 
         Args:
             rfData (np.ndarray): RF data of the ROI (n lines x m samples).
