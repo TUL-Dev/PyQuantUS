@@ -20,6 +20,7 @@ class ClariusInfo(InfoStruct):
         self.sampleSize: int # bytes
 
 # test
+# test 2
 
 def read_tgc_file(file_timestamp: str, rf_timestamps: np.ndarray) -> list | None:
     """Read TGC file and extract TGC data for inputted file.
