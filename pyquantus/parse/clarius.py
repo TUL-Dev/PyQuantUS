@@ -1,18 +1,27 @@
 # Standard Library Imports
 import os
 import re
+import sys
+import logging
+import platform
+import shutil
+import tarfile
+import subprocess
 from typing import Tuple
 
 # Third-Party Library Imports
 import yaml
 import numpy as np
-from scipy.interpolate import interp1d
-from scipy.signal import hilbert
 from tqdm import tqdm
+from scipy.signal import hilbert
+from scipy.interpolate import interp1d
 
 # Local Module Imports
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
 from pyquantus.parse.transforms import scanConvert
+
+# Logging setup
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 #############################################################################################
 class ClariusInfo(InfoStruct):
@@ -479,3 +488,355 @@ def convert_env_to_rf_ntgc(x, linear_tgc_matrix):
 
 #############################################################################################
 
+
+
+
+# raw files generator from tar files
+#############################################################################################
+class Clarius_tar_unpacker():
+    
+    def __init__(self, tar_files_path: str, extraction_mode: str) -> None:  
+
+        self.tar_files_path = tar_files_path
+        self.extraction_mode = extraction_mode
+        
+        if   self.extraction_mode == "single":   self.__run_single_extraction()
+        elif self.extraction_mode == "multiple": self.__run_multiple_extraction()    
+        else:
+            raise ValueError(f"Invalid mode: {self.extraction_mode}")
+        
+    #########################################################################################
+        
+    def __run_single_extraction(self):
+        
+        self.delete_hidden_files_in_sample_folder()
+        self.delete_extracted_folders()
+        self.extract_tar_files()
+        self.set_path_of_extracted_folders()
+        self.set_path_of_lzo_files_inside_extracted_folders()
+        self.read_lzo_files()
+        self.set_path_of_raw_files_inside_extracted_folders()
+        self.read_raw_files()
+        self.delete_hidden_files_in_extracted_folders()
+
+    #########################################################################################
+
+    def __run_multiple_extraction(self):
+        """Extracts data from all directories inside `self.tar_files_path`."""
+        try:
+            # Retrieve all subdirectory paths
+            folder_paths = [
+                os.path.join(self.tar_files_path, folder)
+                for folder in os.listdir(self.tar_files_path)
+                if os.path.isdir(os.path.join(self.tar_files_path, folder))
+            ]
+
+            # Process each folder for data extraction
+            for folder_path in folder_paths:
+                self.tar_files_path = folder_path  # Update path before extraction
+                self.__run_single_extraction()
+
+        except Exception as e:
+            logging.error(f"An error occurred while extracting data: {e}")
+
+    #########################################################################################
+    
+    def delete_hidden_files_in_sample_folder(self):
+        """
+        Deletes hidden files (starting with a dot) from the sample folder.
+
+        Returns:
+            bool: True if files were successfully deleted, False otherwise.
+        """
+        if not os.path.exists(self.tar_files_path):
+            logging.error(f"Sample folder path does not exist: {self.tar_files_path}")
+            return False  # Indicate failure due to non-existing path
+
+        try:
+            deleted_files_count = 0  # Count of deleted files
+            # Iterate over the files in the sample folder
+            for filename in os.listdir(self.tar_files_path):
+                # Check if the file is hidden (starts with a dot)
+                if filename.startswith('.'):
+                    file_path = os.path.join(self.tar_files_path, filename)
+                    os.remove(file_path)  # Delete the hidden file
+                    logging.info(f"Deleted hidden file: {file_path}")
+                    deleted_files_count += 1
+
+            if deleted_files_count > 0:
+                logging.info(f"Total hidden files deleted: {deleted_files_count}")
+            else:
+                logging.info("No hidden files to delete.")
+
+            return True  # Indicate success
+        except Exception as e:
+            logging.error(f"An error occurred while deleting hidden files: {e}")
+            return False  # Indicate failure
+        
+    #########################################################################################
+       
+    def delete_extracted_folders(self):
+        """Deletes all extracted folders in the specified directory."""
+        extracted_folders = [
+            os.path.join(self.tar_files_path, item)
+            for item in os.listdir(self.tar_files_path)
+            if os.path.isdir(os.path.join(self.tar_files_path, item)) and "extracted" in item
+        ]
+
+        for folder in extracted_folders:
+            try:
+                shutil.rmtree(folder)
+                logging.info(f"Deleted folder: {folder}")
+            except OSError as e:
+                logging.error(f"Error deleting folder {folder}: {e}")
+                    
+    ###################################################################################
+        
+    def extract_tar_files(self):
+        """
+        Extracts all tar files in the specified sample folder.
+
+        The extracted files are placed in a subdirectory named after each tar file with '_extracted' appended.
+        """
+        # Iterate over files in the sample folder
+        for item_name in os.listdir(self.tar_files_path):
+            item_path = os.path.join(self.tar_files_path, item_name)
+            
+            # Check if the item is a file
+            if os.path.isfile(item_path):
+                # Check if the file is a tar file
+                if tarfile.is_tarfile(item_path):
+                    # Use the file name without the extension for the extracted folder
+                    file_name = os.path.splitext(item_name)[0]
+
+                    # Create a new folder for extracted files
+                    extracted_folder = os.path.join(self.tar_files_path, f'{file_name}.tar_extracted')
+                    os.makedirs(extracted_folder, exist_ok=True)
+                    
+                    try:
+                        # Extract the tar file into the new folder
+                        with tarfile.open(item_path, 'r') as tar:
+                            tar.extractall(path=extracted_folder)
+                            logging.info(f"Extracted '{item_name}' into '{extracted_folder}'")
+                    except (tarfile.TarError, OSError) as e:
+                        logging.error(f"Error extracting '{item_name}': {e}")
+
+    ###################################################################################
+    
+    def set_path_of_extracted_folders(self):
+        """Finds and stores paths of extracted folders inside `self.tar_files_path`."""
+        logging.info("Searching for extracted folders...")
+
+        # Find all directories containing 'extracted' in their name
+        self.extracted_folders_path_list = [
+            os.path.join(self.tar_files_path, item)
+            for item in os.listdir(self.tar_files_path)
+            if os.path.isdir(os.path.join(self.tar_files_path, item)) and "extracted" in item
+        ]
+
+        # Log each extracted folder found
+        for folder in self.extracted_folders_path_list:
+            logging.info(f"Found extracted folder: {folder}")
+
+        # Log summary
+        logging.info(f"Total extracted folders found: {len(self.extracted_folders_path_list)}")
+    
+    ###################################################################################
+
+    def set_path_of_lzo_files_inside_extracted_folders(self):
+        """Finds and stores paths of .lzo files inside extracted folders."""
+        logging.info("Starting to search for LZO files inside extracted folders...")
+
+        # Ensure extracted folders list is available
+        if not self.extracted_folders_path_list:
+            logging.warning("No extracted folders found. Please check the extracted folders path list.")
+            return
+
+        # Now search for .lzo files in the extracted folders
+        lzo_files = []
+        for folder in self.extracted_folders_path_list:
+            for root, dirs, files in os.walk(folder):  # Walk through each extracted folder
+                for file in files:
+                    if file.endswith('.lzo'):
+                        lzo_file_path = os.path.join(root, file)
+                        lzo_files.append(lzo_file_path)
+                        logging.info(f"Found LZO file: {lzo_file_path}")
+
+        self.lzo_files_path_list = lzo_files  # Store the paths in the class attribute
+
+        # Log the number of LZO files found
+        logging.info(f"Total LZO files found: {len(lzo_files)}")
+            
+    ###################################################################################
+
+    def read_lzo_files(self):
+        
+        # Set self.os based on the platform
+        os_name = platform.system().lower()
+        if 'windows' in os_name:
+            self.os = "windows"
+        elif 'darwin' in os_name:
+            self.os = "mac"
+        logging.info(f'Detected operating system: {self.os}')
+               
+        if self.os == "windows":
+            # Get the path of the current working directory
+            working_space_path = os.getcwd()
+            
+            # Construct the full path to the LZO executable, adding the .exe extension
+            path_of_lzo_exe_file = os.path.join(working_space_path, self.lzo_exe_file_path)
+
+            # Log the path being checked
+            logging.info(f'Checking path for LZO executable: {path_of_lzo_exe_file}')
+
+            # Check if the executable exists
+            if not os.path.isfile(path_of_lzo_exe_file):
+                logging.error(f'LZO executable not found: {path_of_lzo_exe_file}')
+                return
+
+            for lzo_file_path in self.lzo_files_path_list:
+                logging.info(f'Starting decompression for: {lzo_file_path}')
+                try:
+                    # Run the lzop command to decompress the LZO file
+                    result = subprocess.run([path_of_lzo_exe_file, '-d', lzo_file_path], check=True)
+                    logging.info(f'Successfully decompressed: {lzo_file_path}')
+                except subprocess.CalledProcessError as e:
+                    logging.error(f'Error decompressing {lzo_file_path}: {e}')
+                except PermissionError as e:
+                    logging.error(f'Permission denied for {lzo_file_path}: {e}')
+                except Exception as e:
+                    logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')
+                    
+        elif self.os == "mac":
+            for lzo_file_path in self.lzo_files_path_list:
+                logging.info(f'Starting decompression for: {lzo_file_path}')
+                try:
+                    # Run the lzop command to decompress the LZO file
+                    result = subprocess.run(['lzop', '-d', lzo_file_path], check=True)
+                    subprocess.run(['lzop', '-d', lzo_file_path], check=True)
+                    logging.info(f'Successfully decompressed: {lzo_file_path}')
+                except FileNotFoundError:
+                    # check if homebrew is installed
+                    brew_path = shutil.which("brew")
+                    # if homebrew is not installed, tell the user to install it manually and exit 
+                    if brew_path is None:
+                        logging.error("Homebrew is required to install lzop. A description how to install Homebrew can be found in the README.md file.")
+                        sys.exit()
+                   
+                    # install lzop using homebrew
+                    subprocess.run(['arch', '-arm64', 'brew', 'install', 'lzop'], check=True)
+                    logging.info("Successfully installed lzop using Homebrew.")
+                    # Run the lzop command to decompress the LZO file
+                    subprocess.run(['lzop', '-d', lzo_file_path], check=True)
+                    logging.info(f'Successfully decompressed: {lzo_file_path}')
+
+                except subprocess.CalledProcessError as e:
+                    logging.error(f'Error decompressing {lzo_file_path}: {e}')
+                except PermissionError as e:
+                    logging.error(f'Permission denied for {lzo_file_path}: {e}')
+                except Exception as e:
+                    logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')            
+                    logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')           
+
+    ###################################################################################
+
+    def set_path_of_raw_files_inside_extracted_folders(self):
+        logging.info("Starting to search for RAW files inside extracted folders...")
+
+        # Ensure extracted folders list is available
+        if not self.extracted_folders_path_list:
+            logging.warning("No extracted folders found. Please check the extracted folders path list.")
+            return
+
+        # Now search for .raw files in the extracted folders
+        raw_files = []
+        for folder in self.extracted_folders_path_list:
+            for root, dirs, files in os.walk(folder):  # Walk through each extracted folder
+                for file in files:
+                    if file.endswith('.raw'):
+                        raw_file_path = os.path.join(root, file)
+                        raw_files.append(raw_file_path)
+                        logging.info(f"Found RAW file: {raw_file_path}")
+
+        self.raw_files_path_list = raw_files  # Store the paths in the class attribute
+
+        # Log the number of RAW files found
+        logging.info(f"Total RAW files found: {len(raw_files)}")
+
+    ###################################################################################
+
+    def read_raw_files(self) -> None:
+        """
+        Function to read raw files from the instance's list of file paths,
+        extract header information, timestamps, and data, and save them as '.npy' files.
+
+        Returns:
+            None
+        """
+        for raw_file_path in self.raw_files_path_list:
+            logging.info(f'Reading raw file: {raw_file_path}')
+            
+            # Define header information fields
+            hdr_info = ('id', 'frames', 'lines', 'samples', 'samplesize')
+
+            # Initialize dictionaries and arrays to store header, timestamps, and data
+            hdr, timestamps, data = {}, None, None
+            
+            # Open the raw file in binary mode
+            try:
+                with open(raw_file_path, 'rb') as raw_bytes:
+                    # Read header information (4 bytes each)
+                    for info in hdr_info:
+                        hdr[info] = int.from_bytes(raw_bytes.read(4), byteorder='little')
+                    
+                    # Read timestamps and data
+                    timestamps = np.zeros(hdr['frames'], dtype='int64')
+                                    
+                    # Calculate the size of each frame
+                    sz = hdr['lines'] * hdr['samples'] * hdr['samplesize']
+                    
+                    # Initialize data array based on file type
+                    if "_rf.raw" in raw_file_path:
+                        data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='int16')
+                    elif "_env.raw" in raw_file_path:
+                        data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='int8')
+
+                    # Loop over frames
+                    for frame in range(hdr['frames']):
+                        
+                        # Read timestamp for each frame (8 bytes)
+                        timestamps[frame] = int.from_bytes(raw_bytes.read(8), byteorder='little')
+                        
+                        # Read frame data and reshape it to match dimensions specified in the header
+                        if "_rf.raw" in raw_file_path:
+                            data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='int16').reshape([hdr['lines'], hdr['samples']])
+                        elif "_env.raw" in raw_file_path:
+                            data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='uint8').reshape([hdr['lines'], hdr['samples']])
+
+                # Print message indicating the number of frames loaded and their size
+                logging.info('Loaded %d raw frames of size %d x %d (lines x samples)', data.shape[2], data.shape[0], data.shape[1])
+                
+                # Save data as numpy array
+                np.save(raw_file_path, data)
+                logging.info(f'Saved data as: {raw_file_path}.npy')
+
+            except Exception as e:
+                logging.error(f'Error reading file {raw_file_path}: {e}')
+
+    ###################################################################################
+    
+    def delete_hidden_files_in_extracted_folders(self):
+        # Iterate through each extracted folder path
+        for folder_path in self.extracted_folders_path_list:
+            try:
+                # List all files in the folder
+                for filename in os.listdir(folder_path):
+                    # Check if the file is hidden (starts with a dot)
+                    if filename.startswith('.'):
+                        file_path = os.path.join(folder_path, filename)
+                        os.remove(file_path)  # Delete the hidden file
+                        logging.info(f"Deleted hidden file: {file_path}")
+            except Exception as e:
+                logging.error(f"Error while deleting hidden files in {folder_path}: {e}")
+          
+    ###################################################################################
