@@ -499,13 +499,14 @@ class Clarius_tar_unpacker():
 
         self.tar_files_path = tar_files_path
         self.extraction_mode = extraction_mode
+        self.lzo_exe_file_path = 'pyquantus/exe/lzop.exe'
         
         if   self.extraction_mode == "single":   self.__run_single_extraction()
         elif self.extraction_mode == "multiple": self.__run_multiple_extraction()    
         else:
             raise ValueError(f"Invalid mode: {self.extraction_mode}")
         
-    #########################################################################################
+    ###################################################################################
         
     def __run_single_extraction(self):
         
@@ -516,10 +517,9 @@ class Clarius_tar_unpacker():
         self.set_path_of_lzo_files_inside_extracted_folders()
         self.read_lzo_files()
         self.set_path_of_raw_files_inside_extracted_folders()
-        self.read_raw_files()
         self.delete_hidden_files_in_extracted_folders()
 
-    #########################################################################################
+    ###################################################################################
 
     def __run_multiple_extraction(self):
         """Extracts data from all directories inside `self.tar_files_path`."""
@@ -539,7 +539,7 @@ class Clarius_tar_unpacker():
         except Exception as e:
             logging.error(f"An error occurred while extracting data: {e}")
 
-    #########################################################################################
+    ###################################################################################
     
     def delete_hidden_files_in_sample_folder(self):
         """
@@ -573,7 +573,7 @@ class Clarius_tar_unpacker():
             logging.error(f"An error occurred while deleting hidden files: {e}")
             return False  # Indicate failure
         
-    #########################################################################################
+    ###################################################################################
        
     def delete_extracted_folders(self):
         """Deletes all extracted folders in the specified directory."""
@@ -762,66 +762,6 @@ class Clarius_tar_unpacker():
 
         # Log the number of RAW files found
         logging.info(f"Total RAW files found: {len(raw_files)}")
-
-    ###################################################################################
-
-    def read_raw_files(self) -> None:
-        """
-        Function to read raw files from the instance's list of file paths,
-        extract header information, timestamps, and data, and save them as '.npy' files.
-
-        Returns:
-            None
-        """
-        for raw_file_path in self.raw_files_path_list:
-            logging.info(f'Reading raw file: {raw_file_path}')
-            
-            # Define header information fields
-            hdr_info = ('id', 'frames', 'lines', 'samples', 'samplesize')
-
-            # Initialize dictionaries and arrays to store header, timestamps, and data
-            hdr, timestamps, data = {}, None, None
-            
-            # Open the raw file in binary mode
-            try:
-                with open(raw_file_path, 'rb') as raw_bytes:
-                    # Read header information (4 bytes each)
-                    for info in hdr_info:
-                        hdr[info] = int.from_bytes(raw_bytes.read(4), byteorder='little')
-                    
-                    # Read timestamps and data
-                    timestamps = np.zeros(hdr['frames'], dtype='int64')
-                                    
-                    # Calculate the size of each frame
-                    sz = hdr['lines'] * hdr['samples'] * hdr['samplesize']
-                    
-                    # Initialize data array based on file type
-                    if "_rf.raw" in raw_file_path:
-                        data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='int16')
-                    elif "_env.raw" in raw_file_path:
-                        data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='int8')
-
-                    # Loop over frames
-                    for frame in range(hdr['frames']):
-                        
-                        # Read timestamp for each frame (8 bytes)
-                        timestamps[frame] = int.from_bytes(raw_bytes.read(8), byteorder='little')
-                        
-                        # Read frame data and reshape it to match dimensions specified in the header
-                        if "_rf.raw" in raw_file_path:
-                            data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='int16').reshape([hdr['lines'], hdr['samples']])
-                        elif "_env.raw" in raw_file_path:
-                            data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='uint8').reshape([hdr['lines'], hdr['samples']])
-
-                # Print message indicating the number of frames loaded and their size
-                logging.info('Loaded %d raw frames of size %d x %d (lines x samples)', data.shape[2], data.shape[0], data.shape[1])
-                
-                # Save data as numpy array
-                np.save(raw_file_path, data)
-                logging.info(f'Saved data as: {raw_file_path}.npy')
-
-            except Exception as e:
-                logging.error(f'Error reading file {raw_file_path}: {e}')
 
     ###################################################################################
     
