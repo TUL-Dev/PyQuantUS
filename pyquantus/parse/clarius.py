@@ -67,18 +67,77 @@ def clarius_rf_parser(img_filename: str,
                                                  img_tgc_filename,
                                                  info_filename,
                                                  version,
-                                                 isPhantom=False
+                                                 is_phantom=False
                                                  )
     
     ref_data, ref_info, _ = read_img(phantom_filename,
                                     phantom_tgc_filename,
                                     phantom_info_filename,
                                     version,
-                                    isPhantom=False
+                                    is_phantom=False
                                     )
 
     return img_data, img_info, ref_data, ref_info, scan_converted
 
+#############################################################################################
+
+def read_raw(raw_file_path) -> None:
+    """
+    Function to read raw files from the instance's list of file paths,
+    extract header information, timestamps, and data, and save them as '.npy' files.
+
+    Returns:
+        None
+    """
+    logging.info(f'Reading raw file: {raw_file_path}')
+    
+    # Define header information fields
+    hdr_info = ('id', 'frames', 'lines', 'samples', 'samplesize')
+
+    # Initialize dictionaries and arrays to store header, timestamps, and data
+    hdr, timestamps, data = {}, None, None
+    
+    # Open the raw file in binary mode
+    try:
+        with open(raw_file_path, 'rb') as raw_bytes:
+            # Read header information (4 bytes each)
+            for info in hdr_info:
+                hdr[info] = int.from_bytes(raw_bytes.read(4), byteorder='little')
+            
+            # Read timestamps and data
+            timestamps = np.zeros(hdr['frames'], dtype='int64')
+                            
+            # Calculate the size of each frame
+            sz = hdr['lines'] * hdr['samples'] * hdr['samplesize']
+            
+            # Initialize data array based on file type
+            if "_rf.raw" in raw_file_path:
+                data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='int16')
+            elif "_env.raw" in raw_file_path:
+                data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='int8')
+
+            # Loop over frames
+            for frame in range(hdr['frames']):
+                
+                # Read timestamp for each frame (8 bytes)
+                timestamps[frame] = int.from_bytes(raw_bytes.read(8), byteorder='little')
+                
+                # Read frame data and reshape it to match dimensions specified in the header
+                if "_rf.raw" in raw_file_path:
+                    data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='int16').reshape([hdr['lines'], hdr['samples']])
+                elif "_env.raw" in raw_file_path:
+                    data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='uint8').reshape([hdr['lines'], hdr['samples']])
+
+        # Print message indicating the number of frames loaded and their size
+        logging.info('Loaded %d raw frames of size %d x %d (lines x samples)', data.shape[2], data.shape[0], data.shape[1])
+        
+        # Save data as numpy array
+        np.save(raw_file_path, data)
+        logging.info(f'Saved data as: {raw_file_path}.npy')
+
+    except Exception as e:
+        logging.error(f'Error reading file {raw_file_path}: {e}')
+                
 #############################################################################################
 
 def read_img(filename: str,
@@ -670,7 +729,31 @@ class Clarius_tar_unpacker():
     ###################################################################################
 
     def read_lzo_files(self):
-        
+        """
+        Detects the operating system and decompresses `.lzo` files accordingly.
+
+        **Workflow:**
+        1. Determines whether the system is Windows or macOS.
+        2. Logs the detected operating system.
+        3. If running on **Windows**:
+            - Constructs the path to the LZO executable.
+            - Checks if the executable exists.
+            - Iterates through the `.lzo` files and decompresses them using `lzop.exe`.
+        4. If running on **macOS**:
+            - Attempts to decompress `.lzo` files using the `lzop` command.
+            - If `lzop` is missing, checks for Homebrew.
+            - Installs `lzop` via Homebrew if necessary.
+            - Decompresses `.lzo` files after ensuring `lzop` is installed.
+        5. Logs successes and failures, handling potential errors like:
+            - `FileNotFoundError`
+            - `PermissionError`
+            - `subprocess.CalledProcessError`
+            - Other unexpected exceptions.
+
+        **Returns:**
+        - Logs the status of each decompression attempt.
+        - Exits the program if `lzop` is missing on macOS and cannot be installed.
+        """
         # Set self.os based on the platform
         os_name = platform.system().lower()
         if 'windows' in os_name:
@@ -741,6 +824,7 @@ class Clarius_tar_unpacker():
     ###################################################################################
 
     def set_path_of_raw_files_inside_extracted_folders(self):
+        """Searches for .raw files inside extracted folders and stores their paths."""
         logging.info("Starting to search for RAW files inside extracted folders...")
 
         # Ensure extracted folders list is available
@@ -766,6 +850,7 @@ class Clarius_tar_unpacker():
     ###################################################################################
     
     def delete_hidden_files_in_extracted_folders(self):
+        """Deletes hidden files (starting with a dot) in extracted folders."""
         # Iterate through each extracted folder path
         for folder_path in self.extracted_folders_path_list:
             try:
