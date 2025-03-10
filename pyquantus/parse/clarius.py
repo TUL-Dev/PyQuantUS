@@ -1,24 +1,489 @@
+# Standard Library Imports
+import logging
 import os
+import platform
 import re
+import shutil
+import subprocess
+import sys
+import tarfile
+from typing import Tuple
 
-import yaml
+# Third-Party Library Imports
 import numpy as np
+import yaml
 from scipy.interpolate import interp1d
 from scipy.signal import hilbert
-from typing import Tuple
 from tqdm import tqdm
 
+# Local Module Imports
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
 from pyquantus.parse.transforms import scanConvert
 
+# Logging setup
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
+# info structures
+###################################################################################
 class ClariusInfo(InfoStruct):
+    
     def __init__(self):
+        
         super().__init__()
+        
         self.numLines: int
         self.samplesPerLine: int
         self.sampleSize: int # bytes
+        
+        # data from raw file
+        self.raw_hdr: dict
+        self.raw_timestamps: np.ndarray
+        self.raw_data: np.ndarray 
+        
+        # outputs
+        self.img_data: DataOutputStruct 
+        self.img_info: ClariusInfo 
+        self.scan_converted: bool        
+        
+###################################################################################
 
+
+
+
+# classes    
+###################################################################################  
+class Clarius_tar_unpacker():
+    """
+    A class for extracting and processing `.tar` archives containing `.lzo` and `.raw` files.
+    
+    Attributes:
+        tar_files_path (str): The path to the directory containing `.tar` files.
+        extraction_mode (str): Extraction mode - either "single" or "multiple".
+        lzo_exe_file_path (str): Path to the LZO executable for decompression (Windows only).
+    """
+    ###################################################################################
+    
+    def __init__(self, tar_files_path: str, extraction_mode: str) -> None:  
+        """
+        Initializes the ClariusTarUnpacker class and starts the extraction process.
+        
+        Args:
+            tar_files_path (str): The directory containing `.tar` files.
+            extraction_mode (str): Mode of extraction - "single" or "multiple".
+        
+        Raises:
+            ValueError: If `extraction_mode` is not "single" or "multiple".
+        """
+        
+        self.tar_files_path = tar_files_path
+        self.extraction_mode = extraction_mode
+        self.lzo_exe_file_path = 'pyquantus/exe/lzop.exe'
+        
+        if   self.extraction_mode == "single":   self.__run_single_extraction()
+        elif self.extraction_mode == "multiple": self.__run_multiple_extraction()    
+        else:
+            raise ValueError(f"Invalid mode: {self.extraction_mode}")
+        
+    ###################################################################################
+        
+    def __run_single_extraction(self):
+        """Runs the extraction process for a single directory."""
+        self.delete_hidden_files_in_sample_folder()
+        self.delete_extracted_folders()
+        self.extract_tar_files()
+        self.set_path_of_extracted_folders()
+        self.set_path_of_lzo_files_inside_extracted_folders()
+        self.read_lzo_files()
+        self.set_path_of_raw_files_inside_extracted_folders()
+        self.delete_hidden_files_in_extracted_folders()
+
+    ###################################################################################
+
+    def __run_multiple_extraction(self):
+        """Extracts data from all directories inside `self.tar_files_path`."""
+        try:
+            # Retrieve all subdirectory paths
+            folder_paths = [
+                os.path.join(self.tar_files_path, folder)
+                for folder in os.listdir(self.tar_files_path)
+                if os.path.isdir(os.path.join(self.tar_files_path, folder))
+            ]
+
+            # Process each folder for data extraction
+            for folder_path in folder_paths:
+                self.tar_files_path = folder_path  # Update path before extraction
+                self.__run_single_extraction()
+
+        except Exception as e:
+            logging.error(f"An error occurred while extracting data: {e}")
+
+    ###################################################################################
+    
+    def delete_hidden_files_in_sample_folder(self):
+        """
+        Deletes hidden files (starting with a dot) from the sample folder.
+
+        Returns:
+            bool: True if files were successfully deleted, False otherwise.
+        """
+        if not os.path.exists(self.tar_files_path):
+            logging.error(f"Sample folder path does not exist: {self.tar_files_path}")
+            return False  # Indicate failure due to non-existing path
+
+        try:
+            deleted_files_count = 0  # Count of deleted files
+            # Iterate over the files in the sample folder
+            for filename in os.listdir(self.tar_files_path):
+                # Check if the file is hidden (starts with a dot)
+                if filename.startswith('.'):
+                    file_path = os.path.join(self.tar_files_path, filename)
+                    os.remove(file_path)  # Delete the hidden file
+                    logging.info(f"Deleted hidden file: {file_path}")
+                    deleted_files_count += 1
+
+            if deleted_files_count > 0:
+                logging.info(f"Total hidden files deleted: {deleted_files_count}")
+            else:
+                logging.info("No hidden files to delete.")
+
+            return True  # Indicate success
+        except Exception as e:
+            logging.error(f"An error occurred while deleting hidden files: {e}")
+            return False  # Indicate failure
+        
+    ###################################################################################
+       
+    def delete_extracted_folders(self):
+        """Deletes all extracted folders in the specified directory."""
+        extracted_folders = [
+            os.path.join(self.tar_files_path, item)
+            for item in os.listdir(self.tar_files_path)
+            if os.path.isdir(os.path.join(self.tar_files_path, item)) and "extracted" in item
+        ]
+
+        for folder in extracted_folders:
+            try:
+                shutil.rmtree(folder)
+                logging.info(f"Deleted folder: {folder}")
+            except OSError as e:
+                logging.error(f"Error deleting folder {folder}: {e}")
+                    
+    ###################################################################################
+        
+    def extract_tar_files(self):
+        """
+        Extracts all tar files in the specified sample folder.
+
+        The extracted files are placed in a subdirectory named after each tar file with '_extracted' appended.
+        """
+        # Iterate over files in the sample folder
+        for item_name in os.listdir(self.tar_files_path):
+            item_path = os.path.join(self.tar_files_path, item_name)
+            
+            # Check if the item is a file
+            if os.path.isfile(item_path):
+                # Check if the file is a tar file
+                if tarfile.is_tarfile(item_path):
+                    # Use the file name without the extension for the extracted folder
+                    file_name = os.path.splitext(item_name)[0]
+
+                    # Create a new folder for extracted files
+                    extracted_folder = os.path.join(self.tar_files_path, f'{file_name}.tar_extracted')
+                    os.makedirs(extracted_folder, exist_ok=True)
+                    
+                    try:
+                        # Extract the tar file into the new folder
+                        with tarfile.open(item_path, 'r') as tar:
+                            tar.extractall(path=extracted_folder)
+                            logging.info(f"Extracted '{item_name}' into '{extracted_folder}'")
+                    except (tarfile.TarError, OSError) as e:
+                        logging.error(f"Error extracting '{item_name}': {e}")
+
+    ###################################################################################
+    
+    def set_path_of_extracted_folders(self):
+        """Finds and stores paths of extracted folders inside `self.tar_files_path`."""
+        logging.info("Searching for extracted folders...")
+
+        # Find all directories containing 'extracted' in their name
+        self.extracted_folders_path_list = [
+            os.path.join(self.tar_files_path, item)
+            for item in os.listdir(self.tar_files_path)
+            if os.path.isdir(os.path.join(self.tar_files_path, item)) and "extracted" in item
+        ]
+
+        # Log each extracted folder found
+        for folder in self.extracted_folders_path_list:
+            logging.info(f"Found extracted folder: {folder}")
+
+        # Log summary
+        logging.info(f"Total extracted folders found: {len(self.extracted_folders_path_list)}")
+    
+    ###################################################################################
+
+    def set_path_of_lzo_files_inside_extracted_folders(self):
+        """Finds and stores paths of .lzo files inside extracted folders."""
+        logging.info("Starting to search for LZO files inside extracted folders...")
+
+        # Ensure extracted folders list is available
+        if not self.extracted_folders_path_list:
+            logging.warning("No extracted folders found. Please check the extracted folders path list.")
+            return
+
+        # Now search for .lzo files in the extracted folders
+        lzo_files = []
+        for folder in self.extracted_folders_path_list:
+            for root, dirs, files in os.walk(folder):  # Walk through each extracted folder
+                for file in files:
+                    if file.endswith('.lzo'):
+                        lzo_file_path = os.path.join(root, file)
+                        lzo_files.append(lzo_file_path)
+                        logging.info(f"Found LZO file: {lzo_file_path}")
+
+        self.lzo_files_path_list = lzo_files  # Store the paths in the class attribute
+
+        # Log the number of LZO files found
+        logging.info(f"Total LZO files found: {len(lzo_files)}")
+            
+    ###################################################################################
+
+    def read_lzo_files(self):
+        """
+        Detects the operating system and decompresses `.lzo` files accordingly.
+
+        **Workflow:**
+        1. Determines whether the system is Windows or macOS.
+        2. Logs the detected operating system.
+        3. If running on **Windows**:
+            - Constructs the path to the LZO executable.
+            - Checks if the executable exists.
+            - Iterates through the `.lzo` files and decompresses them using `lzop.exe`.
+        4. If running on **macOS**:
+            - Attempts to decompress `.lzo` files using the `lzop` command.
+            - If `lzop` is missing, checks for Homebrew.
+            - Installs `lzop` via Homebrew if necessary.
+            - Decompresses `.lzo` files after ensuring `lzop` is installed.
+        5. Logs successes and failures, handling potential errors like:
+            - `FileNotFoundError`
+            - `PermissionError`
+            - `subprocess.CalledProcessError`
+            - Other unexpected exceptions.
+
+        **Returns:**
+        - Logs the status of each decompression attempt.
+        - Exits the program if `lzop` is missing on macOS and cannot be installed.
+        """
+        # Set self.os based on the platform
+        os_name = platform.system().lower()
+        if 'windows' in os_name:
+            self.os = "windows"
+        elif 'darwin' in os_name:
+            self.os = "mac"
+        logging.info(f'Detected operating system: {self.os}')
+               
+        if self.os == "windows":
+            # Get the path of the current working directory
+            working_space_path = os.getcwd()
+            
+            # Construct the full path to the LZO executable, adding the .exe extension
+            path_of_lzo_exe_file = os.path.join(working_space_path, self.lzo_exe_file_path)
+
+            # Log the path being checked
+            logging.info(f'Checking path for LZO executable: {path_of_lzo_exe_file}')
+
+            # Check if the executable exists
+            if not os.path.isfile(path_of_lzo_exe_file):
+                logging.error(f'LZO executable not found: {path_of_lzo_exe_file}')
+                return
+
+            for lzo_file_path in self.lzo_files_path_list:
+                logging.info(f'Starting decompression for: {lzo_file_path}')
+                try:
+                    # Run the lzop command to decompress the LZO file
+                    result = subprocess.run([path_of_lzo_exe_file, '-d', lzo_file_path], check=True)
+                    logging.info(f'Successfully decompressed: {lzo_file_path}')
+                except subprocess.CalledProcessError as e:
+                    logging.error(f'Error decompressing {lzo_file_path}: {e}')
+                except PermissionError as e:
+                    logging.error(f'Permission denied for {lzo_file_path}: {e}')
+                except Exception as e:
+                    logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')
+                    
+        elif self.os == "mac":
+            for lzo_file_path in self.lzo_files_path_list:
+                logging.info(f'Starting decompression for: {lzo_file_path}')
+                try:
+                    # Run the lzop command to decompress the LZO file
+                    result = subprocess.run(['lzop', '-d', lzo_file_path], check=True)
+                    subprocess.run(['lzop', '-d', lzo_file_path], check=True)
+                    logging.info(f'Successfully decompressed: {lzo_file_path}')
+                except FileNotFoundError:
+                    # check if homebrew is installed
+                    brew_path = shutil.which("brew")
+                    # if homebrew is not installed, tell the user to install it manually and exit 
+                    if brew_path is None:
+                        logging.error("Homebrew is required to install lzop. A description how to install Homebrew can be found in the README.md file.")
+                        sys.exit()
+                   
+                    # install lzop using homebrew
+                    subprocess.run(['arch', '-arm64', 'brew', 'install', 'lzop'], check=True)
+                    logging.info("Successfully installed lzop using Homebrew.")
+                    # Run the lzop command to decompress the LZO file
+                    subprocess.run(['lzop', '-d', lzo_file_path], check=True)
+                    logging.info(f'Successfully decompressed: {lzo_file_path}')
+
+                except subprocess.CalledProcessError as e:
+                    logging.error(f'Error decompressing {lzo_file_path}: {e}')
+                except PermissionError as e:
+                    logging.error(f'Permission denied for {lzo_file_path}: {e}')
+                except Exception as e:
+                    logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')            
+                    logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')           
+
+    ###################################################################################
+
+    def set_path_of_raw_files_inside_extracted_folders(self):
+        """Searches for .raw files inside extracted folders and stores their paths."""
+        logging.info("Starting to search for RAW files inside extracted folders...")
+
+        # Ensure extracted folders list is available
+        if not self.extracted_folders_path_list:
+            logging.warning("No extracted folders found. Please check the extracted folders path list.")
+            return
+
+        # Now search for .raw files in the extracted folders
+        raw_files = []
+        for folder in self.extracted_folders_path_list:
+            for root, dirs, files in os.walk(folder):  # Walk through each extracted folder
+                for file in files:
+                    if file.endswith('.raw'):
+                        raw_file_path = os.path.join(root, file)
+                        raw_files.append(raw_file_path)
+                        logging.info(f"Found RAW file: {raw_file_path}")
+
+        self.raw_files_path_list = raw_files  # Store the paths in the class attribute
+
+        # Log the number of RAW files found
+        logging.info(f"Total RAW files found: {len(raw_files)}")
+
+    ###################################################################################
+    
+    def delete_hidden_files_in_extracted_folders(self):
+        """Deletes hidden files (starting with a dot) in extracted folders."""
+        # Iterate through each extracted folder path
+        for folder_path in self.extracted_folders_path_list:
+            try:
+                # List all files in the folder
+                for filename in os.listdir(folder_path):
+                    # Check if the file is hidden (starts with a dot)
+                    if filename.startswith('.'):
+                        file_path = os.path.join(folder_path, filename)
+                        os.remove(file_path)  # Delete the hidden file
+                        logging.info(f"Deleted hidden file: {file_path}")
+            except Exception as e:
+                logging.error(f"Error while deleting hidden files in {folder_path}: {e}")
+          
+    ###################################################################################
+    
+###################################################################################
+class Clarius_parser(ClariusInfo):
+
+    ###################################################################################
+    
+    def __init__(self, 
+                 main_raw_path: str,
+                 main_tgc_yml_path: str | None,
+                 main_rf_yml_path: str,
+                 isPhantom: bool):
+    
+        # inputs
+        self.main_raw_path = main_raw_path
+        self.main_tgc_yml_path = main_tgc_yml_path
+        self.main_rf_yml_path = main_rf_yml_path
+        self.isPhantom = isPhantom
+        
+        # predefined versions
+        self.versions_list = ["6.0.3"]
+        
+        self.__run()
+        
+    ###################################################################################
+    
+    def __run(self):
+        
+        self.read_raw_files()
+        
+    ###################################################################################
+    
+    def read_raw_files(self, 
+                        raw_file_path):
+        """
+        Reads a raw binary file, extracts header information, timestamps, and data,
+        and returns them as a dictionary and NumPy arrays.
+
+        Args:
+            raw_file_path (str): Path to the raw binary file.
+
+        Returns:
+            tuple: (hdr (dict), timestamps (np.ndarray), data (np.ndarray))
+            or (None, None, None) in case of an error.
+        """
+        logging.info(f'Reading raw file: {raw_file_path}')
+
+        # Define header fields
+        hdr_info = ('id', 'frames', 'lines', 'samples', 'samplesize')
+        hdr = {}
+
+        try:
+            with open(raw_file_path, 'rb') as raw_bytes:
+                # Read header (4 bytes each field)
+                for info in hdr_info:
+                    hdr[info] = int.from_bytes(raw_bytes.read(4), byteorder='little')
+
+                # Validate header values
+                if any(value <= 0 for value in hdr.values()):
+                    logging.error(f'Invalid header values: {hdr}')
+                    return None, None, None
+
+                # Initialize arrays
+                timestamps = np.zeros(hdr['frames'], dtype=np.int64)
+                sz = hdr['lines'] * hdr['samples'] * hdr['samplesize']
+                data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype=np.int16)
+
+                # Read timestamps and data for each frame
+                for frame in range(hdr['frames']):
+                    # Read timestamp (8 bytes per frame)
+                    timestamps[frame] = int.from_bytes(raw_bytes.read(8), byteorder='little')
+
+                    # Read frame data and ensure correct number of bytes
+                    frame_data = raw_bytes.read(sz)
+                    if len(frame_data) != sz:
+                        logging.error(f'Unexpected frame size at frame {frame}: Expected {sz} bytes, got {len(frame_data)}')
+                        return None, None, None
+
+                    data[:, :, frame] = np.frombuffer(frame_data, dtype=np.int16).reshape((hdr['lines'], hdr['samples']))
+
+            logging.info(f'Loaded {data.shape[2]} raw frames of size {data.shape[0]} x {data.shape[1]} (lines x samples)')
+
+            self.raw_hdr, self.raw_timestamps, self.raw_data = hdr, timestamps, data
+
+        except Exception as e:
+            logging.error(f'Error reading file {raw_file_path}: {e}')
+            return None, None, None
+
+    ###################################################################################
+    
+    
+    
+###################################################################################
+
+
+
+
+
+# functions
+###################################################################################
 
 def read_tgc_file(file_timestamp: str, rf_timestamps: np.ndarray) -> list | None:
     """Read TGC file and extract TGC data for inputted file.
@@ -64,16 +529,21 @@ def read_tgc_file(file_timestamp: str, rf_timestamps: np.ndarray) -> list | None
 
     return filtered_frames_data
 
+###################################################################################
 
 def clean_and_convert(value):
     """Clean and convert a string value to a float."""
     clean_value = ''.join([char for char in value if char.isdigit() or char in ['.', '-']])
     return float(clean_value)
 
+###################################################################################
+
 def extract_tgc_data_from_line(line):
     """Extract TGC data from a line."""
     tgc_pattern = r'\{([^}]+)\}'
     return re.findall(tgc_pattern, line)
+
+###################################################################################
 
 def read_tgc_file_v2(tgc_path, rf_timestamps):
     """Read TGC file and extract TGC data for inputted file.
@@ -132,6 +602,8 @@ def read_tgc_file_v2(tgc_path, rf_timestamps):
 
     return filtered_frames_data
 
+###################################################################################
+
 def generate_default_tgc_matrix(num_frames: int, info: ClariusInfo) -> np.ndarray:
     """Generate a default TGC matrix for the inputted number of frames and Clarius file metadata.
     
@@ -175,6 +647,8 @@ def generate_default_tgc_matrix(num_frames: int, info: ClariusInfo) -> np.ndarra
     #         print(f"Depth: {depth:.2f}mm, TGC: {tgc_value:.2f}dB")
 
     return linear_default_tgc_matrix_transpose
+
+###################################################################################
 
 def generate_tgc_matrix(file_timestamp: str, tgc_path: str | None, rf_timestamps: np.ndarray, num_frames: int, 
                         info: InfoStruct, isPhantom: bool) -> np.ndarray:
@@ -234,6 +708,8 @@ def generate_tgc_matrix(file_timestamp: str, tgc_path: str | None, rf_timestamps
 
     return linear_tgc_matrix_transpose
 
+###################################################################################
+
 def checkLengthEnvRF(rfa, rfd, rfn, env, db):
     lenEnv = env.shape[2]
     lenRf = rfa.shape[2]
@@ -250,14 +726,29 @@ def checkLengthEnvRF(rfa, rfd, rfn, env, db):
 
     return rfa, rfd, rfn, env, db
 
+###################################################################################
+
 def convert_env_to_rf_ntgc(x, linear_tgc_matrix):
     y1 =  47.3 * x + 30
     y = 10**(y1/20)-1
     y = y / linear_tgc_matrix
     return y 
 
-def readImg(filename: str, tgc_path: str | None, info_path: str, 
+###################################################################################
+
+
+
+
+
+    
+###################################################################################
+
+def readImg(filename: str,
+            main_tgc_yml_path: str | None,
+            main_rf_yml_path: str, 
             version="6.0.3", isPhantom=False) -> Tuple[DataOutputStruct, ClariusInfo, bool]:
+                       
+                    
     """Read RF data contained in Clarius file
     Args:
         filename (string)): where is the Clarius file
@@ -271,11 +762,20 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
     if version != "6.0.3":
         print("Unrecognized version")
         return []
+    
+    hdr, timestamps, data = read_raw_files(main_raw_path)
+
+    if hdr['id'] != 2:
+        print("The file does not contain RF data. Make sure RF mode is turned on while taking scans."
+        )
+        return []
+        
 
     # read the header info
     hinfo = np.fromfile(
         filename, dtype="uint32", count=5
     )  # int32 and uint32 appear to be equivalent in memory -> a = np.int32(1); np.dtype(a).itemsize
+    
     header = {"id": 0, "nframes": 0, "w": 0, "h": 0, "ss": 0}
     header["id"] = hinfo[0]
     header["nframes"] = hinfo[1]  # frames
@@ -297,12 +797,14 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
             data[:, :, f] = np.flip(
                 v.reshape(header["h"], header["w"], order="F").astype(np.int16), axis=1
             )
+            
     #######################################################################################################
-    else:
-        print(
-            "The file does not contain RF data. Make sure RF mode is turned on while taking scans."
-        )
-        return []
+    
+    # else:
+    #     print(
+    #         "The file does not contain RF data. Make sure RF mode is turned on while taking scans."
+    #     )
+    #     return []
 
     # # Check if the ROI is full
     # if header["w"] != 192 or header["h"] != 2928:
@@ -322,6 +824,8 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
         scanConverted = True
     except KeyError:
         scanConverted = False
+        
+        
     info.endDepth1 = float(infoYml["imaging depth"][:-2]) / 1000 #m
     info.startDepth1 = info.endDepth1 / 4 #m
     info.samplingFrequency = int(infoYml["sampling rate"][:-3]) * 1e6
@@ -363,14 +867,12 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
     rf_ntgc = rf_matrix_corrected_B
     rf_dtgc = rf_matrix_corrected_A
     rf_atgc = data
+    rf = rf_ntgc
 
     # rf_atgc, rf_dtgc, rf_ntgc, dataEnv, dB_tgc_matrix = checkLengthEnvRF(rf_atgc,rf_dtgc,rf_ntgc,dataEnv,dB_tgc_matrix)
     linear_tgc_matrix = linear_tgc_matrix[0:dB_tgc_matrix.shape[0],0:dB_tgc_matrix.shape[1],0:dB_tgc_matrix.shape[2]]
     
-    bmode = np.zeros_like(rf_atgc)
-    for f in range(rf_atgc.shape[2]):
-        for i in range(rf_atgc.shape[1]):
-            bmode[:,i, f] = 20*np.log10(abs(hilbert(rf_atgc[:,i, f])))   
+    bmode = 20*np.log10(abs(hilbert(rf, axis=0)))  
             
     clippedMax = info.clipFact*np.amax(bmode)
     bmode = np.clip(bmode, clippedMax-info.dynRange, clippedMax) 
@@ -383,7 +885,7 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
         scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, 
                                             info.endDepth1, desiredHeight=2000)
         scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, 
-                                     info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf_atgc.shape[2]))])
+                                     info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf.shape[2]))])
 
         info.yResRF =  info.endDepth1*1000 / scBmodeStruct.scArr.shape[0]
         info.xResRF = info.yResRF * (scBmodeStruct.scArr.shape[0]/scBmodeStruct.scArr.shape[1]) # placeholder
@@ -404,27 +906,59 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
 
     
     data.bMode = np.transpose(bmode, (2, 0, 1))
-    data.rf = np.transpose(rf_atgc, (2, 0, 1))
+    data.rf = np.transpose(rf, (2, 0, 1))
 
     return data, info, scanConverted
 
-def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str, 
-            phantomFilename: str, phantomTgcFilename: str, phantomInfoFilename: str, 
-            version="6.0.3") -> Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo, bool]:
-    """Parse Clarius RF data and metadata from inputted files.
+###################################################################################
+
+def clariusRfParser(main_raw_path: str,
+                    main_tgc_yml_path: str,
+                    main_rf_yml_path: str, 
+                    phantom_raw_path: str,
+                    phantom_tgc_yml_path: str,
+                    phantom_rf_yml_path: str, 
+                    version="6.0.3"
+                    ) -> Tuple[DataOutputStruct, ClariusInfo,
+                               DataOutputStruct, ClariusInfo,
+                               bool]:
+    """
+    Parses Clarius RF data and metadata from the specified input files.
 
     Args:
-        imgFilename (str): File path of the RF data.
-        imgTgcFilename (str): File path of the TGC data.
-        infoFilename (str): File path of the metadata.
-        phantomFilename (str): File path of the phantom RF data.
-        phantomTgcFilename (str): File path of the phantom TGC data.
-        phantomInfoFilename (str): File path of the phantom metadata.
-        version (str, optional): Defaults to "6.0.3".
+        main_raw_path (str): Path to the main RF data file.
+        main_tgc_yml_path (str): Path to the main TGC data file.
+        main_rf_yml_path (str): Path to the main metadata file.
+        phantom_raw_path (str): Path to the phantom RF data file.
+        phantom_tgc_yml_path (str): Path to the phantom TGC data file.
+        phantom_rf_yml_path (str): Path to the phantom metadata file.
+        version (str, optional): Clarius software version. Defaults to "6.0.3".
 
     Returns:
-        Tuple: Image data, image metadata, phantom data, and phantom metadata.
+        Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo, bool]: 
+        - Main image data
+        - Main image metadata
+        - Phantom image data
+        - Phantom image metadata
+        - Scan conversion status
     """
-    imgData, imgInfo, scanConverted = readImg(imgFilename, imgTgcFilename, infoFilename, version, isPhantom=False)
-    refData, refInfo, scanConverted = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
-    return imgData, imgInfo, refData, refInfo, scanConverted
+    
+    main_img_data, main_img_info, scan_converted = readImg(main_raw_path,
+                                                           main_tgc_yml_path,
+                                                           main_rf_yml_path,
+                                                           version, isPhantom=False)
+    
+    phantom_img_data, phantom_img_info, _ = readImg(phantom_raw_path,
+                                                    phantom_tgc_yml_path,
+                                                    phantom_rf_yml_path,
+                                                    version, isPhantom=False)
+    
+    return main_img_data, main_img_info, phantom_img_data, phantom_img_info, scan_converted
+
+###################################################################################
+
+
+
+
+
+
