@@ -16,3 +16,14 @@ pip install git+https://github.com/TUL-Dev/PyQuantUS
 
 See the notebooks in the [CLI-Demos](CLI-Demos/) folder for examples of analysis for different ultrasound systems. Also note slight differences between examples scan-converted (sc) and non-scan-converted images. Data required to reproduce these examples is stored [here](https://drive.google.com/drive/folders/139J4vLa7ZVnKE6tzMHf__Ug3-IydpBqd?usp=sharing
 ). When using these notebooks, the Python environment should match the environment created for [QuantUS](https://github.com/TUL-Dev/QuantUS).
+
+## UTC Parameter Validation Progress
+
+- [x] MBF
+- [x] SS
+- [x] SI
+- [x] Attenuation Coefficient
+- [x] Nakagami Parameters (w, u)
+- [ ] Backscatter Coefficient
+- [ ] Effective Scatterer Diameter
+- [ ] Effective Scatterer Concentration
