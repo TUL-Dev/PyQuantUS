@@ -363,14 +363,12 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
     rf_ntgc = rf_matrix_corrected_B
     rf_dtgc = rf_matrix_corrected_A
     rf_atgc = data
+    rf = rf_ntgc
 
     # rf_atgc, rf_dtgc, rf_ntgc, dataEnv, dB_tgc_matrix = checkLengthEnvRF(rf_atgc,rf_dtgc,rf_ntgc,dataEnv,dB_tgc_matrix)
     linear_tgc_matrix = linear_tgc_matrix[0:dB_tgc_matrix.shape[0],0:dB_tgc_matrix.shape[1],0:dB_tgc_matrix.shape[2]]
     
-    bmode = np.zeros_like(rf_atgc)
-    for f in range(rf_atgc.shape[2]):
-        for i in range(rf_atgc.shape[1]):
-            bmode[:,i, f] = 20*np.log10(abs(hilbert(rf_atgc[:,i, f])))   
+    bmode = 20*np.log10(abs(hilbert(rf, axis=0)))  
             
     clippedMax = info.clipFact*np.amax(bmode)
     bmode = np.clip(bmode, clippedMax-info.dynRange, clippedMax) 
@@ -383,7 +381,7 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
         scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, 
                                             info.endDepth1, desiredHeight=2000)
         scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, 
-                                     info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf_atgc.shape[2]))])
+                                     info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf.shape[2]))])
 
         info.yResRF =  info.endDepth1*1000 / scBmodeStruct.scArr.shape[0]
         info.xResRF = info.yResRF * (scBmodeStruct.scArr.shape[0]/scBmodeStruct.scArr.shape[1]) # placeholder
@@ -404,7 +402,7 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
 
     
     data.bMode = np.transpose(bmode, (2, 0, 1))
-    data.rf = np.transpose(rf_atgc, (2, 0, 1))
+    data.rf = np.transpose(rf, (2, 0, 1))
 
     return data, info, scanConverted
 
