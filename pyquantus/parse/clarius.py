@@ -627,39 +627,19 @@ class Clarius_tar_unpacker():
             else:
                 logging.info("No hidden files to delete.")
 
-            return True  # Indicate success
-        except Exception as e:
-            logging.error(f"An error occurred while deleting hidden files: {e}")
-            return False  # Indicate failure
-        
-    ###################################################################################
-       
-    def delete_extracted_folders(self):
-        """Deletes all extracted folders in the specified directory."""
-        extracted_folders = [
-            os.path.join(self.tar_files_path, item)
-            for item in os.listdir(self.tar_files_path)
-            if os.path.isdir(os.path.join(self.tar_files_path, item)) and "extracted" in item
-        ]
+    linear_default_tgc_matrix = generate_default_tgc_matrix(header["nframes"], info)
+    linear_default_tgc_matrix = np.transpose(linear_default_tgc_matrix, (1, 0, 2))
+    rf_matrix_corrected_A = rf_matrix_corrected_B * linear_default_tgc_matrix
+    dB_tgc_matrix = 20*np.log10(linear_tgc_matrix)
+    rf_ntgc = rf_matrix_corrected_B
+    rf_dtgc = rf_matrix_corrected_A
+    rf_atgc = data
+    rf = rf_ntgc
 
-        for folder in extracted_folders:
-            try:
-                shutil.rmtree(folder)
-                logging.info(f"Deleted folder: {folder}")
-            except OSError as e:
-                logging.error(f"Error deleting folder {folder}: {e}")
-                    
-    ###################################################################################
-        
-    def extract_tar_files(self):
-        """
-        Extracts all tar files in the specified sample folder.
-
-        The extracted files are placed in a subdirectory named after each tar file with '_extracted' appended.
-        """
-        # Iterate over files in the sample folder
-        for item_name in os.listdir(self.tar_files_path):
-            item_path = os.path.join(self.tar_files_path, item_name)
+    # rf_atgc, rf_dtgc, rf_ntgc, dataEnv, dB_tgc_matrix = checkLengthEnvRF(rf_atgc,rf_dtgc,rf_ntgc,dataEnv,dB_tgc_matrix)
+    linear_tgc_matrix = linear_tgc_matrix[0:dB_tgc_matrix.shape[0],0:dB_tgc_matrix.shape[1],0:dB_tgc_matrix.shape[2]]
+    
+    bmode = 20*np.log10(abs(hilbert(rf, axis=0)))  
             
             # Check if the item is a file
             if os.path.isfile(item_path):
@@ -682,9 +662,13 @@ class Clarius_tar_unpacker():
 
     ###################################################################################
     
-    def set_path_of_extracted_folders(self):
-        """Finds and stores paths of extracted folders inside `self.tar_files_path`."""
-        logging.info("Searching for extracted folders...")
+    data = DataOutputStruct()
+    
+    if scanConverted:
+        scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, 
+                                            info.endDepth1, desiredHeight=2000)
+        scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, 
+                                     info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf.shape[2]))])
 
         # Find all directories containing 'extracted' in their name
         self.extracted_folders_path_list = [
@@ -700,7 +684,8 @@ class Clarius_tar_unpacker():
         # Log summary
         logging.info(f"Total extracted folders found: {len(self.extracted_folders_path_list)}")
     
-    ###################################################################################
+    data.bMode = np.transpose(bmode, (2, 0, 1))
+    data.rf = np.transpose(rf, (2, 0, 1))
 
     def set_path_of_lzo_files_inside_extracted_folders(self):
         """Finds and stores paths of .lzo files inside extracted folders."""
