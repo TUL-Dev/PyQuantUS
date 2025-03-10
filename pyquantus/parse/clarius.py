@@ -1,20 +1,20 @@
 # Standard Library Imports
-import os
-import re
-import sys
 import logging
+import os
 import platform
+import re
 import shutil
-import tarfile
 import subprocess
+import sys
+import tarfile
 from typing import Tuple
 
 # Third-Party Library Imports
-import yaml
 import numpy as np
-from tqdm import tqdm
-from scipy.signal import hilbert
+import yaml
 from scipy.interpolate import interp1d
+from scipy.signal import hilbert
+from tqdm import tqdm
 
 # Local Module Imports
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
@@ -23,338 +23,69 @@ from pyquantus.parse.transforms import scanConvert
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-#############################################################################################
+
 class ClariusInfo(InfoStruct):
     def __init__(self):
-        
-        """
-        Initializes the ClariusInfo class, inheriting from InfoStruct.
-        Defines attributes related to ultrasound imaging data.
-        """
-        
         super().__init__()
-        self.numLines: int  
-        self.samplesPerLine: int 
-        self.sampleSize: int 
+        self.numLines: int
+        self.samplesPerLine: int
+        self.sampleSize: int # bytes
 
-#############################################################################################
-
-def clarius_rf_parser(img_filename: str,
-                      img_tgc_filename: str,
-                      info_filename: str,
-                      phantom_filename: str,
-                      phantom_tgc_filename: str,
-                      phantom_info_filename: str,
-                      version: str = "6.0.3") -> Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo, bool]:
-    
-    """Parses Clarius RF data and metadata from input files.
-
-    Args:
-        img_filename (str): File path of the RF data.
-        img_tgc_filename (str): File path of the TGC data.
-        info_filename (str): File path of the metadata.
-        phantom_filename (str): File path of the phantom RF data.
-        phantom_tgc_filename (str): File path of the phantom TGC data.
-        phantom_info_filename (str): File path of the phantom metadata.
-        version (str, optional): Clarius software version. Defaults to "6.0.3".
-
-    Returns:
-        Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo, bool]: 
-            Image data, image metadata, phantom data, phantom metadata, and scan conversion flag.
-    """
-    
-    img_data, img_info, scan_converted = read_img(img_filename,
-                                                 img_tgc_filename,
-                                                 info_filename,
-                                                 version,
-                                                 is_phantom=False
-                                                 )
-    
-    ref_data, ref_info, _ = read_img(phantom_filename,
-                                    phantom_tgc_filename,
-                                    phantom_info_filename,
-                                    version,
-                                    is_phantom=False
-                                    )
-
-    return img_data, img_info, ref_data, ref_info, scan_converted
-
-#############################################################################################
-
-def read_raw(raw_file_path) -> None:
-    """
-    Function to read raw files from the instance's list of file paths,
-    extract header information, timestamps, and data, and save them as '.npy' files.
-
-    Returns:
-        None
-    """
-    logging.info(f'Reading raw file: {raw_file_path}')
-    
-    # Define header information fields
-    hdr_info = ('id', 'frames', 'lines', 'samples', 'samplesize')
-
-    # Initialize dictionaries and arrays to store header, timestamps, and data
-    hdr, timestamps, data = {}, None, None
-    
-    # Open the raw file in binary mode
-    try:
-        with open(raw_file_path, 'rb') as raw_bytes:
-            # Read header information (4 bytes each)
-            for info in hdr_info:
-                hdr[info] = int.from_bytes(raw_bytes.read(4), byteorder='little')
-            
-            # Read timestamps and data
-            timestamps = np.zeros(hdr['frames'], dtype='int64')
-                            
-            # Calculate the size of each frame
-            sz = hdr['lines'] * hdr['samples'] * hdr['samplesize']
-            
-            # Initialize data array based on file type
-            if "_rf.raw" in raw_file_path:
-                data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='int16')
-            elif "_env.raw" in raw_file_path:
-                data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='int8')
-
-            # Loop over frames
-            for frame in range(hdr['frames']):
-                
-                # Read timestamp for each frame (8 bytes)
-                timestamps[frame] = int.from_bytes(raw_bytes.read(8), byteorder='little')
-                
-                # Read frame data and reshape it to match dimensions specified in the header
-                if "_rf.raw" in raw_file_path:
-                    data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='int16').reshape([hdr['lines'], hdr['samples']])
-                elif "_env.raw" in raw_file_path:
-                    data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='uint8').reshape([hdr['lines'], hdr['samples']])
-
-        # Print message indicating the number of frames loaded and their size
-        logging.info('Loaded %d raw frames of size %d x %d (lines x samples)', data.shape[2], data.shape[0], data.shape[1])
-        
-        # Save data as numpy array
-        np.save(raw_file_path, data)
-        logging.info(f'Saved data as: {raw_file_path}.npy')
-
-    except Exception as e:
-        logging.error(f'Error reading file {raw_file_path}: {e}')
-                
-#############################################################################################
-
-def read_img(filename: str,
-             tgc_path: str | None,
-             info_path: str,
-             version: str,
-             is_phantom: bool) -> Tuple[DataOutputStruct, ClariusInfo, bool]:
-    
-    """
-    Reads RF data from a Clarius ultrasound file.
-
-    Args:
-        filename (str): Path to the Clarius file.
-        tgc_path (str | None): Path to the TGC file (if available).
-        info_path (str): Path to the metadata file.
-        version (str): Clarius file version (only '6.0.3' is supported).
-        is_phantom (bool): True if the data is from a phantom, False if from a patient.
-
-    Returns:
-        Tuple: A tuple containing processed RF data, metadata, and a boolean flag.
-    """
-
-    if version != "6.0.3":
-        print("Unrecognized version")
-        return []
-
-    # Read the header information
-    try:
-        hinfo = np.fromfile(filename, dtype="uint32", count=5)
-        header = {
-            "id":      hinfo[0],
-            "nframes": hinfo[1],  # Number of frames
-            "w":       hinfo[2],  # Width (lines)
-            "h":       hinfo[3],  # Height (samples)
-            "ss":      hinfo[4],  # Sample size
-        }
-    except Exception as e:
-        print(f"Error reading header: {e}")
-        return []
-
-    frames = header["nframes"]
-
-    # Check if file contains RF data
-    if header["id"] != 2:
-        print("File does not contain RF data. Ensure RF mode is enabled during scans.")
-        return []
-
-    # Initialize RF data storage
-    ts = np.zeros(frames, dtype="uint64")
-    data = np.zeros((header["h"], header["w"], frames))
-
-    # Read RF data frame by frame
-    try:
-        for f in range(frames):
-            ts[f] = np.fromfile(filename, dtype="uint64", count=1)[0]
-            v = np.fromfile(filename, dtype="int16", count=header["h"] * header["w"])
-            data[:, :, f] = np.flip(
-                v.reshape(header["h"], header["w"], order="F").astype(np.int16), axis=1
-            )
-    except Exception as e:
-        print(f"Error reading RF data: {e}")
-        return []
-
-    # Validate ROI size
-    if header["w"] != 192 or header["h"] != 2928:
-        print(f"Invalid ROI size: {header['w']}x{header['h']}. Returning empty list.")
-        return []
-
-    # Load metadata
-    try:
-        with open(info_path, 'r') as file:
-            info_yml = yaml.safe_load(file)
-
-        info = ClariusInfo()
-        info.width1 = info_yml["probe"]["radius"] * 2 if "probe" in info_yml else 0
-        scan_converted = "probe" in info_yml
-        info.endDepth1 = float(info_yml["imaging depth"][:-2]) / 1000  # meters
-        info.startDepth1 = info.endDepth1 / 4
-        info.samplingFrequency = int(info_yml["sampling rate"][:-3]) * 1e6
-        info.tilt1 = 0
-        info.samplesPerLine = info_yml["size"]["samples per line"]
-        info.numLines = info_yml["size"]["number of lines"]
-        info.sampleSize = info_yml["size"]["sample size"]
-        info.centerFrequency = float(info_yml["transmit frequency"][:-3]) * 1e6
-        info.minFrequency = 0
-        info.maxFrequency = info.centerFrequency * 2
-        info.lowBandFreq = int(info.centerFrequency / 2)
-        info.upBandFreq = int(info.centerFrequency * 1.5)
-        info.clipFact = 0.95
-        info.dynRange = 50
-    except Exception as e:
-        print(f"Error loading metadata: {e}")
-        return []
-
-    # Apply TGC correction
-    file_timestamp = filename.split("_rf.raw")[0]
-    linear_tgc_matrix = generate_tgc_matrix(file_timestamp, tgc_path, ts, frames, info, is_phantom)
-    linear_tgc_matrix = np.transpose(linear_tgc_matrix, (1, 0, 2))
-
-    if data.shape[2] != linear_tgc_matrix.shape[2]:
-        print(f"Timestamps mismatch in {file_timestamp}. Returning empty array.")
-        return []
-
-    rf_matrix_corrected_B = data / linear_tgc_matrix
-
-    # Apply default TGC
-    linear_default_tgc_matrix = generate_default_tgc_matrix(frames, info)
-    linear_default_tgc_matrix = np.transpose(linear_default_tgc_matrix, (1, 0, 2))
-    rf_matrix_corrected_A = rf_matrix_corrected_B * linear_default_tgc_matrix
-
-    dB_tgc_matrix = 20 * np.log10(linear_tgc_matrix)
-
-    # B-mode processing
-    bmode = np.zeros_like(rf_matrix_corrected_A)
-    for f in range(frames):
-        for i in range(header["w"]):
-            bmode[:, i, f] = 20 * np.log10(abs(hilbert(rf_matrix_corrected_A[:, i, f])))
-
-    clipped_max = info.clipFact * np.amax(bmode)
-    bmode = np.clip(bmode, clipped_max - info.dynRange, clipped_max)
-    bmode -= np.amin(bmode)
-    bmode *= 255 / np.amax(bmode)
-
-    data_output = DataOutputStruct()
-
-    # Perform scan conversion if applicable
-    if scan_converted:
-        sc_bmode_struct, h_cm, w_cm = scanConvert(
-            bmode[:, :, 0], info.width1, info.tilt1, info.startDepth1, info.endDepth1, desiredHeight=2000
-        )
-
-        sc_bmodes = np.array([
-            scanConvert(bmode[:, :, i], info.width1, info.tilt1, info.startDepth1, info.endDepth1, desiredHeight=2000)[0].scArr
-            for i in range(frames)
-        ])
-
-        info.yResRF = info.endDepth1 * 1000 / sc_bmode_struct.scArr.shape[0]
-        info.xResRF = info.yResRF * (sc_bmode_struct.scArr.shape[0] / sc_bmode_struct.scArr.shape[1])
-        info.axialRes = h_cm * 10 / sc_bmode_struct.scArr.shape[0]
-        info.lateralRes = w_cm * 10 / sc_bmode_struct.scArr.shape[1]
-        info.depth = h_cm * 10  # mm
-        info.width = w_cm * 10  # mm
-        data_output.scBmodeStruct = sc_bmode_struct
-        data_output.scBmode = sc_bmodes
-    else:
-        info.yResRF = info.endDepth1 * 1000 / bmode.shape[0]
-        info.xResRF = info.yResRF * (bmode.shape[0] / bmode.shape[1])
-        info.axialRes = info.yResRF
-        info.lateralRes = info.xResRF
-        info.depth = info.endDepth1 * 1000
-        info.width = info.endDepth1 * 1000
-
-    data_output.bMode = np.transpose(bmode, (2, 0, 1))
-    data_output.rf = np.transpose(rf_matrix_corrected_A, (2, 0, 1))
-
-    return data_output, info, scan_converted
-
-#############################################################################################
 
 def read_tgc_file(file_timestamp: str, rf_timestamps: np.ndarray) -> list | None:
-    """
-    Reads a TGC file and extracts the TGC data corresponding to the provided RF timestamps.
+    """Read TGC file and extract TGC data for inputted file.
 
     Args:
         file_timestamp (str): Timestamp of the inputted RF file.
-        rf_timestamps (np.ndarray): Array of RF timestamps.
+        rf_timestamps (np.ndarray): Given RF timestamps.
 
     Returns:
-        list | None: Extracted TGC data matching the RF timestamps, or None if no file is found.
+        list | None: Extracted TGC data corresponding to the RF timestamps, or None if the TGC file is not found.
     """
-    # Define possible filenames
-    possible_files = [f"{file_timestamp}_env.tgc", f"{file_timestamp}_env.tgc.yml"]
+    tgc_file_name_dottgc = file_timestamp + "_env.tgc"
+    tgc_file_name_dotyml = file_timestamp + "_env.tgc.yml"
 
-    # Find an existing TGC file
-    tgc_file_name = next((file for file in possible_files if os.path.isfile(file)), None)
-    if not tgc_file_name:
+    if os.path.isfile(tgc_file_name_dottgc):
+        tgc_file_name = tgc_file_name_dottgc
+    elif os.path.isfile(tgc_file_name_dotyml):
+        tgc_file_name = tgc_file_name_dotyml
+    else:
         return None
 
-    # Read file content
     with open(tgc_file_name, "r") as file:
         data_str = file.read()
 
-    # Process frames data
     frames_data = data_str.split("timestamp:")[1:]
-    
-    # Ensure each frame has default values if missing
     frames_data = [
-        frame if "{" in frame else frame + "  - { 0.00mm, 15.00dB }\n  - { 120.00mm, 35.00dB }"
+        frame
+        if "{" in frame
+        else frame + "  - { 0.00mm, 15.00dB }\n  - { 120.00mm, 35.00dB }"
         for frame in frames_data
     ]
-
-    # Create a dictionary mapping timestamps to frames
     frames_dict = {
         timestamp: frame
         for frame in frames_data
         for timestamp in rf_timestamps
         if str(timestamp) in frame
     }
+    filtered_frames_data = [
+        frames_dict.get(timestamp)
+        for timestamp in rf_timestamps
+        if frames_dict.get(timestamp) is not None
+    ]
 
-    # Extract frames matching given timestamps
-    return [frames_dict[timestamp] for timestamp in rf_timestamps if timestamp in frames_dict]
+    return filtered_frames_data
 
-#############################################################################################
 
 def clean_and_convert(value):
     """Clean and convert a string value to a float."""
     clean_value = ''.join([char for char in value if char.isdigit() or char in ['.', '-']])
     return float(clean_value)
 
-#############################################################################################
-
 def extract_tgc_data_from_line(line):
     """Extract TGC data from a line."""
     tgc_pattern = r'\{([^}]+)\}'
     return re.findall(tgc_pattern, line)
-
-#############################################################################################
 
 def read_tgc_file_v2(tgc_path, rf_timestamps):
     """Read TGC file and extract TGC data for inputted file.
@@ -413,8 +144,6 @@ def read_tgc_file_v2(tgc_path, rf_timestamps):
 
     return filtered_frames_data
 
-#############################################################################################
-
 def generate_default_tgc_matrix(num_frames: int, info: ClariusInfo) -> np.ndarray:
     """Generate a default TGC matrix for the inputted number of frames and Clarius file metadata.
     
@@ -458,8 +187,6 @@ def generate_default_tgc_matrix(num_frames: int, info: ClariusInfo) -> np.ndarra
     #         print(f"Depth: {depth:.2f}mm, TGC: {tgc_value:.2f}dB")
 
     return linear_default_tgc_matrix_transpose
-
-#############################################################################################
 
 def generate_tgc_matrix(file_timestamp: str, tgc_path: str | None, rf_timestamps: np.ndarray, num_frames: int, 
                         info: InfoStruct, isPhantom: bool) -> np.ndarray:
@@ -519,8 +246,6 @@ def generate_tgc_matrix(file_timestamp: str, tgc_path: str | None, rf_timestamps
 
     return linear_tgc_matrix_transpose
 
-#############################################################################################
-
 def checkLengthEnvRF(rfa, rfd, rfn, env, db):
     lenEnv = env.shape[2]
     lenRf = rfa.shape[2]
@@ -537,15 +262,183 @@ def checkLengthEnvRF(rfa, rfd, rfn, env, db):
 
     return rfa, rfd, rfn, env, db
 
-#############################################################################################
-
 def convert_env_to_rf_ntgc(x, linear_tgc_matrix):
     y1 =  47.3 * x + 30
     y = 10**(y1/20)-1
     y = y / linear_tgc_matrix
     return y 
 
-#############################################################################################
+def readImg(filename: str, tgc_path: str | None, info_path: str, 
+            version="6.0.3", isPhantom=False) -> Tuple[DataOutputStruct, ClariusInfo, bool]:
+    """Read RF data contained in Clarius file
+    Args:
+        filename (string)): where is the Clarius file
+        version (str, optional): indicates Clarius file version. Defaults to '6.0.3'. Currently not used.
+        isPhantom (bool, optional): indicated if it is phantom (True) or patient data (False)
+
+    Returns:
+        Tuple: Corrected RF data processed from RF data contained in filename and as well as metadata
+    """
+
+    if version != "6.0.3":
+        print("Unrecognized version")
+        return []
+
+    # read the header info
+    hinfo = np.fromfile(
+        filename, dtype="uint32", count=5
+    )  # int32 and uint32 appear to be equivalent in memory -> a = np.int32(1); np.dtype(a).itemsize
+    header = {"id": 0, "nframes": 0, "w": 0, "h": 0, "ss": 0}
+    header["id"] = hinfo[0]
+    header["nframes"] = hinfo[1]  # frames
+    header["w"] = hinfo[2]  # lines
+    header["h"] = hinfo[3]  # samples
+    header["ss"] = hinfo[4]  # sampleSize
+
+    # % ADDED BY AHMED EL KAFFAS - 22/09/2018
+    frames = header["nframes"]
+
+    id = header["id"]
+    if id == 2:  # RF
+        ts = np.zeros(shape=(frames,), dtype="uint64")
+        data = np.zeros(shape=(header["h"], header["w"], frames))
+        #  read RF data
+        for f in range(frames):
+            ts[f] = np.fromfile(filename, dtype="uint64", count=1)[0]
+            v = np.fromfile(filename, count=header["h"] * header["w"], dtype="int16")
+            data[:, :, f] = np.flip(
+                v.reshape(header["h"], header["w"], order="F").astype(np.int16), axis=1
+            )
+    #######################################################################################################
+    else:
+        print(
+            "The file does not contain RF data. Make sure RF mode is turned on while taking scans."
+        )
+        return []
+
+    # # Check if the ROI is full
+    # if header["w"] != 192 or header["h"] != 2928:
+    #     print(
+    #         "The ROI is not full. The size of RF matrix is {}*{} thus returning an empty list.".format(
+    #             header["w"], header["h"]
+    #         )
+    #     )
+    #     return []
+    
+
+    info = ClariusInfo()
+    with open(info_path, 'r') as file:
+        infoYml = yaml.safe_load(file)
+    try:
+        info.width1 = infoYml["probe"]["radius"] * 2
+        scanConverted = True
+    except KeyError:
+        scanConverted = False
+    info.endDepth1 = float(infoYml["imaging depth"][:-2]) / 1000 #m
+    info.startDepth1 = info.endDepth1 / 4 #m
+    info.samplingFrequency = int(infoYml["sampling rate"][:-3]) * 1e6
+    info.tilt1 = 0
+    info.samplesPerLine = infoYml["size"]["samples per line"]
+    info.numLines = infoYml["size"]["number of lines"]
+    info.sampleSize = infoYml["size"]["sample size"]
+    info.centerFrequency = float(infoYml["transmit frequency"][:-3]) * 1e6
+
+    info.minFrequency = 0
+    info.maxFrequency = info.centerFrequency*2
+    info.lowBandFreq = int(info.centerFrequency/2)
+    info.upBandFreq = int(info.centerFrequency*1.5)
+    
+    info.clipFact = 0.95
+    info.dynRange = 50
+
+    data = data.astype(np.float64)
+    file_timestamp = filename.split("_rf.raw")[0]
+    linear_tgc_matrix = generate_tgc_matrix(file_timestamp, tgc_path, ts, header["nframes"], info, isPhantom)
+    linear_tgc_matrix = np.transpose(linear_tgc_matrix, (1, 0, 2))
+
+    if data.shape[2] != linear_tgc_matrix.shape[2]:
+        print(
+            "\033[31m"
+            + "The timestamps for file_timestamp {} does not match between rf.raw and tgc file. Skipping this scan and returning an empty array.".format(
+                file_timestamp
+            )
+            + "\033[0m"
+        )
+        return []
+
+    rf_matrix_corrected_B = data / linear_tgc_matrix
+
+    linear_default_tgc_matrix = generate_default_tgc_matrix(header["nframes"], info)
+    linear_default_tgc_matrix = np.transpose(linear_default_tgc_matrix, (1, 0, 2))
+    rf_matrix_corrected_A = rf_matrix_corrected_B * linear_default_tgc_matrix
+    dB_tgc_matrix = 20*np.log10(linear_tgc_matrix)
+    rf_ntgc = rf_matrix_corrected_B
+    rf_dtgc = rf_matrix_corrected_A
+    rf_atgc = data
+    rf = rf_ntgc
+
+    # rf_atgc, rf_dtgc, rf_ntgc, dataEnv, dB_tgc_matrix = checkLengthEnvRF(rf_atgc,rf_dtgc,rf_ntgc,dataEnv,dB_tgc_matrix)
+    linear_tgc_matrix = linear_tgc_matrix[0:dB_tgc_matrix.shape[0],0:dB_tgc_matrix.shape[1],0:dB_tgc_matrix.shape[2]]
+    
+    bmode = 20*np.log10(abs(hilbert(rf, axis=0)))  
+            
+    clippedMax = info.clipFact*np.amax(bmode)
+    bmode = np.clip(bmode, clippedMax-info.dynRange, clippedMax) 
+    bmode -= np.amin(bmode)
+    bmode *= (255/np.amax(bmode))
+    
+    data = DataOutputStruct()
+    
+    if scanConverted:
+        scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, 
+                                            info.endDepth1, desiredHeight=2000)
+        scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, 
+                                     info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf.shape[2]))])
+
+        info.yResRF =  info.endDepth1*1000 / scBmodeStruct.scArr.shape[0]
+        info.xResRF = info.yResRF * (scBmodeStruct.scArr.shape[0]/scBmodeStruct.scArr.shape[1]) # placeholder
+        info.axialRes = hCm1*10 / scBmodeStruct.scArr.shape[0]
+        info.lateralRes = wCm1*10 / scBmodeStruct.scArr.shape[1]
+        info.depth = hCm1*10 #mm
+        info.width = wCm1*10 #mm
+        data.scBmodeStruct = scBmodeStruct
+        data.scBmode = scBmodes
+        
+    else:
+        info.yResRF = info.endDepth1*1000 / bmode.shape[0] # mm/pixel
+        info.xResRF = info.yResRF * (bmode.shape[0]/bmode.shape[1]) # placeholder
+        info.axialRes = info.yResRF #mm
+        info.lateralRes = info.xResRF #mm
+        info.depth = info.endDepth1*1000 #mm
+        info.width = info.endDepth1*1000 #mm
+
+    
+    data.bMode = np.transpose(bmode, (2, 0, 1))
+    data.rf = np.transpose(rf, (2, 0, 1))
+
+    return data, info, scanConverted
+
+def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str, 
+            phantomFilename: str, phantomTgcFilename: str, phantomInfoFilename: str, 
+            version="6.0.3") -> Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo, bool]:
+    """Parse Clarius RF data and metadata from inputted files.
+
+    Args:
+        imgFilename (str): File path of the RF data.
+        imgTgcFilename (str): File path of the TGC data.
+        infoFilename (str): File path of the metadata.
+        phantomFilename (str): File path of the phantom RF data.
+        phantomTgcFilename (str): File path of the phantom TGC data.
+        phantomInfoFilename (str): File path of the phantom metadata.
+        version (str, optional): Defaults to "6.0.3".
+
+    Returns:
+        Tuple: Image data, image metadata, phantom data, and phantom metadata.
+    """
+    imgData, imgInfo, scanConverted = readImg(imgFilename, imgTgcFilename, infoFilename, version, isPhantom=False)
+    refData, refInfo, scanConverted = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
+    return imgData, imgInfo, refData, refInfo, scanConverted
+
 
 
 
@@ -627,19 +520,39 @@ class Clarius_tar_unpacker():
             else:
                 logging.info("No hidden files to delete.")
 
-    linear_default_tgc_matrix = generate_default_tgc_matrix(header["nframes"], info)
-    linear_default_tgc_matrix = np.transpose(linear_default_tgc_matrix, (1, 0, 2))
-    rf_matrix_corrected_A = rf_matrix_corrected_B * linear_default_tgc_matrix
-    dB_tgc_matrix = 20*np.log10(linear_tgc_matrix)
-    rf_ntgc = rf_matrix_corrected_B
-    rf_dtgc = rf_matrix_corrected_A
-    rf_atgc = data
-    rf = rf_ntgc
+            return True  # Indicate success
+        except Exception as e:
+            logging.error(f"An error occurred while deleting hidden files: {e}")
+            return False  # Indicate failure
+        
+    ###################################################################################
+       
+    def delete_extracted_folders(self):
+        """Deletes all extracted folders in the specified directory."""
+        extracted_folders = [
+            os.path.join(self.tar_files_path, item)
+            for item in os.listdir(self.tar_files_path)
+            if os.path.isdir(os.path.join(self.tar_files_path, item)) and "extracted" in item
+        ]
 
-    # rf_atgc, rf_dtgc, rf_ntgc, dataEnv, dB_tgc_matrix = checkLengthEnvRF(rf_atgc,rf_dtgc,rf_ntgc,dataEnv,dB_tgc_matrix)
-    linear_tgc_matrix = linear_tgc_matrix[0:dB_tgc_matrix.shape[0],0:dB_tgc_matrix.shape[1],0:dB_tgc_matrix.shape[2]]
-    
-    bmode = 20*np.log10(abs(hilbert(rf, axis=0)))  
+        for folder in extracted_folders:
+            try:
+                shutil.rmtree(folder)
+                logging.info(f"Deleted folder: {folder}")
+            except OSError as e:
+                logging.error(f"Error deleting folder {folder}: {e}")
+                    
+    ###################################################################################
+        
+    def extract_tar_files(self):
+        """
+        Extracts all tar files in the specified sample folder.
+
+        The extracted files are placed in a subdirectory named after each tar file with '_extracted' appended.
+        """
+        # Iterate over files in the sample folder
+        for item_name in os.listdir(self.tar_files_path):
+            item_path = os.path.join(self.tar_files_path, item_name)
             
             # Check if the item is a file
             if os.path.isfile(item_path):
@@ -662,13 +575,9 @@ class Clarius_tar_unpacker():
 
     ###################################################################################
     
-    data = DataOutputStruct()
-    
-    if scanConverted:
-        scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, 
-                                            info.endDepth1, desiredHeight=2000)
-        scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, 
-                                     info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf.shape[2]))])
+    def set_path_of_extracted_folders(self):
+        """Finds and stores paths of extracted folders inside `self.tar_files_path`."""
+        logging.info("Searching for extracted folders...")
 
         # Find all directories containing 'extracted' in their name
         self.extracted_folders_path_list = [
@@ -684,8 +593,7 @@ class Clarius_tar_unpacker():
         # Log summary
         logging.info(f"Total extracted folders found: {len(self.extracted_folders_path_list)}")
     
-    data.bMode = np.transpose(bmode, (2, 0, 1))
-    data.rf = np.transpose(rf, (2, 0, 1))
+    ###################################################################################
 
     def set_path_of_lzo_files_inside_extracted_folders(self):
         """Finds and stores paths of .lzo files inside extracted folders."""
