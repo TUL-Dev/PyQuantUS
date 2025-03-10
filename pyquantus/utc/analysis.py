@@ -201,108 +201,61 @@ class UtcAnalysis:
         
         return 0
     
-    def computeAttenuationCoef(self, rfData: np.ndarray, refRfData: np.ndarray,
-                                    overlap=50, windowDepth=100) -> float:
+    def computeAttenuationCoef(self, rfData: np.ndarray, refRfData: np.ndarray, overlap=50, windowDepth=100) -> float:
         """Compute the local attenuation coefficient of the ROI using the Spectral Difference
-        Method for Local Attenuation Estimation. Note this method cannot be used to estimate
-        attenuation when the scattering properties change within the ROI. This method assumes
-        a tissue-mimicking phantom with a sound speed similar to the expected sound speed of 
-        the analyzed tissue. Assuming linear dependency on depth, the local attenuation coefficient
-        computed here is equivalent to the total attenuation coefficient.
-        source: Mamou & Oelze, page 78-79: https://doi.org/10.1007/978-94-007-6952-6
-        
+        Method for Local Attenuation Estimation. This method computes the attenuation coefficient
+        for multiple frequencies and returns the slope of the attenuation as a function of frequency.
         Args:
             rfData (np.ndarray): RF data of the ROI (n lines x m samples).
             refRfData (np.ndarray): RF data of the phantom (n lines x m samples).
-            roiDepth (int): Depth of the start of the ROI in samples.
             overlap (float): Overlap percentage for analysis windows.
             windowDepth (int): Depth of each window in samples.
-        
         Returns:
             float: Local attenuation coefficient of the ROI for the central frequency (dB/cm/MHz).
+            Updated and verified : Feb 2025 - IR
         """
         samplingFrequency = self.config.samplingFrequency
         startFrequency = self.config.analysisFreqBand[0]
         endFrequency = self.config.analysisFreqBand[1]
-
-        intensities = []; refIntensities = []
-        startIdx = 0; endIdx = windowDepth; windowCenterIndices = []
+        # Initialize arrays for storing intensities (log of power spectrum for each frequency)
+        psSample = [];  # ROI power spectra
+        psRef = [];  # Phantom power spectra
+        startIdx = 0
+        endIdx = windowDepth
+        windowCenterIndices = []
+        counter = 0
+        # Loop through the windows in the RF data
         while endIdx < rfData.shape[0]:
             subWindowRf = rfData[startIdx: endIdx]
             f, ps = computeHanningPowerSpec(subWindowRf, startFrequency, endFrequency, samplingFrequency)
-            ps = np.log(ps)
-            intensities.append(ps[len(f)//2])
-            
+            psSample.append(20*np.log10(ps))  # Log scale intensity for the ROI
             refSubWindowRf = refRfData[startIdx: endIdx]
             refF, refPs = computeHanningPowerSpec(refSubWindowRf, startFrequency, endFrequency, samplingFrequency)
-            refPs = np.log(refPs)
-            refIntensities.append(refPs[len(refF)//2])
-            
-            windowCenterIndices.append((startIdx+endIdx)//2)
-            startIdx += int(windowDepth*(overlap/100))
+            psRef.append(20*np.log10(refPs))  # Log scale intensity for the phantom
+            windowCenterIndices.append((startIdx + endIdx) // 2)
+            startIdx += int(windowDepth*(1-(overlap/100)))
             endIdx = startIdx + windowDepth
-
-        axialResCm = self.ultrasoundImage.axialResRf/10
-        windowDepthsCm = np.array(windowCenterIndices)*axialResCm # sample * (cm/sample) = cm
-        normalizedIntensities = np.subtract(intensities, refIntensities)
-        p = np.polyfit(windowDepthsCm, normalizedIntensities, 1)
-        localAttenuation = self.refAttenuation * self.config.centerFrequency/1e6 - (1/4)*p[0] # dB/cm
-        attenuationCoef = localAttenuation /  (self.config.centerFrequency/1e6) # dB/cm/MHz
-        
+            counter += 1
+        # Convert window depths to cm
+        axialResCm = self.ultrasoundImage.axialResRf / 10
+        windowDepthsCm = np.array(windowCenterIndices) * axialResCm
+        attenuationCoefficients = []  # One coefficient for each frequency
+        f = f / 1e6
+        psSample = np.array(psSample)
+        psRef = np.array(psRef)
+        midIdx = f.shape[0] // 2  # Middle index
+        startIdx = max(0, midIdx - 25)  # Start index for slicing
+        endIdx = min(f.shape[0], midIdx + 25)  # End index for slicing
+        # Compute attenuation for each frequency
+        for fIdx in range(startIdx, endIdx):
+            normalizedIntensities = np.subtract(psSample[:, fIdx], psRef[:, fIdx])
+            #p = np.polyfit(windowDepthsCm, normalizedIntensities, 1)
+            A = windowDepthsCm.reshape(-1, 1)  # or windowDepthsCm[:, np.newaxis]
+            p, _, _, _ = np.linalg.lstsq(A, normalizedIntensities, rcond=None)
+            localAttenuation = self.refAttenuation * f[fIdx] - (1 / 4) * p[0]  # dB/cm
+            attenuationCoefficients.append( localAttenuation / f[fIdx])  # dB/cm/MHz
+        attenuationCoef=np.mean(attenuationCoefficients)
         return attenuationCoef
-    
-    # def computeTotalAttenuationCoef(self, rfData: np.ndarray, refRfData: np.ndarray, roiDepth: int, 
-    #                                 overlap=50, windowDepth=100) -> float:
-    #     """Compute the total attenuation coefficient of the ROI using the Spectral Fit Algorithm
-    #     for Total Attenuation Estimation. This method assumes a Gaussian form factor for both the image
-    #     and phantom scans. It also assumes total attenuation for the image has a linear frequency dependence.
-    #     source: Mamou & Oelze, page 88-89: https://doi.org/10.1007/978-94-007-6952-6
-        
-    #     Args:
-    #         rfData (np.ndarray): RF data of the ROI (n lines x m samples).
-    #         refRfData (np.ndarray): RF data of the phantom (n lines x m samples).
-    #         roiDepth (int): Depth of the start of the ROI in samples.
-    #         overlap (float): Overlap percentage for analysis windows.
-    #         windowDepth (int): Depth of each window in samples.
-        
-    #     Returns:
-    #         float: Total attenuation coefficient of the ROI for the central frequency.
-    #     """
-    #     samplingFrequency = self.config.samplingFrequency
-    #     startFrequency = self.config.analysisFreqBand[0]
-    #     endFrequency = self.config.analysisFreqBand[1]
-        
-    #     intensities = []; refIntensities = []
-    #     startIdx = 0; endIdx = windowDepth; windowCenterIndices = []
-    #     while endIdx > rfData.shape[0]:
-    #         subWindowRf = rfData[startIdx: endIdx]
-    #         f, ps = computeHanningPowerSpec(subWindowRf, startFrequency, endFrequency, samplingFrequency)
-    #         intensities.append(ps[len(f)//2])
-            
-    #         refSubWindowRf = refRfData[startIdx: endIdx]
-    #         refF, refPs = computeHanningPowerSpec(refSubWindowRf, startFrequency, endFrequency, samplingFrequency)
-    #         refIntensities.append(refPs[len(refF)//2])
-            
-    #         windowCenterIndices.append((startIdx+endIdx)//2)
-    #         startIdx += int(windowDepth*(overlap/100))
-    #         endIdx = startIdx + windowDepth
-        
-    #     axialResCm = self.ultrasoundImage.axialResRf/10
-    #     zT = axialResCm*(windowCenterIndices+roiDepth) # cm
-    #     sFit = (intensities/refIntensities)*np.exp(-self.refAttenuation*zT)*self.refBackScatterCoef
-    #     f *= 1e-6 # MHz
-    #     tissueSpeedOfSound = 154000 # cm/s
-        
-    #     def fitFunc(attenuationSlope, effectiveScattererRadius, const):
-    #         return 0.827*(2*np.pi*effectiveScattererRadius/tissueSpeedOfSound)*(f**2) + 4*attenuationSlope*f*zT + const
-        
-    #     # Fit the attenuation slope and effective scatterer radius
-    #     # Use scipy.optimize.curve_fit
-    #     popt, _ = curve_fit(fitFunc, [f], [sFit])
-    #     attenuationSlope = popt[0]
-    #     totalAttenuation = attenuationSlope*f[len(f)//2]
-        
-    #     return totalAttenuation
     
     def computeBackscatterCoefficient(self, rfData: np.ndarray, refRfData: np.ndarray,
                                       frequency: int, roiDepth: int) -> float:
