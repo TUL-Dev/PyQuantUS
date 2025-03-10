@@ -24,6 +24,7 @@ from pyquantus.parse.transforms import scanConvert
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
+###################################################################################
 class ClariusInfo(InfoStruct):
     def __init__(self):
         super().__init__()
@@ -31,6 +32,70 @@ class ClariusInfo(InfoStruct):
         self.samplesPerLine: int
         self.sampleSize: int # bytes
 
+    ###################################################################################
+    
+    
+###################################################################################
+
+def read_raw_files(self) -> None:
+    """
+    Function to read raw files from the instance's list of file paths,
+    extract header information, timestamps, and data, and save them as '.npy' files.
+
+    Returns:
+        None
+    """
+    for raw_file_path in self.raw_files_path_list:
+        logging.info(f'Reading raw file: {raw_file_path}')
+        
+        # Define header information fields
+        hdr_info = ('id', 'frames', 'lines', 'samples', 'samplesize')
+
+        # Initialize dictionaries and arrays to store header, timestamps, and data
+        hdr, timestamps, data = {}, None, None
+        
+        # Open the raw file in binary mode
+        try:
+            with open(raw_file_path, 'rb') as raw_bytes:
+                # Read header information (4 bytes each)
+                for info in hdr_info:
+                    hdr[info] = int.from_bytes(raw_bytes.read(4), byteorder='little')
+                
+                # Read timestamps and data
+                timestamps = np.zeros(hdr['frames'], dtype='int64')
+                                
+                # Calculate the size of each frame
+                sz = hdr['lines'] * hdr['samples'] * hdr['samplesize']
+                
+                # Initialize data array based on file type
+                if "_rf.raw" in raw_file_path:
+                    data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='int16')
+                elif "_env.raw" in raw_file_path:
+                    data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='int8')
+
+                # Loop over frames
+                for frame in range(hdr['frames']):
+                    
+                    # Read timestamp for each frame (8 bytes)
+                    timestamps[frame] = int.from_bytes(raw_bytes.read(8), byteorder='little')
+                    
+                    # Read frame data and reshape it to match dimensions specified in the header
+                    if "_rf.raw" in raw_file_path:
+                        data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='int16').reshape([hdr['lines'], hdr['samples']])
+                    elif "_env.raw" in raw_file_path:
+                        data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='uint8').reshape([hdr['lines'], hdr['samples']])
+
+            # Print message indicating the number of frames loaded and their size
+            logging.info('Loaded %d raw frames of size %d x %d (lines x samples)', data.shape[2], data.shape[0], data.shape[1])
+            
+            # Save data as numpy array
+            np.save(raw_file_path, data)
+            logging.info(f'Saved data as: {raw_file_path}.npy')
+
+        except Exception as e:
+            logging.error(f'Error reading file {raw_file_path}: {e}')    
+            
+###################################################################################
 
 def read_tgc_file(file_timestamp: str, rf_timestamps: np.ndarray) -> list | None:
     """Read TGC file and extract TGC data for inputted file.
@@ -76,16 +141,21 @@ def read_tgc_file(file_timestamp: str, rf_timestamps: np.ndarray) -> list | None
 
     return filtered_frames_data
 
+###################################################################################
 
 def clean_and_convert(value):
     """Clean and convert a string value to a float."""
     clean_value = ''.join([char for char in value if char.isdigit() or char in ['.', '-']])
     return float(clean_value)
 
+###################################################################################
+
 def extract_tgc_data_from_line(line):
     """Extract TGC data from a line."""
     tgc_pattern = r'\{([^}]+)\}'
     return re.findall(tgc_pattern, line)
+
+###################################################################################
 
 def read_tgc_file_v2(tgc_path, rf_timestamps):
     """Read TGC file and extract TGC data for inputted file.
@@ -144,6 +214,8 @@ def read_tgc_file_v2(tgc_path, rf_timestamps):
 
     return filtered_frames_data
 
+###################################################################################
+
 def generate_default_tgc_matrix(num_frames: int, info: ClariusInfo) -> np.ndarray:
     """Generate a default TGC matrix for the inputted number of frames and Clarius file metadata.
     
@@ -187,6 +259,8 @@ def generate_default_tgc_matrix(num_frames: int, info: ClariusInfo) -> np.ndarra
     #         print(f"Depth: {depth:.2f}mm, TGC: {tgc_value:.2f}dB")
 
     return linear_default_tgc_matrix_transpose
+
+###################################################################################
 
 def generate_tgc_matrix(file_timestamp: str, tgc_path: str | None, rf_timestamps: np.ndarray, num_frames: int, 
                         info: InfoStruct, isPhantom: bool) -> np.ndarray:
@@ -246,6 +320,8 @@ def generate_tgc_matrix(file_timestamp: str, tgc_path: str | None, rf_timestamps
 
     return linear_tgc_matrix_transpose
 
+###################################################################################
+
 def checkLengthEnvRF(rfa, rfd, rfn, env, db):
     lenEnv = env.shape[2]
     lenRf = rfa.shape[2]
@@ -262,11 +338,15 @@ def checkLengthEnvRF(rfa, rfd, rfn, env, db):
 
     return rfa, rfd, rfn, env, db
 
+###################################################################################
+
 def convert_env_to_rf_ntgc(x, linear_tgc_matrix):
     y1 =  47.3 * x + 30
     y = 10**(y1/20)-1
     y = y / linear_tgc_matrix
     return y 
+
+###################################################################################
 
 def readImg(filename: str, tgc_path: str | None, info_path: str, 
             version="6.0.3", isPhantom=False) -> Tuple[DataOutputStruct, ClariusInfo, bool]:
@@ -418,6 +498,8 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
 
     return data, info, scanConverted
 
+###################################################################################
+
 def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str, 
             phantomFilename: str, phantomTgcFilename: str, phantomInfoFilename: str, 
             version="6.0.3") -> Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo, bool]:
@@ -439,16 +521,37 @@ def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str,
     refData, refInfo, scanConverted = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
     return imgData, imgInfo, refData, refInfo, scanConverted
 
+###################################################################################
+
+
 
 
 
 
 # raw files generator from tar files
-#############################################################################################
+###################################################################################
 class Clarius_tar_unpacker():
+    """
+    A class for extracting and processing `.tar` archives containing `.lzo` and `.raw` files.
+    
+    Attributes:
+        tar_files_path (str): The path to the directory containing `.tar` files.
+        extraction_mode (str): Extraction mode - either "single" or "multiple".
+        lzo_exe_file_path (str): Path to the LZO executable for decompression (Windows only).
+    """
     
     def __init__(self, tar_files_path: str, extraction_mode: str) -> None:  
-
+        """
+        Initializes the ClariusTarUnpacker class and starts the extraction process.
+        
+        Args:
+            tar_files_path (str): The directory containing `.tar` files.
+            extraction_mode (str): Mode of extraction - "single" or "multiple".
+        
+        Raises:
+            ValueError: If `extraction_mode` is not "single" or "multiple".
+        """
+        
         self.tar_files_path = tar_files_path
         self.extraction_mode = extraction_mode
         self.lzo_exe_file_path = 'pyquantus/exe/lzop.exe'
@@ -461,7 +564,7 @@ class Clarius_tar_unpacker():
     ###################################################################################
         
     def __run_single_extraction(self):
-        
+        """Runs the extraction process for a single directory."""
         self.delete_hidden_files_in_sample_folder()
         self.delete_extracted_folders()
         self.extract_tar_files()
