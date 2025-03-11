@@ -26,7 +26,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # info structures
 ###################################################################################
-class ClariusInfo(InfoStruct):
+class ClariusInfo(DataOutputStruct, InfoStruct):
     
     def __init__(self):
         
@@ -46,6 +46,100 @@ class ClariusInfo(InfoStruct):
         self.img_info: ClariusInfo 
         self.scan_converted: bool        
         
+###################################################################################
+
+
+
+
+
+###################################################################################
+class Clarius_yml_parser():
+        
+    def __init__(self, yml_path):
+        
+        self.yml_path: str = yml_path
+        self.valid_software_versions: list[str] = ['12.0.1-673']
+        
+        # rf.yml
+        self.software_version: str
+        self.iso_time_date: str
+        self.probe_version: str
+        self.probe_elements: int
+        self.probe_pitch: float
+        self.probe_radius: float
+        self.frames: int
+        self.frame_rate: str
+        self.transmit_frequency: str
+        self.imaging_depth: str
+        self.focal_depth: str
+        self.auto_gain: str
+        self.mla: str
+        self.tgc: dict
+        self.size_samples_per_line: int
+        self.size_number_of_lines: int
+        self.size_sample_size: str  
+        self.type: str
+        self.compression: str
+        self.sampling_rate: float
+        self.delay_samples: int
+        self.lines: dict
+        self.focus_depth: str
+        self.focus_tx_frequency: str
+        self.focus_receive_settings: dict 
+        
+        # env.tgc.yml
+        self.frames: int
+        self.timestamp: dict
+        
+        self.__load_rf_yml()
+        self.__load_tgc_yml()
+        
+    ###################################################################################
+        
+    def __load_rf_yml(self):
+        
+        try:
+            with open(self.yml_path, 'r') as file:
+                data = yaml.safe_load(file)
+
+            # Mapping YAML fields to class attributes
+            self.software_version = data.get("software version", None)
+            self.iso_time_date = data.get("iso time/date", None)
+            probe = data.get("probe", {})
+            self.probe_version = probe.get("version", None)
+            self.probe_elements = probe.get("elements", None)
+            self.probe_pitch = probe.get("pitch", None)
+            self.probe_radius = probe.get("radius", None)
+            self.frames = data.get("frames", None)
+            self.frame_rate = data.get("frame rate", None)
+            self.transmit_frequency = data.get("transmit frequency", None)
+            self.imaging_depth = data.get("imaging depth", None)
+            self.focal_depth = data.get("focal depth", None)
+            self.auto_gain = data.get("auto gain", None)
+            self.mla = data.get("mla", None)
+            self.tgc = data.get("tgc", {})
+            size = data.get("size", {})
+            self.size_samples_per_line = size.get("samples per line", None)
+            self.size_number_of_lines = size.get("number of lines", None)
+            self.size_sample_size = size.get("sample size", None)
+            self.type = data.get("type", None)
+            self.compression = data.get("compression", None)
+            self.sampling_rate = data.get("sampling rate", None)
+            self.delay_samples = data.get("delay samples", None)
+            self.lines = data.get("lines", {})
+            focus_data = data.get("focus", {})
+            self.focus_depth = focus_data.get("depth", None)
+            self.focus_tx_frequency = focus_data.get("tx frequency", None)
+            self.focus_receive = focus_data.get("receive", None)
+
+        except Exception as e:
+            print(f"Error loading YAML file: {e}")        
+            
+    ###################################################################################
+    
+    def __load_tgc_yml(self):
+        pass
+
 ###################################################################################
 
 
@@ -117,6 +211,11 @@ class Clarius_tar_unpacker():
         
     ###################################################################################
         
+    def __repr__(self):
+        return ""
+    
+    ###################################################################################
+    
     def __run_single_sample_extraction(self):
         """Runs the extraction process for a single directory."""
         self.delete_extracted_folders()
@@ -477,17 +576,14 @@ class Clarius_tar_unpacker():
         return True
     
     ###################################################################################
-    
+
 ###################################################################################
-
-
-
 
 
 
 # parser
 ###################################################################################  
-class Clarius_parser(ClariusInfo):
+class Clarius_raw_parser(ClariusInfo):
 
     ###################################################################################
     
@@ -507,6 +603,8 @@ class Clarius_parser(ClariusInfo):
         self.supporting_versions_list: list = ["6.0.3"]
         
         self.__run()
+        
+    
         
     ###################################################################################
     
@@ -575,8 +673,6 @@ class Clarius_parser(ClariusInfo):
     ###################################################################################
     
 ###################################################################################
-
-
 
 
 
@@ -835,19 +931,8 @@ def convert_env_to_rf_ntgc(x, linear_tgc_matrix):
 
 ###################################################################################
 
-
-
-
-
-    
-###################################################################################
-
-def readImg(filename: str,
-            main_tgc_yml_path: str | None,
-            main_rf_yml_path: str, 
+def readImg(filename: str, tgc_path: str | None, info_path: str, 
             version="6.0.3", isPhantom=False) -> Tuple[DataOutputStruct, ClariusInfo, bool]:
-                       
-                    
     """Read RF data contained in Clarius file
     Args:
         filename (string)): where is the Clarius file
@@ -861,20 +946,11 @@ def readImg(filename: str,
     if version != "6.0.3":
         print("Unrecognized version")
         return []
-    
-    hdr, timestamps, data = read_raw_files(main_raw_path)
-
-    if hdr['id'] != 2:
-        print("The file does not contain RF data. Make sure RF mode is turned on while taking scans."
-        )
-        return []
-        
 
     # read the header info
     hinfo = np.fromfile(
         filename, dtype="uint32", count=5
     )  # int32 and uint32 appear to be equivalent in memory -> a = np.int32(1); np.dtype(a).itemsize
-    
     header = {"id": 0, "nframes": 0, "w": 0, "h": 0, "ss": 0}
     header["id"] = hinfo[0]
     header["nframes"] = hinfo[1]  # frames
@@ -898,12 +974,11 @@ def readImg(filename: str,
             )
             
     #######################################################################################################
-    
-    # else:
-    #     print(
-    #         "The file does not contain RF data. Make sure RF mode is turned on while taking scans."
-    #     )
-    #     return []
+    else:
+        print(
+            "The file does not contain RF data. Make sure RF mode is turned on while taking scans."
+        )
+        return []
 
     # # Check if the ROI is full
     # if header["w"] != 192 or header["h"] != 2928:
@@ -923,8 +998,6 @@ def readImg(filename: str,
         scanConverted = True
     except KeyError:
         scanConverted = False
-        
-        
     info.endDepth1 = float(infoYml["imaging depth"][:-2]) / 1000 #m
     info.startDepth1 = info.endDepth1 / 4 #m
     info.samplingFrequency = int(infoYml["sampling rate"][:-3]) * 1e6
@@ -966,12 +1039,14 @@ def readImg(filename: str,
     rf_ntgc = rf_matrix_corrected_B
     rf_dtgc = rf_matrix_corrected_A
     rf_atgc = data
-    rf = rf_ntgc
 
     # rf_atgc, rf_dtgc, rf_ntgc, dataEnv, dB_tgc_matrix = checkLengthEnvRF(rf_atgc,rf_dtgc,rf_ntgc,dataEnv,dB_tgc_matrix)
     linear_tgc_matrix = linear_tgc_matrix[0:dB_tgc_matrix.shape[0],0:dB_tgc_matrix.shape[1],0:dB_tgc_matrix.shape[2]]
     
-    bmode = 20*np.log10(abs(hilbert(rf, axis=0)))  
+    bmode = np.zeros_like(rf_atgc)
+    for f in range(rf_atgc.shape[2]):
+        for i in range(rf_atgc.shape[1]):
+            bmode[:,i, f] = 20*np.log10(abs(hilbert(rf_atgc[:,i, f])))   
             
     clippedMax = info.clipFact*np.amax(bmode)
     bmode = np.clip(bmode, clippedMax-info.dynRange, clippedMax) 
@@ -984,7 +1059,7 @@ def readImg(filename: str,
         scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, 
                                             info.endDepth1, desiredHeight=2000)
         scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, 
-                                     info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf.shape[2]))])
+                                     info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf_atgc.shape[2]))])
 
         info.yResRF =  info.endDepth1*1000 / scBmodeStruct.scArr.shape[0]
         info.xResRF = info.yResRF * (scBmodeStruct.scArr.shape[0]/scBmodeStruct.scArr.shape[1]) # placeholder
@@ -1005,59 +1080,31 @@ def readImg(filename: str,
 
     
     data.bMode = np.transpose(bmode, (2, 0, 1))
-    data.rf = np.transpose(rf, (2, 0, 1))
+    data.rf = np.transpose(rf_atgc, (2, 0, 1))
 
     return data, info, scanConverted
 
 ###################################################################################
 
-def clariusRfParser(main_raw_path: str,
-                    main_tgc_yml_path: str,
-                    main_rf_yml_path: str, 
-                    phantom_raw_path: str,
-                    phantom_tgc_yml_path: str,
-                    phantom_rf_yml_path: str, 
-                    version="6.0.3"
-                    ) -> Tuple[DataOutputStruct, ClariusInfo,
-                               DataOutputStruct, ClariusInfo,
-                               bool]:
-    """
-    Parses Clarius RF data and metadata from the specified input files.
+def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str, 
+            phantomFilename: str, phantomTgcFilename: str, phantomInfoFilename: str, 
+            version="6.0.3") -> Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo, bool]:
+    """Parse Clarius RF data and metadata from inputted files.
 
     Args:
-        main_raw_path (str): Path to the main RF data file.
-        main_tgc_yml_path (str): Path to the main TGC data file.
-        main_rf_yml_path (str): Path to the main metadata file.
-        phantom_raw_path (str): Path to the phantom RF data file.
-        phantom_tgc_yml_path (str): Path to the phantom TGC data file.
-        phantom_rf_yml_path (str): Path to the phantom metadata file.
-        version (str, optional): Clarius software version. Defaults to "6.0.3".
+        imgFilename (str): File path of the RF data.
+        imgTgcFilename (str): File path of the TGC data.
+        infoFilename (str): File path of the metadata.
+        phantomFilename (str): File path of the phantom RF data.
+        phantomTgcFilename (str): File path of the phantom TGC data.
+        phantomInfoFilename (str): File path of the phantom metadata.
+        version (str, optional): Defaults to "6.0.3".
 
     Returns:
-        Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo, bool]: 
-        - Main image data
-        - Main image metadata
-        - Phantom image data
-        - Phantom image metadata
-        - Scan conversion status
+        Tuple: Image data, image metadata, phantom data, and phantom metadata.
     """
-    
-    main_img_data, main_img_info, scan_converted = readImg(main_raw_path,
-                                                           main_tgc_yml_path,
-                                                           main_rf_yml_path,
-                                                           version, isPhantom=False)
-    
-    phantom_img_data, phantom_img_info, _ = readImg(phantom_raw_path,
-                                                    phantom_tgc_yml_path,
-                                                    phantom_rf_yml_path,
-                                                    version, isPhantom=False)
-    
-    return main_img_data, main_img_info, phantom_img_data, phantom_img_info, scan_converted
+    imgData, imgInfo, scanConverted = readImg(imgFilename, imgTgcFilename, infoFilename, version, isPhantom=False)
+    refData, refInfo, scanConverted = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
+    return imgData, imgInfo, refData, refInfo, scanConverted
 
 ###################################################################################
-
-
-
-
-
-
