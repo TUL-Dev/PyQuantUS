@@ -51,7 +51,8 @@ class ClariusInfo(InfoStruct):
 
 
 
-# classes    
+
+# tar file unpacker    
 ###################################################################################  
 class Clarius_tar_unpacker():
     """
@@ -64,7 +65,7 @@ class Clarius_tar_unpacker():
     """
     ###################################################################################
     
-    def __init__(self, tar_files_path: str, extraction_mode: str) -> None:  
+    def __init__(self, path: str, extraction_mode: str) -> None:  
         """
         Initializes the ClariusTarUnpacker class and starts the extraction process.
         
@@ -76,20 +77,48 @@ class Clarius_tar_unpacker():
             ValueError: If `extraction_mode` is not "single" or "multiple".
         """
         
-        self.tar_files_path = tar_files_path
+        self.path = path
         self.extraction_mode = extraction_mode
         self.lzo_exe_file_path = 'pyquantus/exe/lzop.exe'
         
-        if   self.extraction_mode == "single":   self.__run_single_extraction()
-        elif self.extraction_mode == "multiple": self.__run_multiple_extraction()    
+        # single tar extraction attibutes
+        self.single_tar_extraction: bool = None
+        self.tar_path: str = None
+        
+        if self.extraction_mode == "single_sample":
+            """Extracts data from a single sample containing multiple tar files.
+            The provided path should point to a directory containing multiple tar files. 
+            Each tar file within this directory will be processed sequentially, 
+            extracting its contents into the appropriate output location."""
+            if self.check_input_path():
+                self.__run_single_sample_extraction()
+
+        elif self.extraction_mode == "multiple_samples":
+            """Processes multiple samples, where each sample is a separate directory 
+            that potentially contains multiple tar files. The given path should be a 
+            directory containing multiple subdirectories, each representing an individual 
+            sample. Each subdirectory is processed independently, extracting the tar files 
+            within it."""
+            if self.check_input_path():
+                self.__run_multiple_samples_extraction()
+
+        elif self.extraction_mode == "single_tar":
+            """Extracts data from a single tar file.
+            The provided path should point directly to a single tar file. The file 
+            will be extracted to a designated output directory, maintaining its internal 
+            structure. This mode is useful when processing a standalone tar file rather 
+            than multiple files in a batch."""
+            if self.check_input_path():
+                self.__run_single_tar_extraction()
+
         else:
+            """Handles invalid extraction modes by raising an error."""
             raise ValueError(f"Invalid mode: {self.extraction_mode}")
         
     ###################################################################################
         
-    def __run_single_extraction(self):
+    def __run_single_sample_extraction(self):
         """Runs the extraction process for a single directory."""
-        self.delete_hidden_files_in_sample_folder()
         self.delete_extracted_folders()
         self.extract_tar_files()
         self.set_path_of_extracted_folders()
@@ -100,66 +129,41 @@ class Clarius_tar_unpacker():
 
     ###################################################################################
 
-    def __run_multiple_extraction(self):
-        """Extracts data from all directories inside `self.tar_files_path`."""
+    def __run_multiple_samples_extraction(self):
+        """Extracts data from all directories inside `self.path`."""
         try:
             # Retrieve all subdirectory paths
             folder_paths = [
-                os.path.join(self.tar_files_path, folder)
-                for folder in os.listdir(self.tar_files_path)
-                if os.path.isdir(os.path.join(self.tar_files_path, folder))
+                os.path.join(self.path, folder)
+                for folder in os.listdir(self.path)
+                if os.path.isdir(os.path.join(self.path, folder))
             ]
 
             # Process each folder for data extraction
             for folder_path in folder_paths:
-                self.tar_files_path = folder_path  # Update path before extraction
-                self.__run_single_extraction()
+                self.path = folder_path  # Update path before extraction
+                self.__run_single_sample_extraction()
 
         except Exception as e:
             logging.error(f"An error occurred while extracting data: {e}")
 
     ###################################################################################
     
-    def delete_hidden_files_in_sample_folder(self):
-        """
-        Deletes hidden files (starting with a dot) from the sample folder.
-
-        Returns:
-            bool: True if files were successfully deleted, False otherwise.
-        """
-        if not os.path.exists(self.tar_files_path):
-            logging.error(f"Sample folder path does not exist: {self.tar_files_path}")
-            return False  # Indicate failure due to non-existing path
-
-        try:
-            deleted_files_count = 0  # Count of deleted files
-            # Iterate over the files in the sample folder
-            for filename in os.listdir(self.tar_files_path):
-                # Check if the file is hidden (starts with a dot)
-                if filename.startswith('.'):
-                    file_path = os.path.join(self.tar_files_path, filename)
-                    os.remove(file_path)  # Delete the hidden file
-                    logging.info(f"Deleted hidden file: {file_path}")
-                    deleted_files_count += 1
-
-            if deleted_files_count > 0:
-                logging.info(f"Total hidden files deleted: {deleted_files_count}")
-            else:
-                logging.info("No hidden files to delete.")
-
-            return True  # Indicate success
-        except Exception as e:
-            logging.error(f"An error occurred while deleting hidden files: {e}")
-            return False  # Indicate failure
-        
+    def __run_single_tar_extraction(self):
+        """Handles extraction when a single tar file is provided."""
+        self.single_tar_extraction = True
+        self.tar_path = self.path
+        self.path = self.get_folder_path_from_file_path(self.tar_path)
+        self.__run_single_sample_extraction()
+            
     ###################################################################################
-       
+           
     def delete_extracted_folders(self):
         """Deletes all extracted folders in the specified directory."""
         extracted_folders = [
-            os.path.join(self.tar_files_path, item)
-            for item in os.listdir(self.tar_files_path)
-            if os.path.isdir(os.path.join(self.tar_files_path, item)) and "extracted" in item
+            os.path.join(self.path, item)
+            for item in os.listdir(self.path)
+            if os.path.isdir(os.path.join(self.path, item)) and "extracted" in item
         ]
 
         for folder in extracted_folders:
@@ -173,44 +177,63 @@ class Clarius_tar_unpacker():
         
     def extract_tar_files(self):
         """
-        Extracts all tar files in the specified sample folder.
-
-        The extracted files are placed in a subdirectory named after each tar file with '_extracted' appended.
+        Extracts all non-hidden tar files in the specified sample folder.
+        If `self.single_tar_extraction` is True, `self.path` should be a `.tar` file.
         """
-        # Iterate over files in the sample folder
-        for item_name in os.listdir(self.tar_files_path):
-            item_path = os.path.join(self.tar_files_path, item_name)
-            
-            # Check if the item is a file
-            if os.path.isfile(item_path):
-                # Check if the file is a tar file
-                if tarfile.is_tarfile(item_path):
-                    # Use the file name without the extension for the extracted folder
-                    file_name = os.path.splitext(item_name)[0]
 
-                    # Create a new folder for extracted files
-                    extracted_folder = os.path.join(self.tar_files_path, f'{file_name}.tar_extracted')
+        if not self.single_tar_extraction:
+            # Ensure the given path is a directory
+            if not os.path.isdir(self.path):
+                logging.error(f"Path '{self.path}' is not a directory.")
+                return
+
+            for item_name in os.listdir(self.path):
+                item_path = os.path.join(self.path, item_name)
+
+                # Ignore hidden files
+                if item_name.startswith('.'):
+                    continue
+                
+                # Check if the item is a tar archive
+                if os.path.isfile(item_path) and item_name.endswith('.tar') and tarfile.is_tarfile(item_path):
+                    file_name = os.path.splitext(item_name)[0]
+                    extracted_folder = os.path.join(self.path, f"{file_name}_extracted")
                     os.makedirs(extracted_folder, exist_ok=True)
-                    
+
                     try:
-                        # Extract the tar file into the new folder
                         with tarfile.open(item_path, 'r') as tar:
                             tar.extractall(path=extracted_folder)
                             logging.info(f"Extracted '{item_name}' into '{extracted_folder}'")
                     except (tarfile.TarError, OSError) as e:
                         logging.error(f"Error extracting '{item_name}': {e}")
 
+        elif self.single_tar_extraction:
+            # Handle single tar extraction
+            if os.path.isfile(self.tar_path) and self.tar_path.endswith('.tar') and tarfile.is_tarfile(self.tar_path):
+                file_name = os.path.splitext(os.path.basename(self.tar_path))[0]
+                extracted_folder = os.path.join(os.path.dirname(self.tar_path), f"{file_name}_extracted")
+                os.makedirs(extracted_folder, exist_ok=True)
+
+                try:
+                    with tarfile.open(self.tar_path, 'r') as tar:
+                        tar.extractall(path=extracted_folder)
+                        logging.info(f"Extracted '{self.tar_path}' into '{extracted_folder}'")
+                except (tarfile.TarError, OSError) as e:
+                    logging.error(f"Error extracting '{self.tar_path}': {e}")
+            else:
+                logging.error(f"Invalid tar file: '{self.tar_path}'")
+
     ###################################################################################
     
     def set_path_of_extracted_folders(self):
-        """Finds and stores paths of extracted folders inside `self.tar_files_path`."""
+        """Finds and stores paths of extracted folders inside `self.path`."""
         logging.info("Searching for extracted folders...")
 
         # Find all directories containing 'extracted' in their name
         self.extracted_folders_path_list = [
-            os.path.join(self.tar_files_path, item)
-            for item in os.listdir(self.tar_files_path)
-            if os.path.isdir(os.path.join(self.tar_files_path, item)) and "extracted" in item
+            os.path.join(self.path, item)
+            for item in os.listdir(self.path)
+            if os.path.isdir(os.path.join(self.path, item)) and "extracted" in item
         ]
 
         # Log each extracted folder found
@@ -275,11 +298,17 @@ class Clarius_tar_unpacker():
         - Exits the program if `lzop` is missing on macOS and cannot be installed.
         """
         # Set self.os based on the platform
-        os_name = platform.system().lower()
+        os_name = platform.system().lower()           
+        
         if 'windows' in os_name:
             self.os = "windows"
         elif 'darwin' in os_name:
             self.os = "mac"
+        elif 'linux' in os_name:
+            self.os = "linux"
+        else:
+            self.os = "unknown"
+            
         logging.info(f'Detected operating system: {self.os}')
                
         if self.os == "windows":
@@ -301,7 +330,7 @@ class Clarius_tar_unpacker():
                 logging.info(f'Starting decompression for: {lzo_file_path}')
                 try:
                     # Run the lzop command to decompress the LZO file
-                    result = subprocess.run([path_of_lzo_exe_file, '-d', lzo_file_path], check=True)
+                    subprocess.run([path_of_lzo_exe_file, '-d', lzo_file_path], check=True)
                     logging.info(f'Successfully decompressed: {lzo_file_path}')
                 except subprocess.CalledProcessError as e:
                     logging.error(f'Error decompressing {lzo_file_path}: {e}')
@@ -315,7 +344,6 @@ class Clarius_tar_unpacker():
                 logging.info(f'Starting decompression for: {lzo_file_path}')
                 try:
                     # Run the lzop command to decompress the LZO file
-                    result = subprocess.run(['lzop', '-d', lzo_file_path], check=True)
                     subprocess.run(['lzop', '-d', lzo_file_path], check=True)
                     logging.info(f'Successfully decompressed: {lzo_file_path}')
                 except FileNotFoundError:
@@ -339,7 +367,10 @@ class Clarius_tar_unpacker():
                     logging.error(f'Permission denied for {lzo_file_path}: {e}')
                 except Exception as e:
                     logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')            
-                    logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')           
+                    logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')    
+                    
+        elif self.os == "linux":
+            logging.warning("LZO decompression on Linux has not been fully developed yet.")
 
     ###################################################################################
 
@@ -385,8 +416,77 @@ class Clarius_tar_unpacker():
                 logging.error(f"Error while deleting hidden files in {folder_path}: {e}")
           
     ###################################################################################
+    @staticmethod
+    def get_folder_path_from_file_path(file_path: str) -> str:
+        """Returns the absolute directory path of the given file."""
+        return os.path.dirname(os.path.abspath(file_path))
+    
+    ###################################################################################
+    
+    def check_input_path(self):
+        """
+        Validates the input path based on the specified extraction mode.
+
+        This method checks whether the provided path exists and conforms to 
+        the expected format for different extraction modes:
+
+        - "single_sample": The path must be a directory containing at least 
+        one `.tar` file.
+        - "multiple_samples": The path must be a directory containing at least 
+        one subdirectory.
+        - "single_tar": The path must be a valid `.tar` file.
+
+        Returns:
+            bool: True if the path is valid for the specified extraction mode, 
+                otherwise False with a warning message.
+        """
+        if not os.path.exists(self.path):
+            print(f"Warning: The path '{self.path}' does not exist.")
+            return False
+
+        if self.extraction_mode == "single_sample":
+            if not os.path.isdir(self.path):
+                print(f"Warning: The path '{self.path}' is not a directory.")
+                return False
+            tar_files = [f for f in os.listdir(self.path) if f.endswith(".tar")]
+            if not tar_files:
+                print(f"Warning: No .tar files found in '{self.path}'.")
+                return False
+
+        elif self.extraction_mode == "multiple_samples":
+            if not os.path.isdir(self.path):
+                print(f"Warning: The path '{self.path}' is not a directory.")
+                return False
+            subfolders = [f for f in os.listdir(self.path) if os.path.isdir(os.path.join(self.path, f))]
+            if not subfolders:
+                print(f"Warning: No subdirectories found in '{self.path}'.")
+                return False
+
+        elif self.extraction_mode == "single_tar":
+            if not os.path.isfile(self.path) or not self.path.endswith(".tar"):
+                print(f"Warning: The path '{self.path}' is not a valid .tar file.")
+                return False
+            if not tarfile.is_tarfile(self.path):
+                print(f"Warning: The file '{self.path}' is not a valid tar archive.")
+                return False
+
+        else:
+            print(f"Warning: Unknown extraction mode '{self.extraction_mode}'.")
+            return False
+
+        return True
+    
+    ###################################################################################
     
 ###################################################################################
+
+
+
+
+
+
+# parser
+###################################################################################  
 class Clarius_parser(ClariusInfo):
 
     ###################################################################################
@@ -404,7 +504,7 @@ class Clarius_parser(ClariusInfo):
         self.isPhantom = isPhantom
         
         # predefined versions
-        self.versions_list = ["6.0.3"]
+        self.supporting_versions_list: list = ["6.0.3"]
         
         self.__run()
         
@@ -474,9 +574,8 @@ class Clarius_parser(ClariusInfo):
 
     ###################################################################################
     
-    
-    
 ###################################################################################
+
 
 
 
