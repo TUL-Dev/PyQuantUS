@@ -53,8 +53,18 @@ class ClariusInfo(DataOutputStruct, InfoStruct):
 
 
 ###################################################################################
-class Clarius_yml_parser():
-        
+class YmlParser():
+    """
+    This class reads YAML file data related to ultrasound imaging parameters. 
+    It extracts information from two YAML files:
+    
+    1. `rf.yml` - Contains data such as sampling frequency, probe details, imaging parameters, 
+       and transmission settings.
+    2. `env.tgc.yml` - Contains time gain compensation (TGC) data.
+
+    The extracted data is used to generate new imaging data without TGC, 
+    requiring TGC values for processing.
+    """
     def __init__(self, yml_path):
         
         self.yml_path: str = yml_path
@@ -148,7 +158,7 @@ class Clarius_yml_parser():
 
 # tar file unpacker    
 ###################################################################################  
-class Clarius_tar_unpacker():
+class ClariusTarUnpacker():
     """
     A class for extracting and processing `.tar` archives containing `.lzo` and `.raw` files.
     
@@ -583,7 +593,7 @@ class Clarius_tar_unpacker():
 
 # parser
 ###################################################################################  
-class Clarius_raw_parser(ClariusInfo):
+class ClariusRawParser(ClariusInfo):
 
     ###################################################################################
     
@@ -603,9 +613,7 @@ class Clarius_raw_parser(ClariusInfo):
         self.supporting_versions_list: list = ["6.0.3"]
         
         self.__run()
-        
-    
-        
+                
     ###################################################################################
     
     def __run(self):
@@ -673,6 +681,8 @@ class Clarius_raw_parser(ClariusInfo):
     ###################################################################################
     
 ###################################################################################
+
+
 
 
 
