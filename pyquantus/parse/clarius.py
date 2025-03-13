@@ -49,6 +49,7 @@ class ClariusInfo(DataOutputStruct, InfoStruct):
 ###################################################################################
 
 
+
 # tar file unpacker    
 ###################################################################################  
 class ClariusTarUnpacker():
@@ -115,8 +116,18 @@ class ClariusTarUnpacker():
     ###################################################################################
         
     def __repr__(self):
-        return ""
-    
+        """
+        Returns a string representation of the object.
+
+        This method provides a developer-friendly representation of the instance,
+        typically including key attributes for debugging purposes.
+
+        Returns:
+            str: A string representation of the instance.
+        """
+
+        return f"{self.__class__.__name__}"
+
     ###################################################################################
     
     def __run_single_sample_extraction(self):
@@ -459,68 +470,56 @@ class ClariusTarUnpacker():
                 otherwise False with a warning message.
         """
         if not os.path.exists(self.path):
-            print(f"Warning: The path '{self.path}' does not exist.")
+            logging.warning(f"The path '{self.path}' does not exist.")
             return False
 
         if self.extraction_mode == "single_sample":
             if not os.path.isdir(self.path):
-                print(f"Warning: The path '{self.path}' is not a directory.")
+                logging.warning(f"The path '{self.path}' is not a directory.")
                 return False
             tar_files = [f for f in os.listdir(self.path) if f.endswith(".tar")]
             if not tar_files:
-                print(f"Warning: No .tar files found in '{self.path}'.")
+                logging.warning(f"No .tar files found in '{self.path}'.")
                 return False
 
         elif self.extraction_mode == "multiple_samples":
             if not os.path.isdir(self.path):
-                print(f"Warning: The path '{self.path}' is not a directory.")
+                logging.warning(f"The path '{self.path}' is not a directory.")
                 return False
             subfolders = [f for f in os.listdir(self.path) if os.path.isdir(os.path.join(self.path, f))]
             if not subfolders:
-                print(f"Warning: No subdirectories found in '{self.path}'.")
+                logging.warning(f"No subdirectories found in '{self.path}'.")
                 return False
 
         elif self.extraction_mode == "single_tar":
             if not os.path.isfile(self.path) or not self.path.endswith(".tar"):
-                print(f"Warning: The path '{self.path}' is not a valid .tar file.")
+                logging.warning(f"The path '{self.path}' is not a valid .tar file.")
                 return False
             if not tarfile.is_tarfile(self.path):
-                print(f"Warning: The file '{self.path}' is not a valid tar archive.")
+                logging.warning(f"The file '{self.path}' is not a valid tar archive.")
                 return False
 
         else:
-            print(f"Warning: Unknown extraction mode '{self.extraction_mode}'.")
+            logging.warning(f"Unknown extraction mode '{self.extraction_mode}'.")
             return False
 
         return True
     
     ###################################################################################
     
-
 ###################################################################################
 
 
 
 # parser
 ###################################################################################  
-class ClariusRawParser(ClariusInfo):
+class ClariusParser(ClariusInfo):
 
     ###################################################################################
     
-    def __init__(self, 
-                 main_raw_path: str,
-                 main_tgc_yml_path: str | None,
-                 main_rf_yml_path: str,
-                 isPhantom: bool):
+    def __init__(self, extracted_sample_folder_path: str):
     
-        # inputs
-        self.main_raw_path = main_raw_path
-        self.main_tgc_yml_path = main_tgc_yml_path
-        self.main_rf_yml_path = main_rf_yml_path
-        self.isPhantom = isPhantom
-        
-        # predefined versions
-        self.supporting_versions_list: list = ["6.0.3"]
+        self.path = extracted_sample_folder_path
         
         self.__run()
                 
@@ -528,65 +527,110 @@ class ClariusRawParser(ClariusInfo):
     
     def __run(self):
         
-        self.read_raw_files()
-        
+        if self.check_required_files():
+            
+            # yml
+            self.set_ymls_path()
+            self.read_ymls()
+            
+            # raw
+            self.set_raws_path()
+            self.read_rf_raw()
+            self.read_env_raw()
+            
+            # no tgc
+            self.create_no_tgc()
+
     ###################################################################################
     
-    def read_raw_files(self, 
-                        raw_file_path):
+    def check_required_files(self):
+        """Checks if all required files exist in the directory but ignores extra files or folders."""
+        if not os.path.isdir(self.path):
+            logging.error(f"The path '{self.path}' is NOT a valid folder.")
+            return False
+
+        # Define the required file suffixes after '_'
+        required_files = {
+            "env.raw.lzo",
+            "rf.raw.lzo",
+            "env.raw",
+            "rf.raw",
+            "env.tgc.yml",
+            "env.yml",
+            "rf.yml"
+        }
+
+        # Get all files in the directory
+        files_in_directory = os.listdir(self.path)
+
+        # Extract parts after the first '_'
+        found_files = set()
+        for file in files_in_directory:
+            parts = file.split("_", 1)
+            if len(parts) > 1:
+                found_files.add(parts[1])  # Add the suffix part
+
+        # Check if all required files are present
+        missing_files = required_files - found_files
+
+        if missing_files:
+            logging.warning("The following required files are missing:")
+            for missing in missing_files:
+                logging.warning(f"- {missing}")
+            return False
+
+        logging.info("All required files are present.")
+        return True
+
+    ###################################################################################
+    
+    def read_rf_raw(self):
         """
         Reads a raw binary file, extracts header information, timestamps, and data,
-        and returns them as a dictionary and NumPy arrays.
+        and stores them in instance variables.
 
         Args:
-            raw_file_path (str): Path to the raw binary file.
-
-        Returns:
-            tuple: (hdr (dict), timestamps (np.ndarray), data (np.ndarray))
-            or (None, None, None) in case of an error.
+            None
         """
-        logging.info(f'Reading raw file: {raw_file_path}')
+        logging.info(f'Reading raw file: {self.rf_raw}')
 
-        # Define header fields
-        hdr_info = ('id', 'frames', 'lines', 'samples', 'samplesize')
+        # Define header fields and initialize dictionary
+        hdr_keys = ('id', 'frames', 'lines', 'samples', 'samplesize')
         hdr = {}
-
+        
         try:
-            with open(raw_file_path, 'rb') as raw_bytes:
-                # Read header (4 bytes each field)
-                for info in hdr_info:
-                    hdr[info] = int.from_bytes(raw_bytes.read(4), byteorder='little')
-
+            with open(self.rf_raw, 'rb') as raw_bytes:
+                # Read and parse header
+                hdr = {key: int.from_bytes(raw_bytes.read(4), byteorder='little') for key in hdr_keys}
+                
                 # Validate header values
                 if any(value <= 0 for value in hdr.values()):
                     logging.error(f'Invalid header values: {hdr}')
-                    return None, None, None
-
+                    return
+                
+                frames, lines, samples, samplesize = hdr['frames'], hdr['lines'], hdr['samples'], hdr['samplesize']
+                frame_size = lines * samples * samplesize
+                
                 # Initialize arrays
-                timestamps = np.zeros(hdr['frames'], dtype=np.int64)
-                sz = hdr['lines'] * hdr['samples'] * hdr['samplesize']
-                data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype=np.int16)
-
+                timestamps = np.zeros(frames, dtype=np.int64)
+                data = np.zeros((lines, samples, frames), dtype=np.int16)
+                
                 # Read timestamps and data for each frame
-                for frame in range(hdr['frames']):
-                    # Read timestamp (8 bytes per frame)
+                for frame in range(frames):
                     timestamps[frame] = int.from_bytes(raw_bytes.read(8), byteorder='little')
-
-                    # Read frame data and ensure correct number of bytes
-                    frame_data = raw_bytes.read(sz)
-                    if len(frame_data) != sz:
-                        logging.error(f'Unexpected frame size at frame {frame}: Expected {sz} bytes, got {len(frame_data)}')
-                        return None, None, None
-
-                    data[:, :, frame] = np.frombuffer(frame_data, dtype=np.int16).reshape((hdr['lines'], hdr['samples']))
-
-            logging.info(f'Loaded {data.shape[2]} raw frames of size {data.shape[0]} x {data.shape[1]} (lines x samples)')
-
+                    frame_data = raw_bytes.read(frame_size)
+                    
+                    if len(frame_data) != frame_size:
+                        logging.error(f'Unexpected frame size at frame {frame}: Expected {frame_size} bytes, got {len(frame_data)}')
+                        return
+                    
+                    data[:, :, frame] = np.frombuffer(frame_data, dtype=np.int16).reshape((lines, samples))
+            
+            logging.info(f'Loaded {frames} raw frames of size {lines} x {samples} (lines x samples)')
             self.raw_hdr, self.raw_timestamps, self.raw_data = hdr, timestamps, data
 
         except Exception as e:
-            logging.error(f'Error reading file {raw_file_path}: {e}')
-            return None, None, None
+            logging.error(f'Error reading file {self.rf_raw}: {e}')
 
     ###################################################################################
     class YmlParser():
@@ -601,6 +645,8 @@ class ClariusRawParser(ClariusInfo):
         The extracted data is used to generate new imaging data without TGC, 
         requiring TGC values for processing.
         """
+        ###################################################################################
+        
         def __init__(self, yml_path):
             
             self.path: str = yml_path
@@ -608,27 +654,46 @@ class ClariusRawParser(ClariusInfo):
             self.extension: str
             
             # rf.yml
-            self.software_version: str
-            self.iso_time_date: str
-            self.probe_version: str
-            self.probe_elements: int
-            self.probe_pitch: float
-            self.probe_radius: float
-            self.frames: int
-            self.frame_rate: str
-            self.transmit_frequency: str
-            self.imaging_depth: str
-            self.focal_depth: str
-            self.auto_gain: bool
-            self.mla: bool
-            self.tgc: dict
-            self.size: dict
-            self.type: str
-            self.compression: str
-            self.sampling_rate: float
-            self.delay_samples: int
-            self.lines: dict
-            self.focus: dict
+            self.rf_software_version: str
+            self.rf_iso_time_date: str
+            self.rf_probe: dict
+            self.rf_frames: int
+            self.rf_frame_rate: str
+            self.rf_transmit_frequency: str
+            self.rf_imaging_depth: str
+            self.rf_focal_depth: str
+            self.rf_auto_gain: bool
+            self.rf_mla: bool
+            self.rf_tgc: dict
+            self.rf_size: dict
+            self.rf_type: str
+            self.rf_compression: str
+            self.rf_sampling_rate: float
+            self.rf_delay_samples: int
+            self.rf_lines: dict
+            self.rf_focus: dict
+            
+            # env.yml
+            self.env_software_version: str
+            self.env_iso_time_date: str
+            self.env_probe: dict
+            self.env_frames: int
+            self.env_frame_rate: str
+            self.env_transmit_frequency: str
+            self.env_imaging_depth: str
+            self.env_focal_depth: str
+            self.env_auto_gain: bool
+            self.env_mla: bool
+            self.env_tgc: dict
+            self.env_size: dict
+            self.env_type: str
+            self.env_compression: str
+            self.env_sampling_rate: float
+            self.env_delay_samples: int
+            self.env_lines: dict
+            self.env_focus: dict
+            self.env_compound: dict
+            self.env_roi: dict
             
             # env.tgc.yml
             self.frames: int
@@ -639,12 +704,13 @@ class ClariusRawParser(ClariusInfo):
         ###################################################################################
         
         def __run(self):
-            
+            """Executes the internal workflow of the class."""
             self.set_file_extension()
             self.load_rf_yml()
-            self.load_tgc_yml()
+            self.load_env_yml()
+            self.load_env_tgc_yml()
             self.check_version()
-            
+
         ###################################################################################
         
         def set_file_extension(self):
@@ -705,35 +771,99 @@ class ClariusRawParser(ClariusInfo):
                         data = yaml.safe_load(file)
 
                     # Mapping YAML fields to class attributes
-                    self.software_version = data.get("software version", None)
-                    self.iso_time_date = data.get("iso time/date", None)
-                    probe = data.get("probe", {})
-                    self.probe_version = probe.get("version", None)
-                    self.probe_elements = probe.get("elements", None)
-                    self.probe_pitch = probe.get("pitch", None)
-                    self.probe_radius = probe.get("radius", None)
-                    self.frames = data.get("frames", None)
-                    self.frame_rate = data.get("frame rate", None)
-                    self.transmit_frequency = data.get("transmit frequency", None)
-                    self.imaging_depth = data.get("imaging depth", None)
-                    self.focal_depth = data.get("focal depth", None)
-                    self.auto_gain: bool = data.get("auto gain", None)
-                    self.mla: bool = data.get("mla", None)
-                    self.tgc = data.get("tgc", {})
-                    self.size = data.get("size", {})
-                    self.type = data.get("type", None)
-                    self.compression = data.get("compression", None)
-                    self.sampling_rate = data.get("sampling rate", None)
-                    self.delay_samples = data.get("delay samples", None)
-                    self.lines = data.get("lines", {})
-                    self.focus = data.get("focus", [{}])
-
+                    self.rf_software_version = data.get("software version", None)
+                    self.rf_iso_time_date = data.get("iso time/date", None)
+                    self.rf_probe = data.get("probe", {})
+                    self.rf_frames = data.get("frames", None)
+                    self.rf_frame_rate = data.get("frame rate", None)
+                    self.rf_transmit_frequency = data.get("transmit frequency", None)
+                    self.rf_imaging_depth = data.get("imaging depth", None)
+                    self.rf_focal_depth = data.get("focal depth", None)
+                    self.rf_auto_gain: bool = data.get("auto gain", None)
+                    self.rf_mla: bool = data.get("mla", None)
+                    self.rf_tgc = data.get("tgc", {})
+                    self.rf_size = data.get("size", {})
+                    self.rf_type = data.get("type", None)
+                    self.rf_compression = data.get("compression", None)
+                    self.rf_sampling_rate = data.get("sampling rate", None)
+                    self.rf_delay_samples = data.get("delay samples", None)
+                    self.rf_lines = data.get("lines", {})
+                    self.rf_focus = data.get("focus", [{}])
+                   
                 except Exception as e:
-                    print(f"Error loading YAML file: {e}")
-    
+                    logging.error(f"Error loading YAML file: {e}")
+  
+        ###################################################################################
+        
+        def load_env_yml(self):              
+            """
+            Loads environment configuration from a YAML file (`env.yml`) and maps its contents 
+            to class attributes.
+
+            This method reads a YAML file specified by `self.path` and extracts various 
+            parameters related to the environment, such as software version, imaging settings, 
+            probe details, and acquisition parameters. The extracted data is stored in 
+            corresponding instance variables.
+
+            Attributes Set:
+                - env_software_version (str or None): Software version from YAML.
+                - env_iso_time_date (str or None): ISO formatted time/date.
+                - env_probe (dict): Probe details.
+                - env_frames (int or None): Number of frames.
+                - env_frame_rate (float or None): Frame rate.
+                - env_transmit_frequency (float or None): Transmit frequency.
+                - env_imaging_depth (float or None): Imaging depth.
+                - env_focal_depth (float or None): Focal depth.
+                - env_auto_gain (bool or None): Auto gain setting.
+                - env_mla (bool or None): Multi-line acquisition setting.
+                - env_tgc (dict): Time Gain Compensation settings.
+                - env_size (dict): Image size parameters.
+                - env_type (str or None): Data type.
+                - env_compression (str or None): Compression type.
+                - env_sampling_rate (float or None): Sampling rate.
+                - env_delay_samples (int or None): Number of delay samples.
+                - env_lines (dict): Line-related parameters.
+                - env_focus (list of dicts): Focus parameters.
+                - env_compound (dict): Compound imaging settings.
+                - env_roi (dict): Region of Interest settings.
+
+            Error Handling:
+                - Logs an error message if the YAML file cannot be read or parsed.
+
+            """  
+            if self.extension == "env.yml":
+                try:
+                    with open(self.path, 'r') as file:
+                        data = yaml.safe_load(file)
+
+                    # Mapping YAML fields to class attributes
+                    self.env_software_version = data.get("software version", None)
+                    self.env_iso_time_date = data.get("iso time/date", None)
+                    self.env_probe = data.get("probe", {})
+                    self.env_frames = data.get("frames", None)
+                    self.env_frame_rate = data.get("frame rate", None)
+                    self.env_transmit_frequency = data.get("transmit frequency", None)
+                    self.env_imaging_depth = data.get("imaging depth", None)
+                    self.env_focal_depth = data.get("focal depth", None)
+                    self.env_auto_gain: bool = data.get("auto gain", None)
+                    self.env_mla: bool = data.get("mla", None)
+                    self.env_tgc = data.get("tgc", {})
+                    self.env_size = data.get("size", {})
+                    self.env_type = data.get("type", None)
+                    self.env_compression = data.get("compression", None)
+                    self.env_sampling_rate = data.get("sampling rate", None)
+                    self.env_delay_samples = data.get("delay samples", None)
+                    self.env_lines = data.get("lines", {})
+                    self.env_focus = data.get("focus", [{}])
+                    self.env_compound = data.get("compound", {})
+                    self.env_roi = data.get("roi", {})
+                    
+                except Exception as e:
+                    logging.error(f"Error loading YAML file: {e}")
+
         ###################################################################################
 
-        def load_tgc_yml(self):
+        def load_env_tgc_yml(self):
             """
             Loads and parses an environmental TGC YAML file if the file extension is "env.tgc.yml".
             The method reads the YAML file, extracts relevant fields, and maps them to class attributes.
@@ -776,22 +906,42 @@ class ClariusRawParser(ClariusInfo):
 
                             # Store in list under the current timestamp
                             self.timestamps[current_timestamp].append({"depth": depth, "dB": dB})
-
+                   
                 except Exception as e:
-                    print(f"Error loading YAML file: {e}")
-                    
+                    logging.error(f"Error loading YAML file: {e}")
+
         ###################################################################################
-        
+
         def check_version(self):
             """
-            Checks if the current software version is in the list of valid versions.
+            Checks if the current software version (from env.yml or rf.yml) 
+            is in the list of valid versions.
+
+            Logs an informational message if the version is valid and a warning if it is not.
 
             :return: True if the version is valid, False otherwise.
             """
-            if self.software_version in self.valid_versions:
-                logging.info(f"Version {self.software_version} is valid.")
+            
+            if self.extension == "env.tgc.yml":
+                return  # Ignoriere diese spezielle Datei
+
+            # Prüfen, ob die Attribute existieren, bevor sie verwendet werden
+            env_version = getattr(self, "env_software_version", None)
+            rf_version = getattr(self, "rf_software_version", None)
+
+            version_mapping = {
+                "env.yml": env_version,
+                "rf.yml": rf_version
+            }
+
+            software_version = version_mapping.get(self.extension)
+
+            if software_version in self.valid_versions:
+                logging.info(f"Version {software_version} is valid.")
+                return True
             else:
-                logging.warning(f"Version {self.software_version} is not valid. This might cause some problems.")
+                logging.warning(f"Version {software_version} is not valid. This might cause some problems.")
+                return False
 
         ###################################################################################
         
