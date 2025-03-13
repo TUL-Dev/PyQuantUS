@@ -558,7 +558,7 @@ class ClariusParser(ClariusInfo):
             self.read_env_raw()
            
             # no tgc
-            #self.create_no_tgc()
+            self.create_no_tgc()
 
     ###################################################################################
     
@@ -845,7 +845,11 @@ class ClariusParser(ClariusInfo):
         self.env_raw_hdr, self.env_raw_timestamps, self.env_raw_data = hdr, timestamps, data
     
     ###################################################################################
+
+    def create_no_tgc():
+        pass
     
+    ###################################################################################
     class YmlParser():
         """
         This class reads YAML file data related to ultrasound imaging parameters. 
