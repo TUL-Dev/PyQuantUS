@@ -137,7 +137,7 @@ class YmlParser():
             self.sampling_rate = data.get("sampling rate", None)
             self.delay_samples = data.get("delay samples", None)
             self.lines = data.get("lines", {})
-            focus_data = data.get("focus", {})
+            focus_data = data.get("focus", [{}])[0]
             self.focus_depth = focus_data.get("depth", None)
             self.focus_tx_frequency = focus_data.get("tx frequency", None)
             self.focus_receive = focus_data.get("receive", None)
@@ -479,7 +479,23 @@ class ClariusTarUnpacker():
                     logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')    
                     
         elif self.os == "linux":
-            logging.warning("LZO decompression on Linux has not been fully developed yet.")
+            for lzo_file_path in self.lzo_files_path_list:
+                logging.info(f'Starting decompression for: {lzo_file_path}')
+                try:
+                    # Run the lzop command to decompress the LZO file
+                    subprocess.run(['lzop', '-d', lzo_file_path], check=True)
+                    logging.info(f'Successfully decompressed: {lzo_file_path}')
+                except FileNotFoundError as e:
+                    logging.error(f"lzop must be installed to decompress LZO files. Please install lzop and try again.")
+                    sys.exit()
+
+                except subprocess.CalledProcessError as e:
+                    logging.error(f'Error decompressing {lzo_file_path}: {e}')
+                except PermissionError as e:
+                    logging.error(f'Permission denied for {lzo_file_path}: {e}')
+                except Exception as e:
+                    logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')            
+                    logging.error(f'Unexpected error occurred with {lzo_file_path}: {e}')    
 
     ###################################################################################
 
