@@ -49,113 +49,6 @@ class ClariusInfo(DataOutputStruct, InfoStruct):
 ###################################################################################
 
 
-
-
-
-###################################################################################
-class YmlParser():
-    """
-    This class reads YAML file data related to ultrasound imaging parameters. 
-    It extracts information from two YAML files:
-    
-    1. `rf.yml` - Contains data such as sampling frequency, probe details, imaging parameters, 
-       and transmission settings.
-    2. `env.tgc.yml` - Contains time gain compensation (TGC) data.
-
-    The extracted data is used to generate new imaging data without TGC, 
-    requiring TGC values for processing.
-    """
-    def __init__(self, yml_path):
-        
-        self.yml_path: str = yml_path
-        self.valid_software_versions: list[str] = ['12.0.1-673']
-        
-        # rf.yml
-        self.software_version: str
-        self.iso_time_date: str
-        self.probe_version: str
-        self.probe_elements: int
-        self.probe_pitch: float
-        self.probe_radius: float
-        self.frames: int
-        self.frame_rate: str
-        self.transmit_frequency: str
-        self.imaging_depth: str
-        self.focal_depth: str
-        self.auto_gain: str
-        self.mla: str
-        self.tgc: dict
-        self.size_samples_per_line: int
-        self.size_number_of_lines: int
-        self.size_sample_size: str  
-        self.type: str
-        self.compression: str
-        self.sampling_rate: float
-        self.delay_samples: int
-        self.lines: dict
-        self.focus_depth: str
-        self.focus_tx_frequency: str
-        self.focus_receive_settings: dict 
-        
-        # env.tgc.yml
-        self.frames: int
-        self.timestamp: dict
-        
-        self.__load_rf_yml()
-        self.__load_tgc_yml()
-        
-    ###################################################################################
-        
-    def __load_rf_yml(self):
-        
-        try:
-            with open(self.yml_path, 'r') as file:
-                data = yaml.safe_load(file)
-
-            # Mapping YAML fields to class attributes
-            self.software_version = data.get("software version", None)
-            self.iso_time_date = data.get("iso time/date", None)
-            probe = data.get("probe", {})
-            self.probe_version = probe.get("version", None)
-            self.probe_elements = probe.get("elements", None)
-            self.probe_pitch = probe.get("pitch", None)
-            self.probe_radius = probe.get("radius", None)
-            self.frames = data.get("frames", None)
-            self.frame_rate = data.get("frame rate", None)
-            self.transmit_frequency = data.get("transmit frequency", None)
-            self.imaging_depth = data.get("imaging depth", None)
-            self.focal_depth = data.get("focal depth", None)
-            self.auto_gain = data.get("auto gain", None)
-            self.mla = data.get("mla", None)
-            self.tgc = data.get("tgc", {})
-            size = data.get("size", {})
-            self.size_samples_per_line = size.get("samples per line", None)
-            self.size_number_of_lines = size.get("number of lines", None)
-            self.size_sample_size = size.get("sample size", None)
-            self.type = data.get("type", None)
-            self.compression = data.get("compression", None)
-            self.sampling_rate = data.get("sampling rate", None)
-            self.delay_samples = data.get("delay samples", None)
-            self.lines = data.get("lines", {})
-            focus_data = data.get("focus", [{}])[0]
-            self.focus_depth = focus_data.get("depth", None)
-            self.focus_tx_frequency = focus_data.get("tx frequency", None)
-            self.focus_receive = focus_data.get("receive", None)
-
-        except Exception as e:
-            print(f"Error loading YAML file: {e}")        
-            
-    ###################################################################################
-    
-    def __load_tgc_yml(self):
-        pass
-
-###################################################################################
-
-
-
-
-
 # tar file unpacker    
 ###################################################################################  
 class ClariusTarUnpacker():
@@ -602,6 +495,7 @@ class ClariusTarUnpacker():
         return True
     
     ###################################################################################
+    
 
 ###################################################################################
 
@@ -695,6 +589,215 @@ class ClariusRawParser(ClariusInfo):
             return None, None, None
 
     ###################################################################################
+    class YmlParser():
+        """
+        This class reads YAML file data related to ultrasound imaging parameters. 
+        It extracts information from two YAML files:
+        
+        1. `rf.yml` - Contains data such as sampling frequency, probe details, imaging parameters, 
+        and transmission settings.
+        2. `env.tgc.yml` - Contains time gain compensation (TGC) data.
+
+        The extracted data is used to generate new imaging data without TGC, 
+        requiring TGC values for processing.
+        """
+        def __init__(self, yml_path):
+            
+            self.path: str = yml_path
+            self.valid_versions: list[str] = ['12.0.1-673']
+            self.extension: str
+            
+            # rf.yml
+            self.software_version: str
+            self.iso_time_date: str
+            self.probe_version: str
+            self.probe_elements: int
+            self.probe_pitch: float
+            self.probe_radius: float
+            self.frames: int
+            self.frame_rate: str
+            self.transmit_frequency: str
+            self.imaging_depth: str
+            self.focal_depth: str
+            self.auto_gain: bool
+            self.mla: bool
+            self.tgc: dict
+            self.size: dict
+            self.type: str
+            self.compression: str
+            self.sampling_rate: float
+            self.delay_samples: int
+            self.lines: dict
+            self.focus: dict
+            
+            # env.tgc.yml
+            self.frames: int
+            self.timestamps: dict
+            
+            self.__run()
+            
+        ###################################################################################
+        
+        def __run(self):
+            
+            self.set_file_extension()
+            self.load_rf_yml()
+            self.load_tgc_yml()
+            self.check_version()
+            
+        ###################################################################################
+        
+        def set_file_extension(self):
+            """
+            Extracts and sets the file format based on the part after the last underscore `_`.
+            Logs any issues encountered.
+            """
+            if not isinstance(self.path, str):
+                logging.error("Invalid path: Path should be a string.")
+                return None
+
+            filename = os.path.basename(self.path)  # Get the filename only
+            parts = filename.rsplit("_", 1)  # Split at the last underscore
+
+            if len(parts) < 2:
+                logging.warning("No underscore found in filename: %s", self.path)
+                return None
+
+            self.extension = parts[-1]  # Get the part after the last underscore
+            logging.info("File format detected after last underscore: %s", self.extension)
+    
+        ###################################################################################
+        
+        def load_rf_yml(self):
+            """
+            Loads and parses an RF YAML file if the file extension is "rf.yml".
+            The method reads the YAML file, extracts relevant fields, and maps them to class attributes.
+            
+            Attributes Populated:
+            - software_version (str): Software version from the YAML file.
+            - iso_time_date (str): ISO formatted timestamp.
+            - probe_version (str): Version of the probe.
+            - probe_elements (int): Number of probe elements.
+            - probe_pitch (float): Probe pitch value.
+            - probe_radius (float): Probe radius value.
+            - frames (int): Number of frames in the file.
+            - frame_rate (float): Frame rate value.
+            - transmit_frequency (float): Transmit frequency.
+            - imaging_depth (float): Imaging depth.
+            - focal_depth (float): Focal depth.
+            - auto_gain (bool): Whether auto gain is enabled.
+            - mla (bool): Multi-line acquisition status.
+            - tgc (dict): Time gain compensation settings.
+            - size (dict): Size specifications.
+            - type (str): Type information.
+            - compression (str): Compression method.
+            - sampling_rate (float): Sampling rate value.
+            - delay_samples (int): Number of delay samples.
+            - lines (dict): Line specifications.
+            - focus (list): List of focus parameters.
+            
+            Raises:
+            - Exception: If an error occurs while loading the YAML file.
+            """
+            if self.extension == "rf.yml":
+                try:
+                    with open(self.path, 'r') as file:
+                        data = yaml.safe_load(file)
+
+                    # Mapping YAML fields to class attributes
+                    self.software_version = data.get("software version", None)
+                    self.iso_time_date = data.get("iso time/date", None)
+                    probe = data.get("probe", {})
+                    self.probe_version = probe.get("version", None)
+                    self.probe_elements = probe.get("elements", None)
+                    self.probe_pitch = probe.get("pitch", None)
+                    self.probe_radius = probe.get("radius", None)
+                    self.frames = data.get("frames", None)
+                    self.frame_rate = data.get("frame rate", None)
+                    self.transmit_frequency = data.get("transmit frequency", None)
+                    self.imaging_depth = data.get("imaging depth", None)
+                    self.focal_depth = data.get("focal depth", None)
+                    self.auto_gain: bool = data.get("auto gain", None)
+                    self.mla: bool = data.get("mla", None)
+                    self.tgc = data.get("tgc", {})
+                    self.size = data.get("size", {})
+                    self.type = data.get("type", None)
+                    self.compression = data.get("compression", None)
+                    self.sampling_rate = data.get("sampling rate", None)
+                    self.delay_samples = data.get("delay samples", None)
+                    self.lines = data.get("lines", {})
+                    self.focus = data.get("focus", [{}])
+
+                except Exception as e:
+                    print(f"Error loading YAML file: {e}")
+    
+        ###################################################################################
+
+        def load_tgc_yml(self):
+            """
+            Loads and parses an environmental TGC YAML file if the file extension is "env.tgc.yml".
+            The method reads the YAML file, extracts relevant fields, and maps them to class attributes.
+            
+            Attributes Populated:
+            - frames (int): Number of frames specified in the file.
+            - timestamps (dict): Dictionary mapping timestamps to lists of depth and dB values.
+            Each entry in the list is a dictionary with:
+                - depth (float): Depth value in millimeters.
+                - dB (float): Gain value in decibels.
+            
+            Raises:
+            - Exception: If an error occurs while loading the YAML file.
+            """
+            if self.extension == "env.tgc.yml":
+                try:
+                    with open(self.path, 'r') as file:
+                        lines = file.readlines()
+
+                    self.timestamps = {}
+                    current_timestamp = None
+                    self.frames = None
+
+                    for line in lines:
+                        line = line.strip()
+
+                        if line.startswith("frames:"):
+                            self.frames = int(line.split(":")[1].strip())
+
+                        elif line.startswith("timestamp:"):
+                            # Extract timestamp value
+                            current_timestamp = int(line.split(":")[1].strip())
+                            self.timestamps[current_timestamp] = []
+
+                        elif current_timestamp is not None and line.startswith("- {"):
+                            # Extract depth and dB values
+                            values = line.replace("- {", "").replace("}", "").split(", ")
+                            depth = float(values[0].replace("mm", "").strip())
+                            dB = float(values[1].replace("dB", "").strip())
+
+                            # Store in list under the current timestamp
+                            self.timestamps[current_timestamp].append({"depth": depth, "dB": dB})
+
+                except Exception as e:
+                    print(f"Error loading YAML file: {e}")
+                    
+        ###################################################################################
+        
+        def check_version(self):
+            """
+            Checks if the current software version is in the list of valid versions.
+
+            :return: True if the version is valid, False otherwise.
+            """
+            if self.software_version in self.valid_versions:
+                logging.info(f"Version {self.software_version} is valid.")
+            else:
+                logging.warning(f"Version {self.software_version} is not valid. This might cause some problems.")
+
+        ###################################################################################
+        
+    ###################################################################################
+    
+    
     
 ###################################################################################
 
