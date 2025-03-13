@@ -15,6 +15,7 @@ import yaml
 from scipy.interpolate import interp1d
 from scipy.signal import hilbert
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # Local Module Imports
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
@@ -540,25 +541,31 @@ class ClariusParser(ClariusInfo):
         self.env_raw_timestamps: np.ndarray
         self.env_raw_data: np.ndarray 
         
+        # tgc 
+        self.default_tgc_data: dict = {}
+        self.clean_tgc_data: dict = {}
+
         self.__run()
                 
     ###################################################################################
     
     def __run(self):
-        
-        if self.check_required_files():
-            
-            # yml
-            self.set_ymls_path()
-            self.read_ymls()
-            
-            # raw
-            self.set_raws_path()
-            self.read_rf_raw()
-            self.read_env_raw()
-           
-            # no tgc
-            self.create_no_tgc()
+        if not self.check_required_files():
+            return
+
+        # Process YAML files
+        self.set_ymls_path()
+        self.read_ymls()
+
+        # Process raw files
+        self.set_raws_path()
+        self.read_rf_raw()
+        self.read_env_raw()
+
+        # Create no_tgc
+        self.set_default_tgc_data()
+        self.create_clean_no_tgc_data()
+        #self.create_no_tgc_raw()
 
     ###################################################################################
     
@@ -656,9 +663,9 @@ class ClariusParser(ClariusInfo):
 
     def read_ymls(self):
         
-        rf_yml_obj = ClariusParser.YmlParser(self.rf_yml_path)
-        env_yml_obj = ClariusParser.YmlParser(self.env_yml_path)
-        env_tgc_yml_obj = ClariusParser.YmlParser(self.env_tgc_yml_path)
+        self.rf_yml_obj = ClariusParser.YmlParser(self.rf_yml_path)
+        self.env_yml_obj = ClariusParser.YmlParser(self.env_yml_path)
+        self.env_tgc_yml_obj = ClariusParser.YmlParser(self.env_tgc_yml_path)
         
     ###################################################################################
     
@@ -843,12 +850,117 @@ class ClariusParser(ClariusInfo):
         logging.info("Loaded %d raw frames of size %d x %d (lines x samples)", data.shape[2], data.shape[0], data.shape[1])
         
         self.env_raw_hdr, self.env_raw_timestamps, self.env_raw_data = hdr, timestamps, data
+           
+    ###################################################################################
+    
+    def set_default_tgc_data(self):
+        rf_tgc = self.rf_yml_obj.rf_tgc  # Extract the original data
+        self.default_tgc_data = []  # Initialize empty list
+
+        for entry in rf_tgc:
+            keys = list(entry.keys())  # Extract keys dynamically
+            if len(keys) == 2:
+                length_key = keys[0]  # e.g., "0.00mm"
+                db_key = keys[1]  # e.g., "5.00dB"
+
+                # Extract depth from length_key
+                depth_match = re.findall(r"[\d.]+", length_key)
+                depth_value = float(depth_match[0]) if depth_match else None  # Convert to float
+
+                # Extract dB from db_key
+                db_match = re.findall(r"[\d.]+", db_key)
+                db_value = float(db_match[0]) if db_match else None  # Convert to float
+
+                if depth_value is not None and db_value is not None:
+                    self.default_tgc_data.append({'depth': depth_value, 'dB': db_value})
     
     ###################################################################################
 
-    def create_no_tgc():
-        pass
-    
+    def create_clean_no_tgc_data(self):
+        previous_data_dict = None
+
+        for timestamp, data_list in self.env_tgc_yml_obj.timestamps.items():
+            logging.debug(f"Processing {timestamp}: {data_list}")
+
+            if isinstance(data_list, list) and data_list:  # Check if it's a non-empty list
+                data_dict = data_list  # Falls `data_list` die relevanten Daten enthält
+                previous_data_dict = data_dict  # Store last valid data
+            else:
+                logging.warning(f"No valid data for {timestamp}, using previous valid data.")
+                data_dict = previous_data_dict if previous_data_dict else self.default_tgc_data
+
+            self.clean_tgc_data[timestamp] = data_dict
+            logging.info(f"Final data stored for {timestamp}: {data_dict}")
+
+        ###################################################################################
+
+
+    # def create_no_tgc(self, visualize=False):
+        
+    #     logging.info("Loaded numpy file into self.rf_raw_data.")
+
+    #     for frame in range(self.rf_raw_data.shape[2]):
+    #         try:
+    #             value = clean_tgc_parameters[f"timestamp_{frame}"]
+    #         except KeyError:
+    #             value = clean_tgc_parameters[f"timestamp_{frame - 1}"]
+
+    #         logging.info(f"Calculating attenuation for frame {frame} with data: {value}")
+
+    #         depth_mm_list = list(value.keys())
+    #         attenuation_dB_list = list(value.values())
+    #         signal_1d_size = self.rf_raw_data.shape[1]
+    #         number_of_samples = signal_1d_size + delay_samples
+    #         depth_array_1d = np.linspace(0, imaging_depth_mm, number_of_samples)
+    #         attenuation_array_1d = [0] * len(depth_array_1d)
+
+    #         for index_1 in range(len(depth_array_1d)):
+    #             for index_2 in range(len(depth_mm_list)):
+    #                 if depth_array_1d[index_1] < depth_mm_list[index_2]:
+    #                     if index_2 == 0:
+    #                         attenuation_array_1d[index_1] = attenuation_dB_list[index_2]
+    #                         break
+    #                     elif 0 < index_2 < len(depth_mm_list):
+    #                         x_1 = depth_mm_list[index_2 - 1]
+    #                         y_1 = attenuation_dB_list[index_2 - 1]
+    #                         x_2 = depth_mm_list[index_2]
+    #                         y_2 = attenuation_dB_list[index_2]
+
+    #                         slope = (y_2 - y_1) / (x_2 - x_1)
+    #                         attenuation_array_1d[index_1] = y_1 + slope * (depth_array_1d[index_1] - x_1)
+    #                     break
+    #             else:
+    #                 attenuation_array_1d[index_1] = attenuation_dB_list[-1]
+
+    #         # Visualization of attenuation_array_1d if visualize is True
+    #         if visualize:
+    #             plt.figure(figsize=(10, 5))
+    #             plt.plot(depth_array_1d, attenuation_array_1d, label=f'Frame {frame}', color='blue')
+    #             plt.title(f'Attenuation vs Depth for Frame {frame}')
+    #             plt.xlabel('Depth (mm)')
+    #             plt.ylabel('Attenuation (dB)')
+    #             plt.grid()
+    #             plt.legend()
+    #             plt.show()  # Display the plot
+
+    #         attenuation_dB_1d_trimmed = np.array(attenuation_array_1d[delay_samples: delay_samples + self.rf_raw_data.shape[1]], dtype=np.float64)
+    #         ratio = 10**(attenuation_dB_1d_trimmed / 20)
+
+    #         for line in range(self.rf_raw_data.shape[0]):
+    #             self.rf_raw_data[line, :, frame] /= ratio
+
+    #     file_name = os.path.basename(numpy_file_path)
+    #     file_name_without_ext = os.path.splitext(file_name)[0]
+    #     folder_path = os.path.dirname(numpy_file_path)
+    #     save_dir = os.path.join(folder_path, file_name_without_ext + ".no_tgc")
+    #     self.rf_raw_data = np.array(self.rf_raw_data, dtype=np.float16)
+
+    #     np.save(save_dir, self.rf_raw_data)
+    #     logging.info(f"Saved processed self.rf_raw_data to {save_dir}.")
+    # else:
+    #     logging.warning("No rf.raw.npy file found.")  
+  
+                
     ###################################################################################
     class YmlParser():
         """
