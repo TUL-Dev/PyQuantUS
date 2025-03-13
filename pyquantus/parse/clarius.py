@@ -36,11 +36,6 @@ class ClariusInfo(DataOutputStruct, InfoStruct):
         self.samplesPerLine: int
         self.sampleSize: int # bytes
         
-        # data from raw file
-        self.raw_hdr: dict
-        self.raw_timestamps: np.ndarray
-        self.raw_data: np.ndarray 
-        
         # outputs
         self.img_data: DataOutputStruct 
         self.img_info: ClariusInfo 
@@ -521,6 +516,30 @@ class ClariusParser(ClariusInfo):
     
         self.path = extracted_sample_folder_path
         
+        # yml files path
+        self.rf_yml_path: str | None
+        self.env_yml_path: str | None
+        self.env_tgc_yml_path: str | None
+        
+        # raw files path
+        self.rf_raw_path: str | None
+        self.env_raw_path: str | None
+
+        # yml objects
+        self.rf_yml_obj: object
+        self.env_yml_obj: object
+        self.env_tgc_yml_obj: object
+        
+        # data from rf.raw file
+        self.rf_raw_hdr: dict
+        self.rf_raw_timestamps: np.ndarray
+        self.rf_raw_data: np.ndarray 
+        
+        # data from env.raw file
+        self.env_raw_hdr: dict
+        self.env_raw_timestamps: np.ndarray
+        self.env_raw_data: np.ndarray 
+        
         self.__run()
                 
     ###################################################################################
@@ -537,9 +556,9 @@ class ClariusParser(ClariusInfo):
             self.set_raws_path()
             self.read_rf_raw()
             self.read_env_raw()
-            
+           
             # no tgc
-            self.create_no_tgc()
+            #self.create_no_tgc()
 
     ###################################################################################
     
@@ -584,28 +603,152 @@ class ClariusParser(ClariusInfo):
 
     ###################################################################################
     
-    def read_rf_raw(self):
+    def set_ymls_path(self):
         """
-        Reads a raw binary file, extracts header information, timestamps, and data,
-        and stores them in instance variables.
+        Scans the directory for files ending with `_rf.yml`, `_env.yml`, and `_env.tgc.yml`,
+        then sets their paths as instance attributes.
 
-        Args:
+        This method ensures that even if the files have dynamic prefixes, 
+        they will be correctly identified based on their endings.
+
+        Attributes:
+            rf_yml_path (str): Full path to the file ending with `_rf.yml`, else None.
+            env_yml_path (str): Full path to the file ending with `_env.yml`, else None.
+            env_tgc_yml_path (str): Full path to the file ending with `_env.tgc.yml`, else None.
+
+        Returns:
             None
         """
-        logging.info(f'Reading raw file: {self.rf_raw}')
+
+        # Required YAML file suffixes and corresponding attribute names
+        required_suffixes = {
+            "_rf.yml": "rf_yml_path",
+            "_env.yml": "env_yml_path",
+            "_env.tgc.yml": "env_tgc_yml_path"
+        }
+
+        logging.info(f"Scanning directory: {self.path}")
+
+        # Get all files in the directory
+        try:
+            files_in_dir = os.listdir(self.path)
+        except FileNotFoundError:
+            logging.error(f"Directory not found: {self.path}")
+            return
+
+        # Check if any file matches the required suffix
+        for suffix, attr_name in required_suffixes.items():
+            matching_files = [f for f in files_in_dir if f.endswith(suffix)]
+            
+            if matching_files:
+                # Take the first matching file (assuming there's only one per suffix)
+                selected_file = matching_files[0]
+                file_path = os.path.join(self.path, selected_file)
+                setattr(self, attr_name, file_path)
+                logging.info(f"Found {suffix}: {file_path}")
+            else:
+                setattr(self, attr_name, None)
+                logging.warning(f"Missing file ending with {suffix}")
+
+        logging.info("YAML file path setting completed.")
+    
+    ###################################################################################
+
+    def read_ymls(self):
+        
+        rf_yml_obj = ClariusParser.YmlParser(self.rf_yml_path)
+        env_yml_obj = ClariusParser.YmlParser(self.env_yml_path)
+        env_tgc_yml_obj = ClariusParser.YmlParser(self.env_tgc_yml_path)
+        
+    ###################################################################################
+    
+    def set_raws_path(self):
+        """
+        Scans the directory for files ending with `_rf.raw` and `_env.raw`,
+        then sets their paths as instance attributes.
+
+        This method ensures that even if the files have dynamic prefixes, 
+        they will be correctly identified based on their endings.
+
+        Attributes:
+            rf_raw_path (str): Full path to the file ending with `_rf.raw`, else None.
+            env_raw_path (str): Full path to the file ending with `_env.raw`, else None.
+
+        Returns:
+            None
+        """
+
+        # Required RAW file suffixes and corresponding attribute names
+        required_suffixes = {
+            "_rf.raw": "rf_raw_path",
+            "_env.raw": "env_raw_path"
+        }
+
+        logging.info(f"Scanning directory: {self.path} for RAW files")
+
+        # Get all files in the directory
+        try:
+            files_in_dir = os.listdir(self.path)
+        except FileNotFoundError:
+            logging.error(f"Directory not found: {self.path}")
+            return
+
+        # Check if any file matches the required suffix
+        for suffix, attr_name in required_suffixes.items():
+            matching_files = [f for f in files_in_dir if f.endswith(suffix)]
+            
+            if matching_files:
+                # Take the first matching file (assuming there's only one per suffix)
+                selected_file = matching_files[0]
+                file_path = os.path.join(self.path, selected_file)
+                setattr(self, attr_name, file_path)
+                logging.info(f"Found {suffix}: {file_path}")
+            else:
+                setattr(self, attr_name, None)
+                logging.warning(f"Missing file ending with {suffix}")
+
+        logging.info("RAW file path setting completed.")
+        
+    ###################################################################################
+    
+    def read_rf_raw(self):
+        """
+        Reads raw RF data from a binary file, extracting header information, timestamps, and frame data.
+        
+        This function follows the format used by Clarius' ultrasound raw data, as found in their GitHub repository:
+        https://github.com/clariusdev/raw/blob/master/common/python/rdataread.py
+        
+        The function parses:
+        - A 5-field header (id, frames, lines, samples, samplesize)
+        - Timestamps for each frame
+        - RF data for each frame
+        
+        The loaded data is stored as instance attributes:
+        - `self.rf_raw_hdr`: Dictionary containing header information
+        - `self.rf_raw_timestamps`: NumPy array of frame timestamps
+        - `self.rf_raw_data`: NumPy array of the RF data
+        
+        Raises:
+            FileNotFoundError: If the file is not found.
+            ValueError: If the file format is incorrect.
+        """
+        logging.info("Reading raw RF file: %s", self.rf_raw_path)
 
         # Define header fields and initialize dictionary
         hdr_keys = ('id', 'frames', 'lines', 'samples', 'samplesize')
         hdr = {}
-        
+
         try:
-            with open(self.rf_raw, 'rb') as raw_bytes:
+            with open(self.rf_raw_path, 'rb') as raw_bytes:
+                logging.info("Opened file successfully.")
+                
                 # Read and parse header
                 hdr = {key: int.from_bytes(raw_bytes.read(4), byteorder='little') for key in hdr_keys}
+                logging.info("Parsed header: %s", hdr)
                 
                 # Validate header values
                 if any(value <= 0 for value in hdr.values()):
-                    logging.error(f'Invalid header values: {hdr}')
+                    logging.error("Invalid header values: %s", hdr)
                     return
                 
                 frames, lines, samples, samplesize = hdr['frames'], hdr['lines'], hdr['samples'], hdr['samplesize']
@@ -621,18 +764,88 @@ class ClariusParser(ClariusInfo):
                     frame_data = raw_bytes.read(frame_size)
                     
                     if len(frame_data) != frame_size:
-                        logging.error(f'Unexpected frame size at frame {frame}: Expected {frame_size} bytes, got {len(frame_data)}')
+                        logging.error("Unexpected frame size at frame %d: Expected %d bytes, got %d", frame, frame_size, len(frame_data))
                         return
                     
                     data[:, :, frame] = np.frombuffer(frame_data, dtype=np.int16).reshape((lines, samples))
-            
-            logging.info(f'Loaded {frames} raw frames of size {lines} x {samples} (lines x samples)')
-            self.raw_hdr, self.raw_timestamps, self.raw_data = hdr, timestamps, data
-
+                
+                logging.info("Successfully read %d RF frames.", frames)
+                
+        except FileNotFoundError:
+            logging.error("File not found: %s", self.rf_raw_path)
+            raise
         except Exception as e:
-            logging.error(f'Error reading file {self.rf_raw}: {e}')
+            logging.error("Error reading RF data: %s", str(e))
+            raise
+
+        logging.info("Loaded %d raw RF frames of size %d x %d (lines x samples)", data.shape[2], data.shape[0], data.shape[1])
+        
+        self.rf_raw_hdr, self.rf_raw_timestamps, self.rf_raw_data = hdr, timestamps, data
 
     ###################################################################################
+    
+    def read_env_raw(self):
+        """
+        Reads raw environmental data from a binary file, extracting header information, timestamps, and frame data.
+        
+        This function reads data in the format used by Clarius' ultrasound raw data, as found in their GitHub repository:
+        https://github.com/clariusdev/raw/blob/master/common/python/rdataread.py
+        
+        The function parses:
+        - A 5-field header (id, frames, lines, samples, samplesize)
+        - Timestamps for each frame
+        - Image data for each frame
+        
+        The loaded data is stored as instance attributes:
+        - `self.env_raw_hdr`: Dictionary containing header information
+        - `self.env_raw_timestamps`: NumPy array of frame timestamps
+        - `self.env_raw_data`: NumPy array of the image data
+        
+        Raises:
+            FileNotFoundError: If the file is not found.
+            ValueError: If the file format is incorrect.
+        """
+        logging.info("Reading raw environmental data from: %s", self.env_raw_path)
+        
+        hdr_info = ('id', 'frames', 'lines', 'samples', 'samplesize')
+        hdr, timestamps, data = {}, None, None
+
+        try:
+            with open(self.env_raw_path, 'rb') as raw_bytes:
+                logging.info("Opened file successfully.")
+                
+                # Read 4-byte header values
+                for info in hdr_info:
+                    hdr[info] = int.from_bytes(raw_bytes.read(4), byteorder='little')
+                logging.info("Parsed header: %s", hdr)
+                
+                # Prepare timestamp and data arrays
+                timestamps = np.zeros(hdr['frames'], dtype='int64')
+                sz = hdr['lines'] * hdr['samples'] * hdr['samplesize']
+                data = np.zeros((hdr['lines'], hdr['samples'], hdr['frames']), dtype='uint8')
+                
+                for frame in range(hdr['frames']):
+                    # Read 8-byte timestamp
+                    timestamps[frame] = int.from_bytes(raw_bytes.read(8), byteorder='little')
+                    
+                    # Read and reshape frame data
+                    data[:, :, frame] = np.frombuffer(raw_bytes.read(sz), dtype='uint8').reshape([hdr['lines'], hdr['samples']])
+                
+                logging.info("Successfully read %d frames.", hdr['frames'])
+                
+        except FileNotFoundError:
+            logging.error("File not found: %s", self.env_raw_path)
+            raise
+        except Exception as e:
+            logging.error("Error reading raw data: %s", str(e))
+            raise
+
+        logging.info("Loaded %d raw frames of size %d x %d (lines x samples)", data.shape[2], data.shape[0], data.shape[1])
+        
+        self.env_raw_hdr, self.env_raw_timestamps, self.env_raw_data = hdr, timestamps, data
+    
+    ###################################################################################
+    
     class YmlParser():
         """
         This class reads YAML file data related to ultrasound imaging parameters. 
