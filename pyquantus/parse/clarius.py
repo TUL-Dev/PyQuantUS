@@ -1130,7 +1130,7 @@ def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str,
         Tuple: Image data, image metadata, phantom data, and phantom metadata.
     """
     # Check yml files
-    YmlParser(imgTgcFilename); YmlParser(phantomTgcFilename); YmlParser(infoFilename); YmlParser(phantomInfoFilename)
+    # YmlParser(imgTgcFilename); YmlParser(phantomTgcFilename); YmlParser(infoFilename); YmlParser(phantomInfoFilename)
     
     imgData, imgInfo, scanConverted = readImg(imgFilename, imgTgcFilename, infoFilename, version, isPhantom=False)
     refData, refInfo, scanConverted = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
