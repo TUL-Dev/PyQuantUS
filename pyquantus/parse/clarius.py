@@ -15,6 +15,7 @@ import yaml
 from scipy.interpolate import interp1d
 from scipy.signal import hilbert
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # Local Module Imports
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
@@ -512,9 +513,10 @@ class ClariusParser(ClariusInfo):
 
     ###################################################################################
     
-    def __init__(self, extracted_sample_folder_path: str):
+    def __init__(self, extracted_sample_folder_path: str, visualize: bool=False):
     
         self.path = extracted_sample_folder_path
+        self.visualize = visualize
         
         # yml files path
         self.rf_yml_path: str | None
@@ -532,33 +534,54 @@ class ClariusParser(ClariusInfo):
         
         # data from rf.raw file
         self.rf_raw_hdr: dict
-        self.rf_raw_timestamps: np.ndarray
-        self.rf_raw_data: np.ndarray 
+        self.rf_raw_timestamps_1d: np.ndarray
+        self.rf_raw_data_3d: np.ndarray 
         
         # data from env.raw file
         self.env_raw_hdr: dict
-        self.env_raw_timestamps: np.ndarray
-        self.env_raw_data: np.ndarray 
+        self.env_raw_timestamps_1d: np.ndarray
+        self.env_raw_data_3d: np.ndarray 
         
+        # tgc
+        self.default_tgc_data: dict = {}
+        self.clean_tgc_data: dict = {}
+        self.rf_no_tgc_raw_data_3d: np.ndarray
+        
+        # depth and time
+        self.trimmed_depth_array_1d_cm: np.ndarray
+        self.trimmed_time_array_1d_s: np.ndarray
+        
+        # visualization
+        self.default_frame: int = 0
+        self.SPEED_OF_SOUND: int = 1540 # [m/s]
+        self.hilbert_transform_axis: int = 1
+
         self.__run()
                 
     ###################################################################################
     
     def __run(self):
+        if not self.check_required_files(): return
+
+        # Process YAML files
+        self.set_ymls_path()
+        self.read_ymls()
+
+        # Process raw files
+        self.set_raws_path()
+        self.read_rf_raw()
+        self.read_env_raw()
+
+        # Create no_tgc
+        self.set_default_tgc_data()
+        self.create_clean_no_tgc_data()
+        self.create_no_tgc_raw()
         
-        if self.check_required_files():
-            
-            # yml
-            self.set_ymls_path()
-            self.read_ymls()
-            
-            # raw
-            self.set_raws_path()
-            self.read_rf_raw()
-            self.read_env_raw()
-           
-            # no tgc
-            #self.create_no_tgc()
+        self.set_trimmed_depth_and_time_array()
+        
+        if not self.visualize: return
+        self.plot(self.rf_raw_data_3d, title="rf_raw") 
+        self.plot(self.rf_no_tgc_raw_data_3d,title="rf_no_tgc_raw")
 
     ###################################################################################
     
@@ -656,9 +679,9 @@ class ClariusParser(ClariusInfo):
 
     def read_ymls(self):
         
-        rf_yml_obj = ClariusParser.YmlParser(self.rf_yml_path)
-        env_yml_obj = ClariusParser.YmlParser(self.env_yml_path)
-        env_tgc_yml_obj = ClariusParser.YmlParser(self.env_tgc_yml_path)
+        self.rf_yml_obj = ClariusParser.YmlParser(self.rf_yml_path)
+        self.env_yml_obj = ClariusParser.YmlParser(self.env_yml_path)
+        self.env_tgc_yml_obj = ClariusParser.YmlParser(self.env_tgc_yml_path)
         
     ###################################################################################
     
@@ -725,8 +748,8 @@ class ClariusParser(ClariusInfo):
         
         The loaded data is stored as instance attributes:
         - `self.rf_raw_hdr`: Dictionary containing header information
-        - `self.rf_raw_timestamps`: NumPy array of frame timestamps
-        - `self.rf_raw_data`: NumPy array of the RF data
+        - `self.rf_raw_timestamps_1d`: NumPy array of frame timestamps
+        - `self.rf_raw_data_3d`: NumPy array of the RF data
         
         Raises:
             FileNotFoundError: If the file is not found.
@@ -780,7 +803,7 @@ class ClariusParser(ClariusInfo):
 
         logging.info("Loaded %d raw RF frames of size %d x %d (lines x samples)", data.shape[2], data.shape[0], data.shape[1])
         
-        self.rf_raw_hdr, self.rf_raw_timestamps, self.rf_raw_data = hdr, timestamps, data
+        self.rf_raw_hdr, self.rf_raw_timestamps_1d, self.rf_raw_data_3d = hdr, timestamps, data
 
     ###################################################################################
     
@@ -798,8 +821,8 @@ class ClariusParser(ClariusInfo):
         
         The loaded data is stored as instance attributes:
         - `self.env_raw_hdr`: Dictionary containing header information
-        - `self.env_raw_timestamps`: NumPy array of frame timestamps
-        - `self.env_raw_data`: NumPy array of the image data
+        - `self.env_raw_timestamps_1d`: NumPy array of frame timestamps
+        - `self.env_raw_data_3d`: NumPy array of the image data
         
         Raises:
             FileNotFoundError: If the file is not found.
@@ -842,10 +865,307 @@ class ClariusParser(ClariusInfo):
 
         logging.info("Loaded %d raw frames of size %d x %d (lines x samples)", data.shape[2], data.shape[0], data.shape[1])
         
-        self.env_raw_hdr, self.env_raw_timestamps, self.env_raw_data = hdr, timestamps, data
-    
+        self.env_raw_hdr, self.env_raw_timestamps_1d, self.env_raw_data_3d = hdr, timestamps, data
+           
     ###################################################################################
     
+    def set_default_tgc_data(self):
+        rf_tgc = self.rf_yml_obj.rf_tgc  # Extract the original data
+        self.default_tgc_data = []  # Initialize empty list
+
+        for entry in rf_tgc:
+            keys = list(entry.keys())  # Extract keys dynamically
+            if len(keys) == 2:
+                length_key = keys[0]  # e.g., "0.00mm"
+                db_key = keys[1]  # e.g., "5.00dB"
+
+                # Extract depth from length_key
+                depth_match = re.findall(r"[\d.]+", length_key)
+                depth_value = float(depth_match[0]) if depth_match else None  # Convert to float
+
+                # Extract dB from db_key
+                db_match = re.findall(r"[\d.]+", db_key)
+                db_value = float(db_match[0]) if db_match else None  # Convert to float
+
+                if depth_value is not None and db_value is not None:
+                    self.default_tgc_data.append({'depth': depth_value, 'dB': db_value})
+    
+    ###################################################################################
+
+    def create_clean_no_tgc_data(self):
+        previous_data_dict = None
+
+        for timestamp, data_list in self.env_tgc_yml_obj.timestamps.items():
+            logging.debug(f"Processing {timestamp}: {data_list}")
+
+            if isinstance(data_list, list) and data_list:  # Check if it's a non-empty list
+                data_dict = data_list  
+                previous_data_dict = data_dict 
+            else:
+                logging.warning(f"No valid data for {timestamp}, using previous valid data.")
+                data_dict = previous_data_dict if previous_data_dict else self.default_tgc_data
+
+            self.clean_tgc_data[timestamp] = data_dict
+            logging.info(f"Final data stored for {timestamp}: {data_dict}")
+
+    ###################################################################################
+
+    def create_no_tgc_raw(self, visualize=False):
+        """
+        Processes RF data to remove the time-gain compensation (TGC) effect.
+
+        This function computes and applies a correction factor to the RF signal
+        to counteract attenuation introduced by TGC. The TGC values are interpolated
+        based on depth and applied frame-wise.
+
+        Parameters:
+        -----------
+        visualize : bool, optional
+            If True, plots attenuation versus depth for each frame (default is False).
+        """
+        full_depth_mm, signal_length, delay_samples = self.create_full_imaging_depth_array()
+        num_frames = self.rf_raw_data_3d.shape[2]
+        
+        rf_no_tgc_raw = np.copy(self.rf_raw_data_3d).astype(np.float64)
+
+        for frame in range(num_frames):
+            # Initialize TGC array with zeros
+            tgc_array_dB = np.zeros(len(full_depth_mm), dtype=np.float16)
+            values = list(self.clean_tgc_data.values())[frame]
+
+            # Extract depth and dB values
+            depths_mm = np.array([entry['depth'] for entry in values])
+            tgc_dB = np.array([entry['dB'] for entry in values])
+
+            # Perform interpolation
+            for i, depth in enumerate(full_depth_mm):
+                mask = depths_mm > depth
+                if mask.any():
+                    idx = mask.argmax()
+                    if idx == 0:
+                        tgc_array_dB[i] = tgc_dB[idx]
+                    else:
+                        x1, y1 = depths_mm[idx - 1], tgc_dB[idx - 1]
+                        x2, y2 = depths_mm[idx], tgc_dB[idx]
+                        tgc_array_dB[i] = y1 + (y2 - y1) * (depth - x1) / (x2 - x1)
+                else:
+                    tgc_array_dB[i] = tgc_dB[-1]
+
+            # Visualization (optional)
+            if visualize:
+                plt.figure(figsize=(10, 5))
+                plt.plot(full_depth_mm, tgc_array_dB, label=f'Frame {frame}', color='blue')
+                plt.title(f'Attenuation vs Depth for Frame {frame}')
+                plt.xlabel('Depth (mm)')
+                plt.ylabel('Attenuation (dB)')
+                plt.grid()
+                plt.legend()
+                plt.show()
+
+            # Apply correction
+            trimmed_tgc_dB = tgc_array_dB[delay_samples: delay_samples + signal_length]
+            trimmed_tgc_coefficient = 10 ** (trimmed_tgc_dB / 20)   
+            
+            for line in range(rf_no_tgc_raw.shape[0]):
+                rf_no_tgc_raw[line, :, frame] /= trimmed_tgc_coefficient
+
+            self.rf_no_tgc_raw_data_3d = rf_no_tgc_raw
+        
+    ###################################################################################
+
+    def create_full_imaging_depth_array(self):
+        """
+        Generates an array representing the full imaging depth in millimeters.
+
+        This function calculates the depth array based on the imaging depth and delay samples,
+        ensuring accurate mapping of signal depth.
+
+        Returns:
+        --------
+        tuple: (full_imaging_depth_array_1d_mm, trimmed_signal_length, delay_samples)
+            - full_imaging_depth_array_1d_mm: 1D NumPy array of depth values in mm.
+            - trimmed_signal_length: Length of the trimmed RF signal.
+            - delay_samples: Number of delay samples before the valid signal starts.
+        """
+        trimmed_signal_length = self.rf_raw_data_3d.shape[1]
+        delay_samples = self.rf_yml_obj.rf_delay_samples
+        imaging_depth_mm = self.extract_digit(self.rf_yml_obj.rf_imaging_depth)
+
+        # Compute full depth array
+        full_signal_length = trimmed_signal_length + delay_samples
+        depth_array_mm = np.linspace(0, imaging_depth_mm, full_signal_length, dtype=np.float16)
+
+        return depth_array_mm, trimmed_signal_length, delay_samples
+
+    ###################################################################################
+    
+    def set_trimmed_depth_and_time_array(self):
+        """
+        Sets the trimmed imaging depth array in centimeters.
+
+        This function extracts the full imaging depth array, removes the delay samples,
+        and converts the values from millimeters to centimeters.
+
+        Updates:
+        --------
+        self.trimmed_imaging_depth_array_1d_cm : 1D NumPy array
+            Trimmed imaging depth array in cm.
+        """
+        full_depth_array_mm, _, delay_samples = self.create_full_imaging_depth_array()
+        self.trimmed_depth_array_1d_cm = full_depth_array_mm[delay_samples:] * 0.1  # Convert mm to cm
+        self.trimmed_time_array_1d_s = (self.trimmed_depth_array_1d_cm * 0.1) / self.SPEED_OF_SOUND
+        
+        self.trimmed_depth_array_1d_cm = np.array(self.trimmed_depth_array_1d_cm, dtype=np.float64)
+        self.trimmed_time_array_1d_s = np.array(self.trimmed_time_array_1d_s, dtype=np.float64)
+        
+    ###################################################################################
+    
+    def get_signal_envelope_xd(self, signal_xd: np.ndarray, hilbert_transform_axis: int):
+        logging.debug("Starting to set the xD signal envelope.")
+
+        # Step 1: Mirror the signal
+        logging.debug("Mirroring the signal.")
+        signal_xd_mirrored = signal_xd.copy()
+        
+        for axis in range(signal_xd_mirrored.ndim):
+            logging.debug(f"Reversing signal along axis {axis}.")
+            # Reverse the signal along the current axis
+            reversed_signal = np.flip(signal_xd_mirrored, axis)
+            
+            logging.debug(f"Concatenating original and reversed signal along axis {axis}.")
+            # Concatenate the original and reversed signal along the current axis
+            signal_xd_mirrored = np.concatenate((signal_xd_mirrored, reversed_signal), axis=axis)
+
+        # Step 2: Apply the Hilbert transform to the mirrored signal
+        logging.debug("Applying Hilbert transform to the mirrored signal.")
+        hilbert_signal_mirrored = np.apply_along_axis(hilbert, arr=signal_xd_mirrored, axis=hilbert_transform_axis)
+        
+        # Step 3: Restore the original signal from the mirrored Hilbert signal
+        logging.debug("Restoring the original signal from the mirrored Hilbert signal.")
+        restored_signal = hilbert_signal_mirrored.copy()
+        
+        # Calculate the original size of the signal along each axis
+        original_sizes = tuple(restored_signal.shape[axis] // 2 for axis in range(restored_signal.ndim))
+        logging.debug(f"Original sizes of the signal: {original_sizes}.")
+        
+        # Slice to get the original signal
+        logging.debug("Slicing to get the original signal.")
+        signal_xd_unmirrored = restored_signal[tuple(slice(0, size) for size in original_sizes)]
+        
+        # Step 4: Compute the envelope of the analytic signal
+        logging.debug("Computing the envelope of the analytic signal.")
+        signal_envelope_xd = np.abs(signal_xd_unmirrored)
+
+        logging.debug("Finished setting the xD signal envelope.")
+        
+        return signal_envelope_xd
+    
+    ###################################################################################
+        
+    def plot(self, signal_3d, title=""):
+        
+        signal_2d = signal_3d[:, :, self.default_frame]
+        signal_1d = signal_2d[signal_2d.shape[0] // 2, :]
+        envelope_2d = self.get_signal_envelope_xd(signal_2d, hilbert_transform_axis=self.hilbert_transform_axis)
+        
+        self.image_envelope_2d(envelope_2d, title)
+        self.plot_1d_signal_and_fft(signal_1d, title)
+            
+    ###################################################################################
+
+    def image_envelope_2d(self, envelope, title):
+        logging.info("Starting the plot function.")
+       
+        # Flip the rotated array horizontally
+        rotated_flipped_array = self.rotate_flip(envelope)
+
+        log_envelope_2d = 20 * np.log10(np.abs(1 + rotated_flipped_array))
+        
+        logging.debug("Calculated log envelope 2D.")
+
+        plt.figure(figsize=(8, 6))
+        plt.imshow(log_envelope_2d, cmap='gray', aspect='auto')
+        plt.title(title)
+        plt.colorbar(label='dB')
+        logging.info("Displayed 2D Signal Envelope.")
+
+        plt.tight_layout()
+        plt.show()
+        logging.info("Plotting completed and displayed.")
+        
+    ###################################################################################
+
+    def plot_1d_signal_and_fft(self, signal_1d, title):
+        
+        sampling_rate_Hz = self.extract_digit(self.rf_yml_obj.rf_sampling_rate) * 1e6
+                        
+        # Get envelope
+        envelope_1d = self.get_signal_envelope_xd(signal_1d, hilbert_transform_axis=0)
+
+        # Calculate FFT
+        fft_signal = np.fft.fft(signal_1d)
+        fft_magnitude = np.abs(fft_signal)
+
+        # Frequency axis in MHz using the sampling frequency
+        num_samples = len(signal_1d)
+        freq_Hz = np.fft.fftfreq(num_samples, d=(1 / (sampling_rate_Hz)))  # Frequency in Hz
+
+        # Only take positive frequencies
+        positive_freq_indices = freq_Hz >= 0
+        freq_positive_MHz = freq_Hz[positive_freq_indices] / 1e6
+        fft_magnitude_positive = fft_magnitude[positive_freq_indices]
+
+        # Create figure
+        plt.figure(figsize=(14, 4))
+
+        # Plot the original signal with envelope
+        plt.subplot(1, 2, 1)  # 1 row, 2 columns, first subplot
+        plt.plot(self.trimmed_depth_array_1d_cm, signal_1d, color='blue', label='Signal')  
+        plt.plot(self.trimmed_depth_array_1d_cm, envelope_1d, color='red', linestyle='dashed', label='Envelope')  
+        plt.title('1D Signal Plot')
+        plt.xlabel('Time (µs)')  
+        plt.ylabel('Amplitude')
+        plt.legend()  # Add legend
+        plt.grid(True)
+
+        # Plot the positive FFT
+        plt.subplot(1, 2, 2)  # 1 row, 2 columns, second subplot
+        plt.plot(freq_positive_MHz, fft_magnitude_positive, color='green')  
+        plt.title('FFT of Signal')
+        plt.xlabel('Frequency (MHz)')  
+        plt.ylabel('Magnitude')
+        plt.grid(True)
+
+        plt.tight_layout()  
+        plt.show()
+
+    ###################################################################################
+    @staticmethod
+    def extract_digit(input_string: str) -> float | int | None:
+        """
+        Extracts the first number (integer or floating-point) from a string.
+        Returns an int if the number is an integer, otherwise returns a float.
+        If no number is found, returns None.
+        """
+        match = re.search(r"\d+\.\d+|\d+", input_string)  # Match float first, then integer
+        if match:
+            number = match.group()
+            return float(number) if '.' in number else int(number)  # Convert appropriately
+        return None
+
+    ###################################################################################
+    @staticmethod
+    def rotate_flip(two_dimension_array: np.ndarray) -> np.ndarray:
+
+        # Rotate the input array counterclockwise by 90 degrees
+        rotated_array = np.rot90(two_dimension_array)
+        
+        # Flip the rotated array horizontally
+        rotated_flipped_array = np.flipud(rotated_array)
+        
+        return rotated_flipped_array
+    
+    ###################################################################################
     class YmlParser():
         """
         This class reads YAML file data related to ultrasound imaging parameters. 
