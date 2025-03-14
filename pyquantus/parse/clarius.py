@@ -533,17 +533,18 @@ class ClariusParser(ClariusInfo):
         
         # data from rf.raw file
         self.rf_raw_hdr: dict
-        self.rf_raw_timestamps: np.ndarray
-        self.rf_raw_data: np.ndarray 
+        self.rf_raw_timestamps_1d: np.ndarray
+        self.rf_raw_data_3d: np.ndarray 
         
         # data from env.raw file
         self.env_raw_hdr: dict
-        self.env_raw_timestamps: np.ndarray
-        self.env_raw_data: np.ndarray 
+        self.env_raw_timestamps_1d: np.ndarray
+        self.env_raw_data_3d: np.ndarray 
         
-        # tgc 
+        # tgc
         self.default_tgc_data: dict = {}
         self.clean_tgc_data: dict = {}
+        self.rf_no_tgc_raw_data_3d: np.ndarray
 
         self.__run()
                 
@@ -565,7 +566,10 @@ class ClariusParser(ClariusInfo):
         # Create no_tgc
         self.set_default_tgc_data()
         self.create_clean_no_tgc_data()
-        #self.create_no_tgc_raw()
+        self.create_no_tgc_raw()
+        
+        #self.create_trimmed_depth()
+
 
     ###################################################################################
     
@@ -732,8 +736,8 @@ class ClariusParser(ClariusInfo):
         
         The loaded data is stored as instance attributes:
         - `self.rf_raw_hdr`: Dictionary containing header information
-        - `self.rf_raw_timestamps`: NumPy array of frame timestamps
-        - `self.rf_raw_data`: NumPy array of the RF data
+        - `self.rf_raw_timestamps_1d`: NumPy array of frame timestamps
+        - `self.rf_raw_data_3d`: NumPy array of the RF data
         
         Raises:
             FileNotFoundError: If the file is not found.
@@ -787,7 +791,7 @@ class ClariusParser(ClariusInfo):
 
         logging.info("Loaded %d raw RF frames of size %d x %d (lines x samples)", data.shape[2], data.shape[0], data.shape[1])
         
-        self.rf_raw_hdr, self.rf_raw_timestamps, self.rf_raw_data = hdr, timestamps, data
+        self.rf_raw_hdr, self.rf_raw_timestamps_1d, self.rf_raw_data_3d = hdr, timestamps, data
 
     ###################################################################################
     
@@ -805,8 +809,8 @@ class ClariusParser(ClariusInfo):
         
         The loaded data is stored as instance attributes:
         - `self.env_raw_hdr`: Dictionary containing header information
-        - `self.env_raw_timestamps`: NumPy array of frame timestamps
-        - `self.env_raw_data`: NumPy array of the image data
+        - `self.env_raw_timestamps_1d`: NumPy array of frame timestamps
+        - `self.env_raw_data_3d`: NumPy array of the image data
         
         Raises:
             FileNotFoundError: If the file is not found.
@@ -849,7 +853,7 @@ class ClariusParser(ClariusInfo):
 
         logging.info("Loaded %d raw frames of size %d x %d (lines x samples)", data.shape[2], data.shape[0], data.shape[1])
         
-        self.env_raw_hdr, self.env_raw_timestamps, self.env_raw_data = hdr, timestamps, data
+        self.env_raw_hdr, self.env_raw_timestamps_1d, self.env_raw_data_3d = hdr, timestamps, data
            
     ###################################################################################
     
@@ -883,8 +887,8 @@ class ClariusParser(ClariusInfo):
             logging.debug(f"Processing {timestamp}: {data_list}")
 
             if isinstance(data_list, list) and data_list:  # Check if it's a non-empty list
-                data_dict = data_list  # Falls `data_list` die relevanten Daten enthält
-                previous_data_dict = data_dict  # Store last valid data
+                data_dict = data_list  
+                previous_data_dict = data_dict 
             else:
                 logging.warning(f"No valid data for {timestamp}, using previous valid data.")
                 data_dict = previous_data_dict if previous_data_dict else self.default_tgc_data
@@ -892,75 +896,93 @@ class ClariusParser(ClariusInfo):
             self.clean_tgc_data[timestamp] = data_dict
             logging.info(f"Final data stored for {timestamp}: {data_dict}")
 
-        ###################################################################################
+    ###################################################################################
 
+    def create_no_tgc_raw(self, visualize=False):
+        """
+        Processes RF data to remove the time-gain compensation (TGC) effect.
 
-    # def create_no_tgc(self, visualize=False):
+        This function calculates and applies a correction factor to the RF signal
+        to account for the attenuation introduced by TGC. It interpolates TGC values
+        based on depth and applies the correction frame-wise.
+
+        Parameters:
+        -----------
+        visualize : bool, optional
+            If True, plots the attenuation versus depth for each frame (default is True).
+
+        Steps:
+        ------
+        1. Determine the signal length and depth parameters.
+        2. Create a depth array for interpolation.
+        3. Iterate through each frame of the RF data:
+        - Interpolate TGC values based on depth.
+        - Apply correction to the RF signal.
+        - Optionally visualize the TGC curve.
+        4. Store the processed RF data without TGC.
+        """
         
-    #     logging.info("Loaded numpy file into self.rf_raw_data.")
+        trimmed_signal_length = self.rf_raw_data_3d.shape[1]
+        delay_samples = self.rf_yml_obj.rf_delay_samples
+        imaging_depth_mm = self.extract_float(self.rf_yml_obj.rf_imaging_depth)
+        full_signal_length = trimmed_signal_length + delay_samples
+        full_imaging_depth_array_1d_mm = np.linspace(0, imaging_depth_mm, full_signal_length)
+        
+        for frame in range(self.rf_raw_data_3d.shape[2]):
+            full_tgc_array_1d_dB = [0] * len(full_imaging_depth_array_1d_mm)
+            values = list(self.clean_tgc_data.values())[frame]
+            
+            tgc_depth_array_mm_list = [entry['depth'] for entry in values]
+            tgc_dB_list = [entry['dB'] for entry in values]
+            
+            for index_1 in range(len(full_imaging_depth_array_1d_mm)):
+                for index_2 in range(len(tgc_depth_array_mm_list)):
+                    if full_imaging_depth_array_1d_mm[index_1] < tgc_depth_array_mm_list[index_2]:
+                        if index_2 == 0:
+                            full_tgc_array_1d_dB[index_1] = tgc_dB_list[index_2]
+                            break
+                        elif 0 < index_2 < len(tgc_depth_array_mm_list):
+                            x_1, y_1 = tgc_depth_array_mm_list[index_2 - 1], tgc_dB_list[index_2 - 1]
+                            x_2, y_2 = tgc_depth_array_mm_list[index_2], tgc_dB_list[index_2]
+                            slope = (y_2 - y_1) / (x_2 - x_1)
+                            full_tgc_array_1d_dB[index_1] = y_1 + slope * (full_imaging_depth_array_1d_mm[index_1] - x_1)
+                        break
+                else:
+                    full_tgc_array_1d_dB[index_1] = tgc_dB_list[-1]
+            
+            # Visualization
+            if visualize:
+                plt.figure(figsize=(10, 5))
+                plt.plot(full_imaging_depth_array_1d_mm, full_tgc_array_1d_dB, label=f'Frame {frame}', color='blue')
+                plt.title(f'Attenuation vs Depth for Frame {frame}')
+                plt.xlabel('Depth (mm)')
+                plt.ylabel('Attenuation (dB)')
+                plt.grid()
+                plt.legend()
+                plt.show()
+            
+            trimmed_tgc_array_1d_dB = np.array(
+                full_tgc_array_1d_dB[delay_samples: delay_samples + trimmed_signal_length], dtype=np.float16
+            )
+            trimmed_tgc_coefficient_array_1d = 10**(trimmed_tgc_array_1d_dB / 20)
+            
+            rf_no_tgc_raw_data_3d = self.rf_raw_data_3d.astype(np.float16)  # or np.float64
+            
+            for line in range(self.rf_raw_data_3d.shape[0]):
+                rf_no_tgc_raw_data_3d[line, :, frame] /= trimmed_tgc_coefficient_array_1d
+            
+            self.rf_no_tgc_raw_data_3d = rf_no_tgc_raw_data_3d
+        
+    ###################################################################################
+    @staticmethod
+    def extract_float(input_string):
+        """
+        Extracts the first floating-point number from a string and returns it as a float.
+        If no number is found, returns None.
+        """
+        match = re.search(r"\d+\.\d+", input_string)
+        return float(match.group()) if match else None
 
-    #     for frame in range(self.rf_raw_data.shape[2]):
-    #         try:
-    #             value = clean_tgc_parameters[f"timestamp_{frame}"]
-    #         except KeyError:
-    #             value = clean_tgc_parameters[f"timestamp_{frame - 1}"]
-
-    #         logging.info(f"Calculating attenuation for frame {frame} with data: {value}")
-
-    #         depth_mm_list = list(value.keys())
-    #         attenuation_dB_list = list(value.values())
-    #         signal_1d_size = self.rf_raw_data.shape[1]
-    #         number_of_samples = signal_1d_size + delay_samples
-    #         depth_array_1d = np.linspace(0, imaging_depth_mm, number_of_samples)
-    #         attenuation_array_1d = [0] * len(depth_array_1d)
-
-    #         for index_1 in range(len(depth_array_1d)):
-    #             for index_2 in range(len(depth_mm_list)):
-    #                 if depth_array_1d[index_1] < depth_mm_list[index_2]:
-    #                     if index_2 == 0:
-    #                         attenuation_array_1d[index_1] = attenuation_dB_list[index_2]
-    #                         break
-    #                     elif 0 < index_2 < len(depth_mm_list):
-    #                         x_1 = depth_mm_list[index_2 - 1]
-    #                         y_1 = attenuation_dB_list[index_2 - 1]
-    #                         x_2 = depth_mm_list[index_2]
-    #                         y_2 = attenuation_dB_list[index_2]
-
-    #                         slope = (y_2 - y_1) / (x_2 - x_1)
-    #                         attenuation_array_1d[index_1] = y_1 + slope * (depth_array_1d[index_1] - x_1)
-    #                     break
-    #             else:
-    #                 attenuation_array_1d[index_1] = attenuation_dB_list[-1]
-
-    #         # Visualization of attenuation_array_1d if visualize is True
-    #         if visualize:
-    #             plt.figure(figsize=(10, 5))
-    #             plt.plot(depth_array_1d, attenuation_array_1d, label=f'Frame {frame}', color='blue')
-    #             plt.title(f'Attenuation vs Depth for Frame {frame}')
-    #             plt.xlabel('Depth (mm)')
-    #             plt.ylabel('Attenuation (dB)')
-    #             plt.grid()
-    #             plt.legend()
-    #             plt.show()  # Display the plot
-
-    #         attenuation_dB_1d_trimmed = np.array(attenuation_array_1d[delay_samples: delay_samples + self.rf_raw_data.shape[1]], dtype=np.float64)
-    #         ratio = 10**(attenuation_dB_1d_trimmed / 20)
-
-    #         for line in range(self.rf_raw_data.shape[0]):
-    #             self.rf_raw_data[line, :, frame] /= ratio
-
-    #     file_name = os.path.basename(numpy_file_path)
-    #     file_name_without_ext = os.path.splitext(file_name)[0]
-    #     folder_path = os.path.dirname(numpy_file_path)
-    #     save_dir = os.path.join(folder_path, file_name_without_ext + ".no_tgc")
-    #     self.rf_raw_data = np.array(self.rf_raw_data, dtype=np.float16)
-
-    #     np.save(save_dir, self.rf_raw_data)
-    #     logging.info(f"Saved processed self.rf_raw_data to {save_dir}.")
-    # else:
-    #     logging.warning("No rf.raw.npy file found.")  
-  
-                
     ###################################################################################
     class YmlParser():
         """
