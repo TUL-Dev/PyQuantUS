@@ -545,6 +545,9 @@ class ClariusParser(ClariusInfo):
         self.default_tgc_data: dict = {}
         self.clean_tgc_data: dict = {}
         self.rf_no_tgc_raw_data_3d: np.ndarray
+        
+        # depth
+        self.trimmed_imaging_depth_array_1d_cm:np.ndarray
 
         self.__run()
                 
@@ -568,8 +571,8 @@ class ClariusParser(ClariusInfo):
         self.create_clean_no_tgc_data()
         self.create_no_tgc_raw()
         
-        #self.create_trimmed_depth()
-
+        self.set_trimmed_imaging_depth_array()
+        #self.visualize_raw()
 
     ###################################################################################
     
@@ -902,77 +905,105 @@ class ClariusParser(ClariusInfo):
         """
         Processes RF data to remove the time-gain compensation (TGC) effect.
 
-        This function calculates and applies a correction factor to the RF signal
-        to account for the attenuation introduced by TGC. It interpolates TGC values
-        based on depth and applies the correction frame-wise.
+        This function computes and applies a correction factor to the RF signal
+        to counteract attenuation introduced by TGC. The TGC values are interpolated
+        based on depth and applied frame-wise.
 
         Parameters:
         -----------
         visualize : bool, optional
-            If True, plots the attenuation versus depth for each frame (default is True).
-
-        Steps:
-        ------
-        1. Determine the signal length and depth parameters.
-        2. Create a depth array for interpolation.
-        3. Iterate through each frame of the RF data:
-        - Interpolate TGC values based on depth.
-        - Apply correction to the RF signal.
-        - Optionally visualize the TGC curve.
-        4. Store the processed RF data without TGC.
+            If True, plots attenuation versus depth for each frame (default is False).
         """
+        full_depth_mm, signal_length, delay_samples = self.create_full_imaging_depth_array()
+        num_frames = self.rf_raw_data_3d.shape[2]
         
-        trimmed_signal_length = self.rf_raw_data_3d.shape[1]
-        delay_samples = self.rf_yml_obj.rf_delay_samples
-        imaging_depth_mm = self.extract_float(self.rf_yml_obj.rf_imaging_depth)
-        full_signal_length = trimmed_signal_length + delay_samples
-        full_imaging_depth_array_1d_mm = np.linspace(0, imaging_depth_mm, full_signal_length)
-        
-        for frame in range(self.rf_raw_data_3d.shape[2]):
-            full_tgc_array_1d_dB = [0] * len(full_imaging_depth_array_1d_mm)
+        for frame in range(num_frames):
+            # Initialize TGC array with zeros
+            tgc_array_dB = np.zeros(len(full_depth_mm), dtype=np.float16)
             values = list(self.clean_tgc_data.values())[frame]
-            
-            tgc_depth_array_mm_list = [entry['depth'] for entry in values]
-            tgc_dB_list = [entry['dB'] for entry in values]
-            
-            for index_1 in range(len(full_imaging_depth_array_1d_mm)):
-                for index_2 in range(len(tgc_depth_array_mm_list)):
-                    if full_imaging_depth_array_1d_mm[index_1] < tgc_depth_array_mm_list[index_2]:
-                        if index_2 == 0:
-                            full_tgc_array_1d_dB[index_1] = tgc_dB_list[index_2]
-                            break
-                        elif 0 < index_2 < len(tgc_depth_array_mm_list):
-                            x_1, y_1 = tgc_depth_array_mm_list[index_2 - 1], tgc_dB_list[index_2 - 1]
-                            x_2, y_2 = tgc_depth_array_mm_list[index_2], tgc_dB_list[index_2]
-                            slope = (y_2 - y_1) / (x_2 - x_1)
-                            full_tgc_array_1d_dB[index_1] = y_1 + slope * (full_imaging_depth_array_1d_mm[index_1] - x_1)
-                        break
+
+            # Extract depth and dB values
+            depths_mm = np.array([entry['depth'] for entry in values])
+            tgc_dB = np.array([entry['dB'] for entry in values])
+
+            # Perform interpolation
+            for i, depth in enumerate(full_depth_mm):
+                mask = depths_mm > depth
+                if mask.any():
+                    idx = mask.argmax()
+                    if idx == 0:
+                        tgc_array_dB[i] = tgc_dB[idx]
+                    else:
+                        x1, y1 = depths_mm[idx - 1], tgc_dB[idx - 1]
+                        x2, y2 = depths_mm[idx], tgc_dB[idx]
+                        tgc_array_dB[i] = y1 + (y2 - y1) * (depth - x1) / (x2 - x1)
                 else:
-                    full_tgc_array_1d_dB[index_1] = tgc_dB_list[-1]
-            
-            # Visualization
+                    tgc_array_dB[i] = tgc_dB[-1]
+
+            # Visualization (optional)
             if visualize:
                 plt.figure(figsize=(10, 5))
-                plt.plot(full_imaging_depth_array_1d_mm, full_tgc_array_1d_dB, label=f'Frame {frame}', color='blue')
+                plt.plot(full_depth_mm, tgc_array_dB, label=f'Frame {frame}', color='blue')
                 plt.title(f'Attenuation vs Depth for Frame {frame}')
                 plt.xlabel('Depth (mm)')
                 plt.ylabel('Attenuation (dB)')
                 plt.grid()
                 plt.legend()
                 plt.show()
-            
-            trimmed_tgc_array_1d_dB = np.array(
-                full_tgc_array_1d_dB[delay_samples: delay_samples + trimmed_signal_length], dtype=np.float16
-            )
-            trimmed_tgc_coefficient_array_1d = 10**(trimmed_tgc_array_1d_dB / 20)
-            
-            rf_no_tgc_raw_data_3d = self.rf_raw_data_3d.astype(np.float16)  # or np.float64
-            
+
+            # Apply correction
+            trimmed_tgc_dB = tgc_array_dB[delay_samples: delay_samples + signal_length]
+            tgc_coefficient = 10 ** (trimmed_tgc_dB / 20)
+
+            rf_no_tgc_raw = self.rf_raw_data_3d.astype(np.float16)
             for line in range(self.rf_raw_data_3d.shape[0]):
-                rf_no_tgc_raw_data_3d[line, :, frame] /= trimmed_tgc_coefficient_array_1d
-            
-            self.rf_no_tgc_raw_data_3d = rf_no_tgc_raw_data_3d
+                rf_no_tgc_raw[line, :, frame] /= tgc_coefficient
+
+            self.rf_no_tgc_raw_data_3d = rf_no_tgc_raw
         
+    ###################################################################################
+
+    def create_full_imaging_depth_array(self):
+        """
+        Generates an array representing the full imaging depth in millimeters.
+
+        This function calculates the depth array based on the imaging depth and delay samples,
+        ensuring accurate mapping of signal depth.
+
+        Returns:
+        --------
+        tuple: (full_imaging_depth_array_1d_mm, trimmed_signal_length, delay_samples)
+            - full_imaging_depth_array_1d_mm: 1D NumPy array of depth values in mm.
+            - trimmed_signal_length: Length of the trimmed RF signal.
+            - delay_samples: Number of delay samples before the valid signal starts.
+        """
+        trimmed_signal_length = self.rf_raw_data_3d.shape[1]
+        delay_samples = self.rf_yml_obj.rf_delay_samples
+        imaging_depth_mm = self.extract_float(self.rf_yml_obj.rf_imaging_depth)
+
+        # Compute full depth array
+        full_signal_length = trimmed_signal_length + delay_samples
+        depth_array_mm = np.linspace(0, imaging_depth_mm, full_signal_length, dtype=np.float16)
+
+        return depth_array_mm, trimmed_signal_length, delay_samples
+
+    ###################################################################################
+    
+    def set_trimmed_imaging_depth_array(self):
+        """
+        Sets the trimmed imaging depth array in centimeters.
+
+        This function extracts the full imaging depth array, removes the delay samples,
+        and converts the values from millimeters to centimeters.
+
+        Updates:
+        --------
+        self.trimmed_imaging_depth_array_1d_cm : 1D NumPy array
+            Trimmed imaging depth array in cm.
+        """
+        full_depth_array_mm, _, delay_samples = self.create_full_imaging_depth_array()
+        self.trimmed_imaging_depth_array_1d_cm = full_depth_array_mm[delay_samples:] * 0.1  # Convert mm to cm
+
     ###################################################################################
     @staticmethod
     def extract_float(input_string):
