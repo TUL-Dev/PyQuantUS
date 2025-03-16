@@ -463,6 +463,7 @@ class ClariusTarUnpacker():
                         sys.exit()
                    
                     # install lzop using homebrew
+                    subprocess.run(['brew', 'update'], check=True)
                     subprocess.run(['arch', '-arm64', 'brew', 'install', 'lzop'], check=True)
                     logging.info("Successfully installed lzop using Homebrew.")
                     # Run the lzop command to decompress the LZO file
