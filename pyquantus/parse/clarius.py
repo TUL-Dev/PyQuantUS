@@ -73,7 +73,10 @@ class ClariusTarUnpacker():
         
         self.path = path
         self.extraction_mode = extraction_mode
-        self.lzo_exe_file_path = 'pyquantus/exe/lzop.exe'
+        #self.lzo_exe_file_path = 'pyquantus/exe/lzop.exe'
+        
+        # Using lzop.exe file for Windows renamed to lzop.py to make it pip-accessible
+        self.lzo_exe_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir)}\exe\lzop.py"
         
         # single tar extraction attibutes
         self.single_tar_extraction: bool = None
@@ -322,10 +325,13 @@ class ClariusTarUnpacker():
                
         if self.os == "windows":
             # Get the path of the current working directory
-            working_space_path = os.getcwd()
+            # working_space_path = os.getcwd()
             
             # Construct the full path to the LZO executable, adding the .exe extension
-            path_of_lzo_exe_file = os.path.join(working_space_path, self.lzo_exe_file_path)
+            # path_of_lzo_exe_file = os.path.join(working_space_path, self.lzo_exe_file_path)
+            
+            # Construct the full path to the LZO executable
+            path_of_lzo_exe_file = self.lzo_exe_file_path
 
             # Log the path being checked
             logging.info(f'Checking path for LZO executable: {path_of_lzo_exe_file}')
@@ -364,6 +370,7 @@ class ClariusTarUnpacker():
                         sys.exit()
                    
                     # install lzop using homebrew
+                    subprocess.run(['brew', 'update'], check=True)
                     subprocess.run(['arch', '-arm64', 'brew', 'install', 'lzop'], check=True)
                     logging.info("Successfully installed lzop using Homebrew.")
                     # Run the lzop command to decompress the LZO file
