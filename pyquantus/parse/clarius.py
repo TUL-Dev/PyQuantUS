@@ -22,28 +22,8 @@ from pyquantus.parse.objects import DataOutputStruct, InfoStruct
 from pyquantus.parse.transforms import scanConvert
 
 # Logging setup
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-
-# info structures
-###################################################################################
-class ClariusInfo(DataOutputStruct, InfoStruct):
-    
-    def __init__(self):
-        
-        super().__init__()
-        
-        self.numLines: int
-        self.samplesPerLine: int
-        self.sampleSize: int # bytes
-        
-        # outputs
-        self.img_data: DataOutputStruct 
-        self.img_info: ClariusInfo 
-        self.scan_converted: bool        
-        
-###################################################################################
-
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.disable(logging.CRITICAL)
 
 
 # tar file unpacker    
@@ -516,7 +496,7 @@ class ClariusTarUnpacker():
 
 # parser
 ###################################################################################  
-class ClariusParser(ClariusInfo):
+class ClariusParser():
 
     ###################################################################################
     
@@ -552,6 +532,8 @@ class ClariusParser(ClariusInfo):
         # tgc
         self.default_tgc_data: dict = {}
         self.clean_tgc_data: dict = {}
+        
+        # no tgc
         self.rf_no_tgc_raw_data_3d: np.ndarray
         
         # depth and time
@@ -562,6 +544,21 @@ class ClariusParser(ClariusInfo):
         self.default_frame: int = 0
         self.SPEED_OF_SOUND: int = 1540 # [m/s]
         self.hilbert_transform_axis: int = 1
+        
+        # data structure
+        self.clarius_info_struct: object = ClariusParser.ClariusInfoStruct()
+        self.clarius_data_struct: object = DataOutputStruct()
+        
+        # nd signal and envelope
+        self.tgc_signal_2d: np.ndarray 
+        self.tgc_signal_1d: np.ndarray             
+        self.no_tgc_signal_2d: np.ndarray 
+        self.no_tgc_signal_1d: np.ndarray 
+        self.tgc_envelope_2d: np.ndarray
+        self.no_tgc_envelope_3d: np.ndarray
+        self.no_tgc_envelope_2d: np.ndarray
+        
+        self.scan_converted = None
 
         self.__run()
                 
@@ -584,11 +581,31 @@ class ClariusParser(ClariusInfo):
         self.create_clean_no_tgc_data()
         self.create_no_tgc_raw()
         
+        # time and deoth array
         self.set_trimmed_depth_and_time_array()
         
+        # set signal and envelope
+        self.set_tgc_signal_nd()
+        self.set_tgc_envelope_nd()
+        self.set_no_tgc_signal_nd()
+        self.set_no_tgc_envelope_nd()
+        
+        # et data to structure       
+        self.set_data_of_clarius_info_struct()
+        
+        # normalize envelope
+        self.tgc_envelope_2d = self.normalize_envelope(self.tgc_envelope_2d) # !!!
+        self.no_tgc_envelope_2d = self.normalize_envelope(self.no_tgc_envelope_2d) # !!!
+        
+        # convert envelope
+        self.convert_envelope() # !!!
+        
+        # visualize
         if not self.visualize: return
-        self.plot(self.rf_raw_data_3d, title="rf_raw") 
-        self.plot(self.rf_no_tgc_raw_data_3d,title="rf_no_tgc_raw")
+        self.image_envelope_2d(self.tgc_envelope_2d, title="rf_raw")
+        self.image_envelope_2d(self.no_tgc_envelope_2d, title="rf_no_tgc_raw")
+        self.plot_1d_signal_and_fft(self.tgc_signal_1d, title="rf_raw")
+        self.plot_1d_signal_and_fft(self.no_tgc_signal_1d, title="rf_no_tgc_raw")
 
     ###################################################################################
     
@@ -684,8 +701,21 @@ class ClariusParser(ClariusInfo):
     
     ###################################################################################
 
-    def read_ymls(self):
-        
+    def read_ymls(self) -> None:
+        """
+        Reads and parses multiple YAML files using the ClariusParser.YmlParser.
+
+        This function initializes YAML parser objects for different configuration files 
+        and assigns them to instance attributes.
+
+        Attributes:
+            self.rf_yml_obj: Parses the RF YAML file located at `self.rf_yml_path`.
+            self.env_yml_obj: Parses the environment YAML file located at `self.env_yml_path`.
+            self.env_tgc_yml_obj: Parses the environment TGC YAML file located at `self.env_tgc_yml_path`.
+
+        Returns:
+            None
+        """
         self.rf_yml_obj = ClariusParser.YmlParser(self.rf_yml_path)
         self.env_yml_obj = ClariusParser.YmlParser(self.env_yml_path)
         self.env_tgc_yml_obj = ClariusParser.YmlParser(self.env_tgc_yml_path)
@@ -876,7 +906,21 @@ class ClariusParser(ClariusInfo):
            
     ###################################################################################
     
-    def set_default_tgc_data(self):
+    def set_default_tgc_data(self) -> None:
+        """
+        Extracts and processes TGC (Time Gain Compensation) data from the RF YAML object.
+
+        This function parses key-value pairs from the RF TGC data, extracts depth and 
+        dB values, and stores them in a structured format within `self.default_tgc_data`.
+
+        Attributes:
+            self.default_tgc_data (list[dict]): A list of dictionaries, each containing:
+                - 'depth' (float): The extracted depth value from the length key.
+                - 'dB' (float): The extracted dB value from the dB key.
+
+        Returns:
+            None
+        """
         rf_tgc = self.rf_yml_obj.rf_tgc  # Extract the original data
         self.default_tgc_data = []  # Initialize empty list
 
@@ -896,10 +940,27 @@ class ClariusParser(ClariusInfo):
 
                 if depth_value is not None and db_value is not None:
                     self.default_tgc_data.append({'depth': depth_value, 'dB': db_value})
-    
+
     ###################################################################################
 
-    def create_clean_no_tgc_data(self):
+    def create_clean_no_tgc_data(self) -> None:
+        """
+        Creates a cleaned version of TGC (Time Gain Compensation) data by ensuring 
+        each timestamp has valid data. If a timestamp lacks valid data, it uses the 
+        most recent valid data or falls back to default TGC data.
+
+        This function processes TGC data from `self.env_tgc_yml_obj.timestamps` and 
+        stores the cleaned version in `self.clean_tgc_data`.
+
+        Attributes:
+            self.clean_tgc_data (dict): A dictionary where:
+                - Keys (str): Timestamps from `env_tgc_yml_obj.timestamps`.
+                - Values (list[dict]): Processed TGC data lists, falling back to 
+                previous valid data or default TGC data if necessary.
+
+        Returns:
+            None
+        """
         previous_data_dict = None
 
         for timestamp, data_list in self.env_tgc_yml_obj.timestamps.items():
@@ -1027,7 +1088,108 @@ class ClariusParser(ClariusInfo):
         
     ###################################################################################
     
-    def get_signal_envelope_xd(self, signal_xd: np.ndarray, hilbert_transform_axis: int):
+    def set_tgc_signal_nd(self) -> None:
+        """
+        Extracts and sets the TGC (Time Gain Compensation) signal in different dimensions.
+
+        This function extracts a 2D slice from the 3D RF raw data using `self.default_frame`, 
+        and then extracts a 1D signal from the center row of the 2D slice.
+
+        Attributes:
+            self.tgc_signal_2d (np.ndarray): A 2D array extracted from `self.rf_raw_data_3d` 
+                at the specified default frame.
+            self.tgc_signal_1d (np.ndarray): A 1D signal extracted from the center row 
+                of `self.tgc_signal_2d`.
+
+        Returns:
+            None
+        """
+        self.tgc_signal_2d = self.rf_raw_data_3d[:, :, self.default_frame]
+        self.tgc_signal_1d = self.tgc_signal_2d[self.tgc_signal_2d.shape[0] // 2, :]
+
+    ###################################################################################
+    
+    def set_no_tgc_signal_nd(self) -> None:
+        """
+        Extracts and sets the non-TGC (Time Gain Compensation) signal in different dimensions.
+
+        This function extracts a 2D slice from the 3D RF raw data without TGC using `self.default_frame`, 
+        and then extracts a 1D signal from the center row of the 2D slice.
+
+        Attributes:
+            self.no_tgc_signal_2d (np.ndarray): A 2D array extracted from `self.rf_no_tgc_raw_data_3d` 
+                at the specified default frame.
+            self.no_tgc_signal_1d (np.ndarray): A 1D signal extracted from the center row 
+                of `self.no_tgc_signal_2d`.
+
+        Returns:
+            None
+        """
+        self.no_tgc_signal_2d = self.rf_no_tgc_raw_data_3d[:, :, self.default_frame]
+        self.no_tgc_signal_1d = self.no_tgc_signal_2d[self.no_tgc_signal_2d.shape[0] // 2, :]
+        
+    ###################################################################################
+    
+    def set_tgc_envelope_nd(self) -> None:
+        """
+        Computes and sets the TGC (Time Gain Compensation) envelope in multiple dimensions.
+
+        This function applies the Hilbert transform to the 2D TGC signal to compute its 
+        envelope and stores the result.
+
+        Attributes:
+            self.tgc_envelope_2d (np.ndarray): A 2D array representing the envelope 
+                of `self.tgc_signal_2d`, computed using the Hilbert transform.
+
+        Returns:
+            None
+        """
+        self.tgc_envelope_2d = self.get_signal_envelope_xd(self.tgc_signal_2d,
+                                                           hilbert_transform_axis=self.hilbert_transform_axis)
+
+    ###################################################################################
+
+    def set_no_tgc_envelope_nd(self) -> None:
+        """
+        Computes and sets the non-TGC (Time Gain Compensation) envelope in multiple dimensions.
+
+        This function applies the Hilbert transform to both the 3D and 2D non-TGC signals 
+        to compute their envelopes and stores the results.
+
+        Attributes:
+            self.no_tgc_envelope_3d (np.ndarray): A 3D array representing the envelope 
+                of `self.rf_no_tgc_raw_data_3d`, computed using the Hilbert transform.
+            self.no_tgc_envelope_2d (np.ndarray): A 2D array representing the envelope 
+                of `self.no_tgc_signal_2d`, computed using the Hilbert transform.
+
+        Returns:
+            None
+        """
+        self.no_tgc_envelope_3d = self.get_signal_envelope_xd(self.rf_no_tgc_raw_data_3d,
+                                                              hilbert_transform_axis=self.hilbert_transform_axis)
+        
+        self.no_tgc_envelope_2d = self.get_signal_envelope_xd(self.no_tgc_signal_2d,
+                                                              hilbert_transform_axis=self.hilbert_transform_axis)
+
+    ###################################################################################
+    
+    def get_signal_envelope_xd(self,
+                               signal_xd: np.ndarray,
+                               hilbert_transform_axis: int) -> np.ndarray:
+        """
+        Computes the envelope of an x-dimensional signal using the Hilbert transform.
+
+        This function mirrors the input signal along all its dimensions, applies the 
+        Hilbert transform along the specified axis, and then extracts the original 
+        signal envelope from the analytic signal.
+
+        Args:
+            signal_xd (np.ndarray): The input x-dimensional signal represented as a NumPy array.
+            hilbert_transform_axis (int): The axis along which the Hilbert transform is applied.
+
+        Returns:
+            np.ndarray: The computed signal envelope of the input signal.
+        """
         logging.debug("Starting to set the xD signal envelope.")
 
         # Step 1: Mirror the signal
@@ -1066,23 +1228,26 @@ class ClariusParser(ClariusInfo):
         logging.debug("Finished setting the xD signal envelope.")
         
         return signal_envelope_xd
-    
-    ###################################################################################
-        
-    def plot(self, signal_3d, title=""):
-        
-        signal_2d = signal_3d[:, :, self.default_frame]
-        signal_1d = signal_2d[signal_2d.shape[0] // 2, :]
-        envelope_2d = self.get_signal_envelope_xd(signal_2d, hilbert_transform_axis=self.hilbert_transform_axis)
-        
-        self.image_envelope_2d(envelope_2d, title)
-        self.plot_1d_signal_and_fft(signal_1d, title)
-            
+                
     ###################################################################################
 
-    def image_envelope_2d(self, envelope, title):
+    def image_envelope_2d(self, envelope: np.ndarray, title: str) -> None:
+        """
+        Plots a 2D signal envelope in decibels.
+
+        This function takes a 2D array representing a signal envelope, applies 
+        a rotation and flipping transformation, converts it to a logarithmic 
+        decibel scale, and displays it as an image plot.
+
+        Args:
+            envelope (np.ndarray): A 2D NumPy array representing the signal envelope.
+            title (str): The title of the plot.
+
+        Returns:
+            None
+        """
         logging.info("Starting the plot function.")
-       
+        
         # Flip the rotated array horizontally
         rotated_flipped_array = self.rotate_flip(envelope)
 
@@ -1099,11 +1264,17 @@ class ClariusParser(ClariusInfo):
         plt.tight_layout()
         plt.show()
         logging.info("Plotting completed and displayed.")
-        
+
     ###################################################################################
 
-    def plot_1d_signal_and_fft(self, signal_1d, title):
+    def plot_1d_signal_and_fft(self, signal_1d: np.ndarray, title: str):
+        """
+        Plots a 1D signal and its corresponding FFT.
         
+        Args:
+            signal_1d (np.ndarray): The 1D signal to be analyzed.
+            title (str): Title for the plots.
+        """
         sampling_rate_Hz = self.extract_digit(self.rf_yml_obj.rf_sampling_rate) * 1e6
                         
         # Get envelope
@@ -1129,7 +1300,7 @@ class ClariusParser(ClariusInfo):
         plt.subplot(1, 2, 1)  # 1 row, 2 columns, first subplot
         plt.plot(self.trimmed_depth_array_1d_cm, signal_1d, color='blue', label='Signal')  
         plt.plot(self.trimmed_depth_array_1d_cm, envelope_1d, color='red', linestyle='dashed', label='Envelope')  
-        plt.title('1D Signal Plot')
+        plt.title(f'1D Signal Plot {title}')
         plt.xlabel('Time (µs)')  
         plt.ylabel('Amplitude')
         plt.legend()  # Add legend
@@ -1138,7 +1309,7 @@ class ClariusParser(ClariusInfo):
         # Plot the positive FFT
         plt.subplot(1, 2, 2)  # 1 row, 2 columns, second subplot
         plt.plot(freq_positive_MHz, fft_magnitude_positive, color='green')  
-        plt.title('FFT of Signal')
+        plt.title(f'FFT of Signal {title}')
         plt.xlabel('Frequency (MHz)')  
         plt.ylabel('Magnitude')
         plt.grid(True)
@@ -1146,6 +1317,98 @@ class ClariusParser(ClariusInfo):
         plt.tight_layout()  
         plt.show()
 
+    ###################################################################################
+    
+    def set_data_of_clarius_info_struct(self):
+        
+        self.clarius_info_struct.width1 = self.rf_yml_obj.rf_probe['radius'] * 2
+        self.clarius_info_struct.endDepth1 = self.extract_digit(self.rf_yml_obj.rf_imaging_depth) / 100 # [m]
+        self.clarius_info_struct.startDepth1 = self.clarius_info_struct.endDepth1 / 4 # [m]
+        self.clarius_info_struct.samplingFrequency = self.extract_digit(self.rf_yml_obj.rf_sampling_rate) * 1e6 # [Hz]
+        self.clarius_info_struct.tilt1 = 0
+        self.clarius_info_struct.samplesPerLine = self.rf_yml_obj.rf_size['samples per line']
+        self.clarius_info_struct.numLines = self.rf_yml_obj.rf_size['number of lines']
+        self.clarius_info_struct.sampleSize = self.rf_yml_obj.rf_size['sample size']        
+        self.clarius_info_struct.centerFrequency = self.extract_digit(self.rf_yml_obj.rf_transmit_frequency) * 1e6 # [Hz]
+        self.clarius_info_struct.minFrequency = 0
+        self.clarius_info_struct.maxFrequency = self.clarius_info_struct.centerFrequency * 2
+        self.clarius_info_struct.lowBandFreq = int(self.clarius_info_struct.centerFrequency / 2)
+        self.clarius_info_struct.upBandFreq = int(self.clarius_info_struct.centerFrequency * 1.5)
+        self.clarius_info_struct.clipFact = 0.95
+        self.clarius_info_struct.dynRange = 50
+        
+    ###################################################################################
+
+    def normalize_envelope(self, envelope):
+
+        max_value = np.amax(envelope)
+        clip_threshold = self.clarius_info_struct.clipFact * max_value
+
+        # Clip the envelope within the dynamic range
+        envelope = np.clip(envelope, clip_threshold - self.clarius_info_struct.dynRange, clip_threshold)
+        
+        # Shift to zero
+        envelope -= np.amin(envelope)
+        
+        # Scale to 0-255
+        envelope *= 255 / np.amax(envelope)
+
+        return envelope
+        
+    ###################################################################################
+    
+    def convert_envelope(self):
+        
+        if self.clarius_info_struct.width1:
+            
+            bmode = self.no_tgc_envelope_3d
+            rf_atgc = self.rf_raw_data_3d
+            
+            bmode = np.transpose(bmode, (1, 0, 2))
+            rf_atgc = np.transpose(rf_atgc, (1, 0, 2))
+            
+            scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0],
+                                                    self.clarius_info_struct.width1,
+                                                    self.clarius_info_struct.tilt1,
+                                                    self.clarius_info_struct.startDepth1, 
+                                                    self.clarius_info_struct.endDepth1,
+                                                    desiredHeight=2000)
+            
+            scBmodes = np.array([scanConvert(bmode[:,:,i],
+                                             self.clarius_info_struct.width1,
+                                             self.clarius_info_struct.tilt1,
+                                             self.clarius_info_struct.startDepth1, 
+                                             self.clarius_info_struct.endDepth1,
+                                             desiredHeight=2000)[0].scArr for i in tqdm(range(rf_atgc.shape[2]))])
+            
+            self.clarius_info_struct.yResRF =  self.clarius_info_struct.endDepth1*1000 / scBmodeStruct.scArr.shape[0]
+            self.clarius_info_struct.xResRF = self.clarius_info_struct.yResRF * (scBmodeStruct.scArr.shape[0]/scBmodeStruct.scArr.shape[1]) # placeholder
+            self.clarius_info_struct.axialRes = hCm1*10 / scBmodeStruct.scArr.shape[0]
+            self.clarius_info_struct.lateralRes = wCm1*10 / scBmodeStruct.scArr.shape[1]
+            self.clarius_info_struct.depth = hCm1*10 #mm
+            self.clarius_info_struct.width = wCm1*10 #mm
+            
+            self.clarius_info_struct.scBmodeStruct = scBmodeStruct
+            self.clarius_info_struct.scBmode = scBmodes
+            
+            self.clarius_data_struct.bMode = np.transpose(bmode, (2, 0, 1))
+            self.clarius_data_struct.rf = np.transpose(rf_atgc, (2, 0, 1))
+            
+            self.scan_converted = True
+            
+        else:
+            self.clarius_info_struct.yResRF = self.clarius_info_struct.endDepth1*1000 / bmode.shape[0] # mm/pixel
+            self.clarius_info_struct.xResRF = self.clarius_info_struct.yResRF * (bmode.shape[0]/bmode.shape[1]) # placeholder
+            self.clarius_info_struct.axialRes = self.clarius_info_struct.yResRF #mm
+            self.clarius_info_struct.lateralRes = self.clarius_info_struct.xResRF #mm
+            self.clarius_info_struct.depth = self.clarius_info_struct.endDepth1*1000 #mm
+            self.clarius_info_struct.width = self.clarius_info_struct.endDepth1*1000 #mm
+            
+            self.clarius_data_struct.bMode = np.transpose(bmode, (2, 0, 1))
+            self.clarius_data_struct.rf = np.transpose(rf_atgc, (2, 0, 1))
+            
+            self.scan_converted = False
+            
     ###################################################################################
     @staticmethod
     def extract_digit(input_string: str) -> float | int | None:
@@ -1163,7 +1426,15 @@ class ClariusParser(ClariusInfo):
     ###################################################################################
     @staticmethod
     def rotate_flip(two_dimension_array: np.ndarray) -> np.ndarray:
-
+        """
+        Rotates the input 2D array counterclockwise by 90 degrees and then flips it vertically.
+        
+        Args:
+            two_dimension_array (np.ndarray): The input 2D array to be transformed.
+        
+        Returns:
+            np.ndarray: The rotated and flipped 2D array.
+        """
         # Rotate the input array counterclockwise by 90 degrees
         rotated_array = np.rot90(two_dimension_array)
         
@@ -1486,17 +1757,71 @@ class ClariusParser(ClariusInfo):
         ###################################################################################
         
     ###################################################################################
-    
-    
+    class ClariusInfoStruct(InfoStruct):
+        """
+        ClariusInfoStruct is a subclass of InfoStruct that represents information 
+        about an ultrasound scan's data structure. 
+
+        Attributes:
+            samplesPerLine (int): The number of samples per line in the scan.
+            numLines (int): The total number of lines in the scan.
+            sampleSize (str): The size of each sample, typically represented as a string.
+        """
+        
+        def __init__(self):
+            """
+            Initializes a ClariusInfoStruct object with essential attributes related 
+            to ultrasound scan data structure.
+            """
+            super().__init__()
+            
+            self.samplesPerLine: int  # Number of samples per line
+            self.numLines: int  # Total number of lines
+            self.sampleSize: str  # Size of each sample
     
 ###################################################################################
 
 
 
+# function
+###################################################################################
+
+def clariusRfParser(imgFilename: str,
+                    imgTgcFilename: str,
+                    infoFilename: str, 
+                    phantomFilename: str,
+                    phantomTgcFilename: str,
+                    phantomInfoFilename: str):
+
+    def get_folder_path_from_file_path(file_path: str) -> str:
+        """Returns the absolute directory path of the given file."""
+        return os.path.dirname(os.path.abspath(file_path))
+    
+    main_sample_folder_path    = get_folder_path_from_file_path(imgFilename)
+    pahntom_sample_folder_path = get_folder_path_from_file_path(phantomFilename)
+
+    main_sample_obj    = ClariusParser(main_sample_folder_path)
+    phantom_sample_obj = ClariusParser(pahntom_sample_folder_path)
+      
+    imgData       = main_sample_obj.clarius_data_struct   
+    imgInfo       = main_sample_obj.clarius_info_struct
+    scanConverted = main_sample_obj.scan_converted
+    
+    refData       = phantom_sample_obj.clarius_data_struct   
+    refInfo       = phantom_sample_obj.clarius_info_struct
+    scanConverted = phantom_sample_obj.scan_converted
+    
+    # imgData, imgInfo, scanConverted = readImg(imgFilename, imgTgcFilename, infoFilename, version, isPhantom=False)
+    # refData, refInfo, scanConverted = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
+    
+    return imgData, imgInfo, refData, refInfo, scanConverted
+
+###################################################################################
 
 
 
-# functions
+
+# no need for them
 ###################################################################################
 
 def read_tgc_file(file_timestamp: str, rf_timestamps: np.ndarray) -> list | None:
@@ -1618,7 +1943,7 @@ def read_tgc_file_v2(tgc_path, rf_timestamps):
 
 ###################################################################################
 
-def generate_default_tgc_matrix(num_frames: int, info: ClariusInfo) -> np.ndarray:
+def generate_default_tgc_matrix(num_frames: int, info: ClariusParser.ClariusInfoStruct) -> np.ndarray:
     """Generate a default TGC matrix for the inputted number of frames and Clarius file metadata.
     
     Args:
@@ -1751,7 +2076,7 @@ def convert_env_to_rf_ntgc(x, linear_tgc_matrix):
 ###################################################################################
 
 def readImg(filename: str, tgc_path: str | None, info_path: str, 
-            version="6.0.3", isPhantom=False) -> Tuple[DataOutputStruct, ClariusInfo, bool]:
+            version="6.0.3", isPhantom=False) -> Tuple[DataOutputStruct, ClariusParser.ClariusInfoStruct, bool]:
     """Read RF data contained in Clarius file
     Args:
         filename (string)): where is the Clarius file
@@ -1809,7 +2134,7 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
     #     return []
     
 
-    info = ClariusInfo()
+    info = ClariusParser.ClariusInfoStruct()
     with open(info_path, 'r') as file:
         infoYml = yaml.safe_load(file)
     try:
@@ -1817,6 +2142,7 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
         scanConverted = True
     except KeyError:
         scanConverted = False
+        
     info.endDepth1 = float(infoYml["imaging depth"][:-2]) / 1000 #m
     info.startDepth1 = info.endDepth1 / 4 #m
     info.samplingFrequency = int(infoYml["sampling rate"][:-3]) * 1e6
@@ -1875,8 +2201,10 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
     data = DataOutputStruct()
     
     if scanConverted:
+        
         scBmodeStruct, hCm1, wCm1 = scanConvert(bmode[:,:,0], info.width1, info.tilt1, info.startDepth1, 
                                             info.endDepth1, desiredHeight=2000)
+        
         scBmodes = np.array([scanConvert(bmode[:,:,i], info.width1, info.tilt1, info.startDepth1, 
                                      info.endDepth1, desiredHeight=2000)[0].scArr for i in tqdm(range(rf_atgc.shape[2]))])
 
@@ -1897,6 +2225,8 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
         info.depth = info.endDepth1*1000 #mm
         info.width = info.endDepth1*1000 #mm
 
+    print(bmode.shape)
+    print(rf_atgc.shape)
     
     data.bMode = np.transpose(bmode, (2, 0, 1))
     data.rf = np.transpose(rf_atgc, (2, 0, 1))
@@ -1905,9 +2235,9 @@ def readImg(filename: str, tgc_path: str | None, info_path: str,
 
 ###################################################################################
 
-def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str, 
+def clariusRfParser_old(imgFilename: str, imgTgcFilename: str, infoFilename: str, 
             phantomFilename: str, phantomTgcFilename: str, phantomInfoFilename: str, 
-            version="6.0.3") -> Tuple[DataOutputStruct, ClariusInfo, DataOutputStruct, ClariusInfo, bool]:
+            version="6.0.3") -> Tuple[DataOutputStruct, ClariusParser.ClariusInfoStruct, DataOutputStruct, ClariusParser.ClariusInfoStruct, bool]:
     """Parse Clarius RF data and metadata from inputted files.
 
     Args:
@@ -1923,7 +2253,7 @@ def clariusRfParser(imgFilename: str, imgTgcFilename: str, infoFilename: str,
         Tuple: Image data, image metadata, phantom data, and phantom metadata.
     """
     # Check yml files
-    YmlParser(imgTgcFilename); YmlParser(phantomTgcFilename); YmlParser(infoFilename); YmlParser(phantomInfoFilename)
+    # YmlParser(imgTgcFilename); YmlParser(phantomTgcFilename); YmlParser(infoFilename); YmlParser(phantomInfoFilename)
     
     imgData, imgInfo, scanConverted = readImg(imgFilename, imgTgcFilename, infoFilename, version, isPhantom=False)
     refData, refInfo, scanConverted = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
