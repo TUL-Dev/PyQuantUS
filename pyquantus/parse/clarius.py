@@ -22,8 +22,8 @@ from pyquantus.parse.objects import DataOutputStruct, InfoStruct
 from pyquantus.parse.transforms import scanConvert
 
 # Logging setup
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
-logging.disable(logging.CRITICAL)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+#logging.disable(logging.CRITICAL)
 
 
 # tar file unpacker    
@@ -35,7 +35,7 @@ class ClariusTarUnpacker():
     Attributes:
         tar_files_path (str): The path to the directory containing `.tar` files.
         extraction_mode (str): Extraction mode - either "single" or "multiple".
-        lzo_exe_file_path (str): Path to the LZO executable for decompression (Windows only).
+        lzo_py_file_path (str): Path to the LZO executable for decompression (Windows only).
     """
     ###################################################################################
     
@@ -53,10 +53,10 @@ class ClariusTarUnpacker():
         
         self.path = path
         self.extraction_mode = extraction_mode
-        #self.lzo_exe_file_path = 'pyquantus/exe/lzop.exe'
+        #self.lzo_py_file_path = 'pyquantus/lzop/lzop.py'
         
-        # Using lzop.exe file for Windows renamed to lzop.py to make it pip-accessible
-        self.lzo_exe_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir)}\exe\lzop.py"
+        # Using lzop.py file for Windows renamed to lzop.py to make it pip-accessible
+        self.lzo_py_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir)}\lzop\lzop.py"
         
         # single tar extraction attibutes
         self.single_tar_extraction: bool = None
@@ -273,7 +273,7 @@ class ClariusTarUnpacker():
         3. If running on **Windows**:
             - Constructs the path to the LZO executable.
             - Checks if the executable exists.
-            - Iterates through the `.lzo` files and decompresses them using `lzop.exe`.
+            - Iterates through the `.lzo` files and decompresses them using `lzop.py`.
         4. If running on **macOS**:
             - Attempts to decompress `.lzo` files using the `lzop` command.
             - If `lzop` is missing, checks for Homebrew.
@@ -307,25 +307,22 @@ class ClariusTarUnpacker():
             # Get the path of the current working directory
             # working_space_path = os.getcwd()
             
-            # Construct the full path to the LZO executable, adding the .exe extension
-            # path_of_lzo_exe_file = os.path.join(working_space_path, self.lzo_exe_file_path)
+            # Construct the full path to the LZO executable, adding the .py extension
+            # path_of_lzo_py_file = os.path.join(working_space_path, self.lzo_py_file_path)
             
-            # Construct the full path to the LZO executable
-            path_of_lzo_exe_file = self.lzo_exe_file_path
-
             # Log the path being checked
-            logging.info(f'Checking path for LZO executable: {path_of_lzo_exe_file}')
+            logging.info(f'Checking path for LZO executable: {self.lzo_py_file_path}')
 
             # Check if the executable exists
-            if not os.path.isfile(path_of_lzo_exe_file):
-                logging.error(f'LZO executable not found: {path_of_lzo_exe_file}')
+            if not os.path.isfile(self.lzo_py_file_path):
+                logging.error(f'LZO executable not found: {self.lzo_py_file_path}')
                 return
 
             for lzo_file_path in self.lzo_files_path_list:
                 logging.info(f'Starting decompression for: {lzo_file_path}')
                 try:
                     # Run the lzop command to decompress the LZO file
-                    subprocess.run([path_of_lzo_exe_file, '-d', lzo_file_path], check=True)
+                    subprocess.run([self.lzo_py_file_path, '-d', lzo_file_path], check=True)
                     logging.info(f'Successfully decompressed: {lzo_file_path}')
                 except subprocess.CalledProcessError as e:
                     logging.error(f'Error decompressing {lzo_file_path}: {e}')
@@ -594,8 +591,8 @@ class ClariusParser():
         self.set_data_of_clarius_info_struct()
         
         # normalize envelope
-        self.tgc_envelope_2d = self.normalize_envelope(self.tgc_envelope_2d) # !!!
-        self.no_tgc_envelope_2d = self.normalize_envelope(self.no_tgc_envelope_2d) # !!!
+        # self.tgc_envelope_2d = self.normalize_envelope(self.tgc_envelope_2d) # !!!
+        # self.no_tgc_envelope_2d = self.normalize_envelope(self.no_tgc_envelope_2d) # !!!
         
         # convert envelope
         self.convert_envelope() # !!!
@@ -1301,7 +1298,7 @@ class ClariusParser():
         plt.plot(self.trimmed_depth_array_1d_cm, signal_1d, color='blue', label='Signal')  
         plt.plot(self.trimmed_depth_array_1d_cm, envelope_1d, color='red', linestyle='dashed', label='Envelope')  
         plt.title(f'1D Signal Plot {title}')
-        plt.xlabel('Time (µs)')  
+        plt.xlabel('Depth (cm)')  
         plt.ylabel('Amplitude')
         plt.legend()  # Add legend
         plt.grid(True)
@@ -1342,10 +1339,11 @@ class ClariusParser():
     def normalize_envelope(self, envelope):
 
         max_value = np.amax(envelope)
-        clip_threshold = self.clarius_info_struct.clipFact * max_value
+        clip_max = self.clarius_info_struct.clipFact * max_value
 
-        # Clip the envelope within the dynamic range
-        envelope = np.clip(envelope, clip_threshold - self.clarius_info_struct.dynRange, clip_threshold)
+        # Clip the envelope: causing prolem, given minimum value is the way more higher than real minimum
+        # therefore destroying envelope
+        envelope = np.clip(envelope, clip_max - self.clarius_info_struct.dynRange, clip_max)
         
         # Shift to zero
         envelope -= np.amin(envelope)
