@@ -16,6 +16,7 @@ class DataOutputStruct():
         self.bMode: np.ndarray
         self.widthPixels: int
         self.depthPixels: int
+        self.coordMap3d: np.ndarray # maps sc (x,y,z) to preSC (x,y,z)
         
 class ScConfig:
     """Scan conversion configuration."""
@@ -57,3 +58,20 @@ class InfoStruct():
         self.startDepth1: float
         self.endDepth1: float
         self.endHeight: float
+        
+class ScParams():
+    def __init__(self):
+        self.NUM_PLANES: int
+        self.pixPerMm: float
+        self.VDB_2D_ECHO_APEX_TO_SKINLINE: float
+        self.VDB_2D_ECHO_START_WIDTH_GC: float
+        self.VDB_2D_ECHO_STOP_WIDTH_GC: float
+        self.VDB_THREED_START_ELEVATION_ACTUAL: float
+        self.VDB_THREED_STOP_ELEVATION_ACTUAL: float
+        self.VDB_2D_ECHO_STOP_DEPTH_SIP: float
+        self.VDB_2D_ECHO_START_DEPTH_SIP: float
+        self.VDB_2D_ECHO_SLACK_TIME_MM: float
+        self.VDB_THREED_RT_VOLUME_RATE: float
+
+        self.NumXmtCols: int
+        self.NumRcvCols: int
