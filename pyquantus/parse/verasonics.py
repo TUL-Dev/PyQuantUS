@@ -95,9 +95,9 @@ def verasonicsRfParser(scanPath: Path, phantomPath: Path, paramPath: Path) \
     """Parses Verasonics RF data and metadata.
     
     Args:
-        filePath (str): Path to the RF data.
-        phantomPath (str): Path to the phantom data.
-        OmniOn (int): Whether the Omni is on.
+        filePath (Path): Path to the RF data for the ultrasound scan (.mat)
+        phantomPath (Path): Path to the RF data for the reference phantom (.mat)
+        paramPath (Path): Path to file containing transducer-specific metadata (.mat)
     
     Returns:
         Tuple: RF data and metadata for image and phantom.
