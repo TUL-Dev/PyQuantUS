@@ -92,7 +92,7 @@ def readScan(scanPath: Path, paramPath: Path):
 
 def verasonicsRfParser(scanPath: Path, phantomPath: Path, paramPath: Path) \
     -> Tuple[DataOutputStruct, InfoStruct, DataOutputStruct, InfoStruct]:
-    """Parses Verasonics RF data and metadata take with two focal zones.
+    """Parses Verasonics RF data and metadata.
     
     Args:
         filePath (str): Path to the RF data.
