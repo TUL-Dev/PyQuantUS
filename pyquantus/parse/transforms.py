@@ -106,8 +106,7 @@ def scanConvert(inIm: np.ndarray, width: float, tilt: float, startDepth: float, 
     OutIm.xmap = inIm_indx
     return OutIm, hCm, wCm
 
-def scanConvert3Va(rxLines, lineAngles, planeAngles, beamDist, imgSize, fovSize, z0,
-                   startDepth, stopDepth, startAngleAz, endAngleAz, startAngleEl, endAngleEl):
+def scanConvert3Va(rxLines, lineAngles, planeAngles, beamDist, imgSize, fovSize, z0):
     pixSizeX = 1/(imgSize[0]-1)
     pixSizeY = 1/(imgSize[1]-1)
     pixSizeZ = 1/(imgSize[2]-1)
@@ -173,8 +172,7 @@ def scanConvert3dVolumeSeries(dbEnvDatFullVolSeries, scParams, isLin=True, scale
         for k in range(numVolumes):
             rxAngsAzVec = np.linspace(rxAngAz[0],rxAngAz[-1],dbEnvDatFullVolSeries[k].shape[1])
             rxAngsElVec = np.einsum('ikj->ijk', np.linspace(rxAngEl[0],rxAngEl[-1],dbEnvDatFullVolSeries[k].shape[2]))
-            curImgOut, curImgOutCoords = scanConvert3Va(dbEnvDatFullVolSeries, rxAngsAzVec, rxAngsElVec, imgDpth,imgSize,fovSize, apexDist,
-                                   scParams.VDB_2D_ECHO_START_DEPTH_SIP, DepthMm, azimSteerAngleStart, azimSteerAngleEnd, elevSteerAngleStart, elevSteerAngleEnd)
+            curImgOut, curImgOutCoords = scanConvert3Va(dbEnvDatFullVolSeries, rxAngsAzVec, rxAngsElVec, imgDpth,imgSize,fovSize, apexDist)
             if scale:
                 if not isLin:
                     imgOut.append((curImgOut-NonLinThr)*255/NonLinDiv)
@@ -192,8 +190,7 @@ def scanConvert3dVolumeSeries(dbEnvDatFullVolSeries, scParams, isLin=True, scale
     else:
         rxAngsAzVec = np.linspace(rxAngAz[0],rxAngAz[-1],dbEnvDatFullVolSeries.shape[1])
         rxAngsElVec = np.linspace(rxAngEl[0],rxAngEl[-1],dbEnvDatFullVolSeries.shape[2])
-        curImgOut, curImgOutCoords = scanConvert3Va(dbEnvDatFullVolSeries, rxAngsAzVec, rxAngsElVec, imgDpth,imgSize,fovSize, apexDist,
-                                   scParams.VDB_2D_ECHO_START_DEPTH_SIP, DepthMm, azimSteerAngleStart, azimSteerAngleEnd, elevSteerAngleStart, elevSteerAngleEnd)
+        curImgOut, curImgOutCoords = scanConvert3Va(dbEnvDatFullVolSeries, rxAngsAzVec, rxAngsElVec, imgDpth,imgSize,fovSize, apexDist)
         if scale:
             if not isLin:
                 imgOut = (curImgOut-NonLinThr)*255/NonLinDiv

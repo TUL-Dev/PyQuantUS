@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 from typing import Tuple
 
@@ -8,6 +9,16 @@ from scipy.ndimage import correlate
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct, ScParams
 from pyquantus.parse.transforms import scanConvert3dVolumeSeries
 from pyquantus.parse.philipsRf import Rfdata, parseRF
+
+class InfoStruct3d(InfoStruct):
+    def __init__(self):
+        super().__init__()
+        self.zResRF: float
+        self.coronalRes: float
+        self.axialLen: float
+        self.lateralLen: float
+        self.coronalLen: float
+        self.frameRate: float
 
 def QbpFilter(rfData: np.ndarray, Fc1: float, Fc2: float, FiltOrd: int) -> Tuple[np.ndarray, np.ndarray]:
     FiltCoef = firwin(FiltOrd+1, [Fc1*2, Fc2*2], window="hamming", pass_zero="bandpass") # type: ignore
@@ -127,7 +138,7 @@ def getVolume(rfPath: Path, sipNumOutBits: int = 8, DRlowerdB: int = 20, DRupper
     dBEnvData_vol, rfVol = bandpassFilterEnvLog(rfDataArr,scParams)
 
     #Scan Conversion of 3D volume time series (Only doing 1 volume here)
-    SC_Vol, SC_coord_map, bmodeDims = scanConvert3dVolumeSeries(dBEnvData_vol, scParams, scale=False)
+    SC_Vol, SC_coord_map, bmodePhysicalDims = scanConvert3dVolumeSeries(dBEnvData_vol, scParams, scale=False)
     # SC_rfVol, rfDims = scanConvert3dVolumeSeries(rfVol, scParams, normalize=False)
 
     #Parameters for basic visualization of volume
@@ -140,7 +151,7 @@ def getVolume(rfPath: Path, sipNumOutBits: int = 8, DRlowerdB: int = 20, DRupper
     SC_Vol = (SC_Vol - lowerLim)/(upperLim - lowerLim) * 255
     preSC_Vol = np.clip(dBEnvData_vol, lowerLim, upperLim)
     preSC_Vol = (preSC_Vol - lowerLim)/(upperLim - lowerLim) * 255
-    bmodeDims = [bmodeDims[2], bmodeDims[0], bmodeDims[1]]
+    bmodePhysicalDims = [bmodePhysicalDims[2], bmodePhysicalDims[0], bmodePhysicalDims[1]]
     # rfDims = [rfDims[2], rfDims[0], rfDims[1]]
 
     Data = DataOutputStruct()
@@ -151,16 +162,37 @@ def getVolume(rfPath: Path, sipNumOutBits: int = 8, DRlowerdB: int = 20, DRupper
     Data.depthPixels = SC_Vol.shape[1]
     Data.coordMap3d = SC_coord_map
 
-    Info = InfoStruct()
+    Info = InfoStruct3d()
     Info.minFrequency = 1000000
     Info.maxFrequency = 6000000
-    Info.lowBandFreq = 5000000
-    Info.upBandFreq = 13000000
-    Info.centerFrequency = 9000000 #Hz
+    Info.lowBandFreq = 1000000
+    Info.upBandFreq = 6000000
+    Info.centerFrequency = 3000000 #Hz
     Info.samplingFrequency = 50000000 # TODO: currently a guess
-    Info.width = bmodeDims[2]
-    Info.depth = bmodeDims[1]
-    Info.lateralRes = Info.width/SC_Vol.shape[2] # mm/pix
-    Info.axialRes = Info.depth/SC_Vol.shape[1] # mm/pix
-
+    Info.axialLen = bmodePhysicalDims[2]
+    Info.lateralLen = bmodePhysicalDims[1]
+    Info.coronalLen = bmodePhysicalDims[0]
+    Info.zResRF = bmodePhysicalDims[0] / dBEnvData_vol.shape[0] # mm/pixel
+    Info.yResRF = bmodePhysicalDims[1] / dBEnvData_vol.shape[1] # mm/pixel
+    Info.xResRF = bmodePhysicalDims[2] / dBEnvData_vol.shape[2] # mm/pixel
+    Info.coronalRes = bmodePhysicalDims[0] / SC_Vol.shape[0] # mm/pixel
+    Info.lateralRes = bmodePhysicalDims[1] / SC_Vol.shape[1] # mm/pixel
+    Info.axialRes = bmodePhysicalDims[2] / SC_Vol.shape[2] # mm/pixel
+    
     return Data, Info
+
+def philipsRfParser3d(scanPath: Path, phantomPath: Path) \
+    -> Tuple[DataOutputStruct, InfoStruct3d, DataOutputStruct, InfoStruct3d]:
+    """Parses Philips 3D RF data and metadata.
+    
+    Args:
+        filePath (str): Path to the RF data.
+        phantomPath (str): Path to the phantom data.
+        OmniOn (int): Whether the Omni is on.
+    
+    Returns:
+        Tuple: RF data and metadata for image and phantom.
+    """
+    imgData, imgInfo = getVolume(scanPath)
+    phantomData, phantomInfo = getVolume(phantomPath)
+    return imgData, imgInfo, phantomData, phantomInfo
