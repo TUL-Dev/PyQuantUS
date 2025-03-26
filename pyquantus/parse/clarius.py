@@ -783,7 +783,7 @@ def read_tgc_file_v2(tgc_path, rf_timestamps):
     frames_data = [frame if "{" in frame else frame + "  - { 0.00mm, 15.00dB }\n  - { 120.00mm, 35.00dB }" for frame in frames_data]
     frames_dict = {timestamp: frame for frame in frames_data for timestamp in rf_timestamps if str(timestamp) in frame}
     missing_timestamps = [ts for ts in rf_timestamps if ts not in frames_dict]
-    if len(missing_timestamps) >= 2:
+    if len(missing_timestamps) >= 2 or len(missing_timestamps) == len(rf_timestamps):
         print("The number of missing timestamps for " + tgc_path + " is: " + str(len(missing_timestamps)) + ". Skipping this scan with current criteria.")
         return None
     elif len(missing_timestamps) == 1:
