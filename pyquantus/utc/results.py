@@ -26,9 +26,15 @@ class UtcData:
         mbfIm (np.ndarray): Midband fit parametric map
         ssIm (np.ndarray): Spectral slope parametric map
         siIm (np.ndarray): Spectral intercept parametric map
+        attCoef (np.ndarray): Attenuation coefficient parametric map
+        bscIm (np.ndarray): Backscatter coefficient parametric map
+        uNakagamiIm (np.ndarray): Nakagami shape parameter parametric map
         scMbfIm (np.ndarray): Scan converted midband fit parametric map
         scSsIm (np.ndarray): Scan converted spectral slope parametric map
         scSiIm (np.ndarray): Scan converted spectral intercept parametric map
+        scAttCoefIm (np.ndarray): Scan converted attenuation coefficient parametric map
+        scBscIm (np.ndarray): Scan converted backscatter coefficient parametric map
+        scUNakagamiIm (np.ndarray): Scan converted Nakagami shape parameter parametric map
         minMbf (float): Minimum midband fit value in ROI
         maxMbf (float): Maximum midband fit value in ROI
         mbfArr (List[float]): Midband fit values for each window in ROI
@@ -42,6 +48,9 @@ class UtcData:
         mbfCmap (list): Midband fit colormap used for parametric maps
         ssCmap (list): Spectral slope colormap used for parametric maps
         siCmap (list): Spectral intercept colormap used for parametric maps        
+        attCoefCmap (list): Attenuation coefficient colormap used for parametric maps
+        bscCmap (list): Backscatter coefficient colormap used for parametric maps
+        uNakagamiCmap (list): Nakagami shape parameter colormap used for parametric maps
     """
     def __init__(self):
         self.utcAnalysis: UtcAnalysis
@@ -54,10 +63,16 @@ class UtcData:
         self.mbfIm: np.ndarray
         self.ssIm: np.ndarray
         self.siIm: np.ndarray
+        self.attCoefIm: np.ndarray
+        self.bscIm: np.ndarray
+        self.uNakagamiIm: np.ndarray
         self.windowIdxMap: np.ndarray
         self.scMbfIm: np.ndarray
         self.scSsIm: np.ndarray
         self.scSiIm: np.ndarray
+        self.scAttCoefIm: np.ndarray
+        self.scBscIm: np.ndarray
+        self.scUNakagamiIm: np.ndarray
         self.scWindowIdxMap: np.ndarray
 
         self.minMbf: float; self.maxMbf: float; self.mbfArr: List[float]
@@ -68,6 +83,11 @@ class UtcData:
         self.mbfCmap: list = plt.get_cmap("viridis").colors #type: ignore
         self.ssCmap: list = plt.get_cmap("magma").colors #type: ignore
         self.siCmap: list = plt.get_cmap("plasma").colors #type: ignore
+        self.attCoefCmap: list = plt.get_cmap("inferno").colors #type: ignore
+        self.bscCmap: list = plt.get_cmap("cividis").colors #type: ignore
+        
+        summerCmap = plt.get_cmap("summer")
+        self.uNakagamiCmap: list = [summerCmap(i)[:3] for i in range(summerCmap.N)]
 
     def convertImagesToRGB(self):
         """Converts grayscale images to RGB for colormap application.
@@ -95,11 +115,18 @@ class UtcData:
         self.minSs = min(self.ssArr); self.maxSs = max(self.ssArr)
         self.siArr = [window.results.si for window in self.utcAnalysis.roiWindows]
         self.minSi = min(self.siArr); self.maxSi = max(self.siArr)
+        self.attCoefArr = [window.results.attCoef for window in self.utcAnalysis.roiWindows]
+        self.minAttCoef = min(self.attCoefArr); self.maxAttCoef = max(self.attCoefArr)
+        self.bscArr = [window.results.bsc for window in self.utcAnalysis.roiWindows]
+        self.minBsc = min(self.bscArr); self.maxBsc = max(self.bscArr)
+        self.uNakagamiArr = [window.results.uNakagami for window in self.utcAnalysis.roiWindows]
+        self.minUNakagami = min(self.uNakagamiArr); self.maxUNakagami = max(self.uNakagamiArr)
 
         if not len(self.utcAnalysis.ultrasoundImage.bmode.shape) == 3:
             self.convertImagesToRGB()
         self.mbfIm = self.utcAnalysis.ultrasoundImage.bmode.copy()
         self.ssIm = self.mbfIm.copy(); self.siIm = self.ssIm.copy()
+        self.attCoefIm = self.ssIm.copy(); self.bscIm = self.ssIm.copy(); self.uNakagamiIm = self.ssIm.copy()
         self.windowIdxMap = np.zeros((self.mbfIm.shape[0], self.mbfIm.shape[1])).astype(int)
 
         for i, window in enumerate(self.utcAnalysis.roiWindows):
@@ -109,6 +136,9 @@ class UtcData:
             self.mbfIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.mbfCmap[mbfColorIdx])*255
             self.ssIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.ssCmap[ssColorIdx])*255
             self.siIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.siCmap[siColorIdx])*255
+            self.attCoefIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.attCoefCmap[mbfColorIdx])*255
+            self.bscIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.bscCmap[mbfColorIdx])*255
+            self.uNakagamiIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.uNakagamiCmap[mbfColorIdx])*255
             self.windowIdxMap[window.top: window.bottom+1, window.left: window.right+1] = i+1
 
     def scanConvertRGB(self, image: np.ndarray) -> np.ndarray:
@@ -137,6 +167,9 @@ class UtcData:
         self.scMbfIm = self.scanConvertRGB(self.mbfIm)
         self.scSsIm = self.scanConvertRGB(self.ssIm)
         self.scSiIm = self.scanConvertRGB(self.siIm)
+        self.scAttCoefIm = self.scanConvertRGB(self.attCoefIm)
+        self.scBscIm = self.scanConvertRGB(self.bscIm)
+        self.scUNakagamiIm = self.scanConvertRGB(self.uNakagamiIm)
 
         scStruct, _, _ = scanConvert(self.windowIdxMap, self.scConfig.width, self.scConfig.tilt,
                                         self.scConfig.startDepth, self.scConfig.endDepth, desiredHeight=self.scBmode.shape[0])
@@ -368,6 +401,27 @@ class UtcData:
         if hasattr(self, "scConfig"):
             return self.scSiIm
         return self.siIm
+    
+    @property
+    def finalAttCoefIm(self):
+        """Getter for final attenuation coefficient parametric map regagrdless of scan conversion."""
+        if hasattr(self, "scConfig"):
+            return self.scAttCoefIm
+        return self.attCoefIm
+    
+    @property
+    def finalBscIm(self):
+        """Getter for final backscatter coefficient parametric map regardless of scan conversion."""
+        if hasattr(self, "scConfig"):
+            return self.scBscIm
+        return self.bscIm
+    
+    @property
+    def finalUNakagamiIm(self):
+        """Getter for final Nakagami shape parameter parametric map regardless of scan conversion."""
+        if hasattr(self, "scConfig"):
+            return self.scUNakagamiIm
+        return self.uNakagamiIm
     
     @property
     def finalWindowIdxMap(self):
