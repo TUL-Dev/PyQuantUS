@@ -188,7 +188,6 @@ def philipsRfParser3d(scanPath: Path, phantomPath: Path) \
     Args:
         filePath (str): Path to the RF data.
         phantomPath (str): Path to the phantom data.
-        OmniOn (int): Whether the Omni is on.
     
     Returns:
         Tuple: RF data and metadata for image and phantom.
