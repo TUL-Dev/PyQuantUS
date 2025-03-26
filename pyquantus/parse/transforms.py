@@ -131,7 +131,7 @@ def scanConvert3Va(rxLines, lineAngles, planeAngles, beamDist, imgSize, fovSize,
     radPlaneAngles = np.pi*planeAngles/180
     
     img = interpn((beamDist, radLineAngles, radPlaneAngles), 
-                                    rxLines, (R, TH, PHI), method='nearest', bounds_error=False, fill_value=0)
+                                    rxLines, (R, TH, PHI), method='linear', bounds_error=False, fill_value=0)
     
     imgCoords = interpn((beamDist, radLineAngles, radPlaneAngles), 
                                     coords, (R, TH, PHI), method='nearest', bounds_error=False, fill_value=-1)
