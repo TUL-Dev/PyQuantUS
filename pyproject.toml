@@ -41,8 +41,8 @@ dependencies = [
     "mat73>=0.60",
     "matplotlib>=3.6.2",
     "matplotlib-inline>=0.1.3",
-    "networkx>=3.1",
     "numpy>=1.23.0",
+    "networkx>=3.1",
     "opencv-python-headless>=4.8.0.76",
     "openpyxl>=3.0.10",
     "packaging>=23.1",
@@ -73,6 +73,25 @@ dependencies = [
 
 [project.urls]
 "Source" = "https://github.com/TUL-Dev/PyQuantUS"
+
+[project.scripts]
+pyquantus-parse = "pyquantus.cli.pyquantus_parse:main"
+
+[project.entry-points."pyquantus_parse.parsers"]
+canon_iq = "pyquantus.cli.parse.parsers:parseCanonIq"
+siemens_rf = "pyquantus.cli.parse.parsers:parseSiemensRf"
+terason_rf = "pyquantus.cli.parse.parsers:parseTerasonRf"
+clarius_rf = "pyquantus.cli.parse.parsers:parseClariusRf"
+
+[project.entry-points."pyquantus_parse.roi_loaders"]
+pkl_roi = "pyquantus.cli.parse.load_roi:load_pkl_roi"
+pkl_roi_assert_scan = "pyquantus.cli.parse.load_roi:load_roi_assert_scan"
+pkl_roi_assert_scan_phantom = "pyquantus.cli.parse.load_roi:load_roi_assert_scan_phantom"
+
+[project.entry-points."pyquantus_parse.analysis_config_loaders"]
+pkl_config = "pyquantus.cli.parse.load_configs:load_pkl_analysis"
+pkl_config_assert_phantom = "pyquantus.cli.parse.load_configs:load_analysis_assert_phantom"
+pkl_config_assert_scan_phantom = "pyquantus.cli.parse.load_configs:load_analysis_assert_scan_phantom"
 
 [tool.setuptools]
 ext-modules = [
