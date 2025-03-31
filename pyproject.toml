@@ -75,13 +75,14 @@ dependencies = [
 "Source" = "https://github.com/TUL-Dev/PyQuantUS"
 
 [project.scripts]
-pyquantus-parse = "pyquantus.cli.pyquantus_parse:main"
+quantus = "pyquantus.cli.quantus:main_cli"
+quantus_yaml = "pyquantus.cli.quantus:main_yaml"
 
 [project.entry-points."pyquantus_parse.parsers"]
-canon_iq = "pyquantus.cli.parse.parsers:parseCanonIq"
-siemens_rf = "pyquantus.cli.parse.parsers:parseSiemensRf"
-terason_rf = "pyquantus.cli.parse.parsers:parseTerasonRf"
-clarius_rf = "pyquantus.cli.parse.parsers:parseClariusRf"
+canon_iq = "pyquantus.cli.parse.parsers:parse_canon_iq"
+siemens_rf = "pyquantus.cli.parse.parsers:parse_siemens_rf"
+terason_rf = "pyquantus.cli.parse.parsers:parse_terason_rf"
+clarius_rf = "pyquantus.cli.parse.parsers:parse_clarius_rf"
 
 [project.entry-points."pyquantus_parse.roi_loaders"]
 pkl_roi = "pyquantus.cli.parse.load_roi:load_pkl_roi"
@@ -89,9 +90,29 @@ pkl_roi_assert_scan = "pyquantus.cli.parse.load_roi:load_roi_assert_scan"
 pkl_roi_assert_scan_phantom = "pyquantus.cli.parse.load_roi:load_roi_assert_scan_phantom"
 
 [project.entry-points."pyquantus_parse.analysis_config_loaders"]
-pkl_config = "pyquantus.cli.parse.load_configs:load_pkl_analysis"
-pkl_config_assert_phantom = "pyquantus.cli.parse.load_configs:load_analysis_assert_phantom"
-pkl_config_assert_scan_phantom = "pyquantus.cli.parse.load_configs:load_analysis_assert_scan_phantom"
+pkl_config = "pyquantus.cli.parse.load_config:load_pkl_analysis"
+pkl_config_assert_phantom = "pyquantus.cli.parse.load_config:load_analysis_assert_phantom"
+pkl_config_assert_scan_phantom = "pyquantus.cli.parse.load_config:load_analysis_assert_scan_phantom"
+
+[project.entry-points."pyquantus_utc.analysis_classes"]
+base = "pyquantus.cli.utc.base:BaseAnalysis"
+abn = "pyquantus.cli.utc.attBscNak:AbnAnalysis"
+
+[project.entry-points."pyquantus_utc.analysis_kwarg_types"]
+base = "pyquantus.cli.utc.base:analysisKwargs"
+abn = "pyquantus.cli.utc.attBscNak:analysisKwargs"
+
+[project.entry-points."pyquantus_visualizations.visualization_classes"]
+base = "pyquantus.cli.visualizations.base:BaseVisualizations"
+paramaps = "pyquantus.cli.visualizations.paramaps:ParamapVisualizations"
+
+[project.entry-points."pyquantus_visualizations.visualization_computation_kwarg_types"]
+base = "pyquantus.cli.visualizations.base:computationKwargs"
+paramaps = "pyquantus.cli.visualizations.paramaps:computationKwargs"
+
+[project.entry-points."pyquantus_visualizations.visualization_export_kwarg_types"]
+base = "pyquantus.cli.visualizations.base:exportKwargs"
+paramaps = "pyquantus.cli.visualizations.paramaps:exportKwargs"
 
 [tool.setuptools]
 ext-modules = [

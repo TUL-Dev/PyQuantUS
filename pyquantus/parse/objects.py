@@ -1,11 +1,13 @@
+from dataclasses import dataclass
+
 import numpy as np
 
+@dataclass
 class OutImStruct():
     """Output image structure for scan converted images."""
-    def __init__(self):
-        self.scArr: np.ndarray
-        self.xmap: np.ndarray # sc (y,x) --> preSC x
-        self.ymap: np.ndarray # sc (y,x) --> preSC y
+    scArr: np.ndarray
+    xmap: np.ndarray # sc (y,x) --> preSC x
+    ymap: np.ndarray # sc (y,x) --> preSC y
         
 class DataOutputStruct():
     """Data output structure for general RF/IQ data."""
@@ -17,19 +19,18 @@ class DataOutputStruct():
         self.widthPixels: int
         self.depthPixels: int
         
+@dataclass
 class ScConfig:
     """Scan conversion configuration."""
-    def __init__(self):
-        self.width: int # deg
-        self.tilt: int
-        self.startDepth: float # mm
-        self.endDepth: float # mm
-        self.numSamplesDrOut: int
+    width: int # deg
+    tilt: int
+    startDepth: float # mm
+    endDepth: float # mm
+    numSamplesDrOut: int
         
 class InfoStruct():
     """Metadata structure for RF/IQ data."""
     def __init__(self):
-        self.minFrequency: int # transducer freq (Hz)
         self.maxFrequency: int # transducer freq (Hz)
         self.lowBandFreq: int # analysis freq (Hz)
         self.upBandFreq: int # analysis freq (Hz)

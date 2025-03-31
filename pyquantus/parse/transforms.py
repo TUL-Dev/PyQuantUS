@@ -98,8 +98,5 @@ def scanConvert(inIm: np.ndarray, width: float, tilt: float, startDepth: float, 
     hCm = heightCm
     wCm = widthCm
     
-    OutIm = OutImStruct()
-    OutIm.scArr = outIm
-    OutIm.ymap = inIm_indy
-    OutIm.xmap = inIm_indx
+    OutIm = OutImStruct(outIm, inIm_indx, inIm_indy)
     return OutIm, hCm, wCm

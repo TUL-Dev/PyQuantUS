@@ -1,24 +1,65 @@
 from pathlib import Path
 from typing import Tuple
 
-from pyquantus.parse.canon import canonIqParser
+from pyquantus.utc import UltrasoundImage
+from pyquantus.parse.objects import ScConfig
 from pyquantus.parse.clarius import ClariusTarUnpacker, clariusRfParser
-from pyquantus.parse.philipsMat import philips2dRfMatParser
-from pyquantus.parse.philipsRf import philipsRfParser
+from pyquantus.parse.canon import canonIqParser
 from pyquantus.parse.siemens import siemensRfParser
 from pyquantus.parse.terason import terasonRfParser
-from pyquantus.parse.verasonics import verasonicsRfParser
 
-def parseCanonIq(scan_path: str, phantom_path: str) -> None:
-    return canonIqParser(scan_path, phantom_path)
+def parse_canon_iq(scan_path: str, phantom_path: str, frame: int) -> UltrasoundImage:
+    # Load signal data
+    imgData, imgInfo, refData, refInfo = canonIqParser(scan_path, phantom_path)
+    
+    # Package data
+    ultrasoundImage = UltrasoundImage()
+    ultrasoundImage.axialResRf = imgInfo.depth / imgData.rf.shape[0]
+    ultrasoundImage.lateralResRf = ultrasoundImage.axialResRf * (
+        imgData.rf.shape[0]/imgData.rf.shape[1]
+    ) # placeholder
+    ultrasoundImage.bmode = imgData.bMode
+    ultrasoundImage.phantomRf = refData.rf
+    ultrasoundImage.rf = imgData.rf
+    ultrasoundImage.scBmode = imgData.scBmode
+    ultrasoundImage.xmap = imgData.scBmodeStruct.xmap
+    ultrasoundImage.ymap = imgData.scBmodeStruct.ymap
+    scConfig = ScConfig(imgInfo.width1, imgInfo.tilt1, imgInfo.startDepth1, imgInfo.endDepth1, imgInfo.numSamplesDrOut)
+    ultrasoundImage.scConfig = scConfig
+    
+    return ultrasoundImage
+    
 
-def parseSiemensRf(scan_path: str, phantom_path: str) -> None:
-    return siemensRfParser(scan_path, phantom_path)
+def parse_siemens_rf(scan_path: str, phantom_path: str, frame: int) -> UltrasoundImage:
+    # Load signal data
+    imgData, imgInfo, refData, refInfo = siemensRfParser(scan_path, phantom_path)
+    
+    # Package data
+    ultrasoundImage = UltrasoundImage()
+    ultrasoundImage.axialResRf = imgInfo.depth / imgData.rf[frame].shape[0]
+    ultrasoundImage.lateralResRf = ultrasoundImage.axialResRf * (
+        imgData.rf[frame].shape[0]/imgData.rf[frame].shape[1]
+    ) # placeholder
+    ultrasoundImage.bmode = imgData.bMode[frame]
+    ultrasoundImage.phantomRf = refData.rf[0]
+    ultrasoundImage.rf = imgData.rf[frame]
+    
+    return ultrasoundImage
 
-def parseTerasonRf(scan_path: str, phantom_path: str) -> None:
-    return terasonRfParser(scan_path, phantom_path)
+def parse_terason_rf(scan_path: str, phantom_path: str, frame: int) -> UltrasoundImage:
+    imgData, imgInfo, refData, refInfo = terasonRfParser(scan_path, phantom_path)
+    
+    # Package data
+    ultrasoundImage = UltrasoundImage()
+    ultrasoundImage.axialResRf = imgInfo.axialRes
+    ultrasoundImage.lateralResRf = imgInfo.lateralRes
+    ultrasoundImage.bmode = imgData.bMode
+    ultrasoundImage.phantomRf = refData.rf
+    ultrasoundImage.rf = imgData.rf
+    
+    return ultrasoundImage
 
-def parseClariusRf(imgFilename: str, phantomFilename: str):
+def parse_clarius_rf(imgFilename: str, phantomFilename: str, frame: int) -> UltrasoundImage:
     """Parse Clarius RF data and metadata from inputted files. Assumes consistent naming
     conventions across RAW, TGC, and YML files.
 
@@ -68,4 +109,27 @@ def parseClariusRf(imgFilename: str, phantomFilename: str):
     if not len(phantomTgcPath) or not Path(phantomTgcPath).exists():
         phantomTgcPath = None
         
-    return clariusRfParser(imageRfPath, imageTgcPath, imageInfoPath, phantomRfPath, phantomTgcPath, phantomInfoPath)
+    imgData, imgInfo, refData, refInfo, sc = clariusRfParser(imageRfPath, imageTgcPath, imageInfoPath, phantomRfPath, phantomTgcPath, phantomInfoPath)
+    
+    # Package data
+    ultrasoundImage = UltrasoundImage()
+    ultrasoundImage.axialResRf = imgInfo.depth / imgData.rf[frame].shape[0]
+    ultrasoundImage.lateralResRf = ultrasoundImage.axialResRf * (
+        imgData.rf[frame].shape[0]/imgData.rf[frame].shape[1]
+    ) # placeholder
+    ultrasoundImage.bmode = imgData.bMode[frame]
+    ultrasoundImage.scBmode = imgData.scBmode[frame]
+    ultrasoundImage.phantomRf = refData.rf[0]
+    ultrasoundImage.rf = imgData.rf[frame]
+    ultrasoundImage.xmap = imgData.scBmodeStruct.xmap
+    ultrasoundImage.ymap = imgData.scBmodeStruct.ymap
+    
+    if sc:
+        scConfig = ScConfig()
+        scConfig.width = imgInfo.width1
+        scConfig.tilt = imgInfo.tilt1
+        scConfig.startDepth = imgInfo.startDepth1
+        scConfig.endDepth = imgInfo.endDepth1
+        ultrasoundImage.scConfig = scConfig
+    
+    return ultrasoundImage

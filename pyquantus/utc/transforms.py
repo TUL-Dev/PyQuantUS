@@ -111,3 +111,19 @@ def expandArr(image: np.ndarray) -> np.ndarray:
             fullArr[i,j] = int32torgb(image[i,j])
 
     return fullArr.astype('uint8')
+
+def checkKwargs(kwargTypes: dict, kwargs: dict):
+    """Check if kwargs are consistent with kwargTypes.
+    
+    Args:
+        kwargTypes (dict)s: Dictionary of kwargs and their types.
+    """
+    for key, value in kwargTypes.items():
+        if key not in kwargs:
+            print(kwargs)
+            print(f"Missing required kwarg: {key}")
+            return False
+        if not isinstance(kwargs[key], value):
+            print(f"Invalid type for kwarg {key}. Expected {value}, got {type(kwargs[key])}")
+            return False
+    return True

@@ -5,7 +5,7 @@ import numpy as np
 from typing import Tuple
 
 # DEFAULT
-def load_pkl_roi(roi_path: str, scan_path: str, phantom_path: str) -> Tuple[np.ndarray, np.ndarray]:
+def load_pkl_roi(roi_path: str, scan_path: str, phantom_path: str) -> Tuple[np.ndarray, np.ndarray, int]:
     """Load ROI data from a pickle file saved from the QuantUS UI
     
     Args:
@@ -14,12 +14,12 @@ def load_pkl_roi(roi_path: str, scan_path: str, phantom_path: str) -> Tuple[np.n
         phantom_path (str): Path to the phantom file
         
     Returns:
-        Tuple[np.ndarray, np.ndarray]: Tuple of the X and Y coordinates of the 
-        ROI in the coordinates of the B-mode image.
+        Tuple[np.ndarray, np.ndarray, int]: Tuple of the X and Y coordinates of the 
+        ROI in the coordinates of the B-mode image as well as the frame number of the ROI.
     """
     with open(roi_path, 'rb') as f:
         roi_info: dict = pickle.load(f)
-    return np.array(roi_info["Spline X"]), np.array(roi_info["Spline Y"])
+    return np.array(roi_info["Spline X"]), np.array(roi_info["Spline Y"]), roi_info["Frame"]
 
 def load_roi_assert_scan(roi_path: str, scan_path: str, phantom_path: str) -> Tuple[np.ndarray, np.ndarray]:
     """Load ROI data from a pickle file saved from the QuantUS UI 
@@ -31,13 +31,13 @@ def load_roi_assert_scan(roi_path: str, scan_path: str, phantom_path: str) -> Tu
         phantom_path (str): Path to the phantom file
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: Tuple of the X and Y coordinates of the
-        ROI in the coordinates of the B-mode image.
+        Tuple[np.ndarray, np.ndarray, int]: Tuple of the X and Y coordinates of the 
+        ROI in the coordinates of the B-mode image as well as the frame number of the ROI.
     """
     with open(roi_path, 'rb') as f:
         roi_info: dict = pickle.load(f)
     assert roi_info["Image Name"] == Path(scan_path).name, 'Scan file name mismatch'
-    return np.array(roi_info["Spline X"]), np.array(roi_info["Spline Y"])
+    return np.array(roi_info["Spline X"]), np.array(roi_info["Spline Y"]), roi_info["Frame"]
 
 def load_roi_assert_scan_phantom(roi_path: str, scan_path: str, phantom_path: str) -> Tuple[np.ndarray, np.ndarray]:
     """Load ROI data from a pickle file saved from the QuantUS UI 
@@ -49,12 +49,12 @@ def load_roi_assert_scan_phantom(roi_path: str, scan_path: str, phantom_path: st
         phantom_path (str): Path to the phantom file
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: Tuple of the X and Y coordinates of the
-        ROI in the coordinates of the B-mode image.
+        Tuple[np.ndarray, np.ndarray, int]: Tuple of the X and Y coordinates of the 
+        ROI in the coordinates of the B-mode image as well as the frame number of the ROI.
     """
     with open(roi_path, 'rb') as f:
         roi_info: dict = pickle.load(f)
     assert roi_info["Image Name"] == Path(scan_path).name, 'Scan file name mismatch'
     assert roi_info["Phantom Name"] == Path(phantom_path).name, 'Phantom file name mismatch'
     
-    return np.array(roi_info["Spline X"]), np.array(roi_info["Spline Y"])
+    return np.array(roi_info["Spline X"]), np.array(roi_info["Spline Y"]), roi_info["Frame"]
