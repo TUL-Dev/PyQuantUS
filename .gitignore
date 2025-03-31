@@ -6,3 +6,4 @@ dist/
 fixed_wheels/
 .vscode/
 .DS_Store
+*.so
