@@ -31,6 +31,7 @@ class ParamapVisualizations(UtcVisualizations):
         assert checkKwargs(kwargTypes, kwargs), "Kwargs are inconsistent with kwargTypes"
         
         self.drawParamaps()             # compute all paramatric maps
+        self.formatParamaps()           # adds colorbars to parametric maps
         self.psPlot = self.plotPsData() # compute power spectrum plot
 
     def exportVisualizations(self, kwargTypes: dict, **kwargs):
@@ -46,9 +47,5 @@ class ParamapVisualizations(UtcVisualizations):
         # Save the parametric maps
         paramapFolderPath = Path(kwargs['paramapFolderPath'])
         paramapFolderPath.mkdir(parents=True, exist_ok=True)
-        if hasattr(self.utcAnalysis.ultrasoundImage, 'scBmode'):
-            for paramIx, param in enumerate(self.params):
-                plt.imsave(paramapFolderPath / f'{param}.png', self.scParamaps[paramIx])
-        else:
-            for paramIx, param in enumerate(self.params):
-                plt.imsave(paramapFolderPath / f'{param}.png', self.paramaps[paramIx])
+        for paramIx, param in enumerate(self.params):
+            self.legendParamaps[paramIx].savefig(paramapFolderPath / f'{param}.png')
