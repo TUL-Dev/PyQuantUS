@@ -271,7 +271,7 @@ class UtcAnalysis:
             refPs (np.ndarray): Power spectrum of the reference phantom at the currentn region.
             attCoef (float): Attenuation coefficient of the current region (dB/cm/MHz).
             frequency (int): Frequency on which to compute backscatter coefficient (should 
-                    match frequency of self.refBackScatterCoefficient) (MHz).
+                    match frequency of self.refBackScatterCoefficient) (Hz).
             roiDepth (int): Depth of the start of the ROI in samples.
             
         Returns:
