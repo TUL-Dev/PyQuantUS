@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tarfile
 from typing import Tuple
+from pathlib import Path
 
 # Third-Party Library Imports
 import numpy as np
@@ -230,7 +231,6 @@ class ClariusTarUnpacker():
     
     def __run_single_sample_extraction(self):
         """Runs the extraction process for a single directory."""
-        self.delete_extracted_folders()
         self.extract_tar_files()
         self.set_path_of_extracted_folders()
         self.set_path_of_lzo_files_inside_extracted_folders()
@@ -268,23 +268,6 @@ class ClariusTarUnpacker():
         self.__run_single_sample_extraction()
             
     ###################################################################################
-           
-    def delete_extracted_folders(self):
-        """Deletes all extracted folders in the specified directory."""
-        extracted_folders = [
-            os.path.join(self.path, item)
-            for item in os.listdir(self.path)
-            if os.path.isdir(os.path.join(self.path, item)) and "extracted" in item
-        ]
-
-        for folder in extracted_folders:
-            try:
-                shutil.rmtree(folder)
-                logging.info(f"Deleted folder: {folder}")
-            except OSError as e:
-                logging.error(f"Error deleting folder {folder}: {e}")
-                    
-    ###################################################################################
         
     def extract_tar_files(self):
         """
@@ -307,7 +290,7 @@ class ClariusTarUnpacker():
                 
                 # Check if the item is a tar archive
                 if os.path.isfile(item_path) and item_name.endswith('.tar') and tarfile.is_tarfile(item_path):
-                    file_name = os.path.splitext(item_name)[0]
+                    file_name = Path(item_name).stem
                     extracted_folder = os.path.join(self.path, f"{file_name}_extracted")
                     os.makedirs(extracted_folder, exist_ok=True)
 
@@ -321,7 +304,7 @@ class ClariusTarUnpacker():
         elif self.single_tar_extraction:
             # Handle single tar extraction
             if os.path.isfile(self.tar_path) and self.tar_path.endswith('.tar') and tarfile.is_tarfile(self.tar_path):
-                file_name = os.path.splitext(os.path.basename(self.tar_path))[0]
+                file_name = Path(self.tar_path).stem
                 extracted_folder = os.path.join(os.path.dirname(self.tar_path), f"{file_name}_extracted")
                 os.makedirs(extracted_folder, exist_ok=True)
 
