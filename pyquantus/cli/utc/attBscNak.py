@@ -44,7 +44,7 @@ class AbnAnalysis(UtcAnalysis):
         # Computes MBF, SS, SI and also stores NPS, PS, rPS, and f in window.results
         self.computeBaseParamapVals(scanRfWindow, phantomRfWindow, window)
             
-        attCoef = self.computeAttenuationCoef(scanRfWindow, phantomRfWindow, windowDepth=min(100, scanRfWindow.shape[0]//5))
+        attCoef = self.computeAttenuationCoef(scanRfWindow, phantomRfWindow, windowDepth=min(100, scanRfWindow.shape[0]//3))
         bsc = self.computeBackscatterCoefficient(window.results.f, window.results.ps, window.results.rPs, 
                                                     attCoef, self.config.centerFrequency, roiDepth=scanRfWindow.shape[0])
         _, uNakagami = self.computeNakagamiParams(scanRfWindow)
@@ -140,7 +140,7 @@ class AbnAnalysis(UtcAnalysis):
             refPs (np.ndarray): Power spectrum of the reference phantom at the currentn region.
             attCoef (float): Attenuation coefficient of the current region (dB/cm/MHz).
             frequency (int): Frequency on which to compute backscatter coefficient (should 
-                    match frequency of self.refBackScatterCoefficient) (MHz).
+                    match frequency of self.refBackScatterCoefficient) (Hz).
             roiDepth (int): Depth of the start of the ROI in samples.
             
         Returns:
@@ -156,7 +156,8 @@ class AbnAnalysis(UtcAnalysis):
         convertedAttCoef = attCoef * npConversionFactor  # dB/cm/MHz -> Np/cm/MHz
         convertedRefAttCoef = self.refAttenuation * npConversionFactor # dB/cm/MHz -> Np/cm/MHz
         windowDepthCm = roiDepth*self.ultrasoundImage.axialResRf/10 # cm
-        
+        convertedAttCoef *= frequency/1e6 # Np/cm
+        convertedRefAttCoef *= frequency/1e6 # Np/cm        
         attComp=np.exp(4*windowDepthCm *(convertedAttCoef-convertedRefAttCoef)) 
         bsc = sRatio*self.refBackScatterCoef*attComp
             
