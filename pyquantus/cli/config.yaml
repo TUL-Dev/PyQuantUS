@@ -3,7 +3,6 @@ scan_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Canon 
 phantom_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Canon IQ/Phantom data/Preset_2/phantom2.bin
 roi_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Canon IQ/Sample Patient 001/Preset_2/roi.pkl
 analysis_config_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Canon IQ/Sample Patient 001/Preset_2/analysisConfig.pkl
-frame: 0
 
 # Data Loading Customization
 parser: canon_iq

@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Any, List
 
 import numpy as np
@@ -18,19 +17,19 @@ class Window:
         self.bottom = 0
         self.results = ResultsClass()
 
-@dataclass
 class AnalysisConfig:
     """Class to store configuration data for UTC analysis.
     """
-    transducerFreqBand: List[int]  # [min, max] (Hz)
-    analysisFreqBand: List[int]  # [lower, upper] (Hz)
-    samplingFrequency: int  # Hz
-    axWinSize: float  # axial length per window (mm)
-    latWinSize: float  # lateral width per window (mm)
-    windowThresh: float  # % of window area required to be in ROI
-    axialOverlap: float  # % of ax window length to move before next window
-    lateralOverlap: float  # % of lat window length to move before next window
-    centerFrequency: float  # Hz
+    def __init__(self):
+        self.transducerFreqBand: List[int]  # [min, max] (Hz)
+        self.analysisFreqBand: List[int]  # [lower, upper] (Hz)
+        self.samplingFrequency: int  # Hz
+        self.axWinSize: float  # axial length per window (mm)
+        self.latWinSize: float  # lateral width per window (mm)
+        self.windowThresh: float  # % of window area required to be in ROI
+        self.axialOverlap: float  # % of ax window length to move before next window
+        self.lateralOverlap: float  # % of lat window length to move before next window
+        self.centerFrequency: float  # Hz
 
 class UltrasoundImage:
     """Class to store ultrasound image and RF data.

@@ -11,6 +11,7 @@ class AbnResults(UtcResults):
     for each window to store when completing UTC analysis.
     """
     def __init__(self):
+        super().__init__()
         self.attCoef: float  # attenuation coefficient (dB/cm/MHz)
         self.bsc: float  # backscatter coefficient (1/cm-sr)
         self.uNakagami: float  # Nakagami shape parameter

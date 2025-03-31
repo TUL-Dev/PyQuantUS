@@ -19,7 +19,6 @@ def parser_args(parser):
 def signal_args(parser):
     parser.add_argument('scan_path', type=str, help='Path to scan signals')
     parser.add_argument('phantom_path', type=str, help='Path to phantom signals')
-    parser.add_argument('--frame', type=int, help='Scan frame number')
 
 def roi_args(parser):
     parser.add_argument('roi_path', type=str, help='Path to ROI signals')

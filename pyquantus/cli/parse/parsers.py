@@ -32,7 +32,7 @@ def parse_canon_iq(scan_path: str, phantom_path: str, frame: int) -> UltrasoundI
 
 def parse_siemens_rf(scan_path: str, phantom_path: str, frame: int) -> UltrasoundImage:
     # Load signal data
-    imgData, imgInfo, refData, refInfo = siemensRfParser(scan_path, phantom_path)
+    _, imgData, imgInfo, refData, refInfo = siemensRfParser(scan_path, phantom_path)
     
     # Package data
     ultrasoundImage = UltrasoundImage()
@@ -125,11 +125,7 @@ def parse_clarius_rf(imgFilename: str, phantomFilename: str, frame: int) -> Ultr
     ultrasoundImage.ymap = imgData.scBmodeStruct.ymap
     
     if sc:
-        scConfig = ScConfig()
-        scConfig.width = imgInfo.width1
-        scConfig.tilt = imgInfo.tilt1
-        scConfig.startDepth = imgInfo.startDepth1
-        scConfig.endDepth = imgInfo.endDepth1
+        scConfig = ScConfig(imgInfo.width1, imgInfo.tilt1, imgInfo.startDepth1, imgInfo.endDepth1, -1)
         ultrasoundImage.scConfig = scConfig
     
     return ultrasoundImage
