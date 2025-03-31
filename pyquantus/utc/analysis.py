@@ -181,7 +181,7 @@ class UtcAnalysis:
 
             # Compute MBF, SS, and SI
             mbf, _, _, p = computeSpectralParams(nps, f, lowFreq, upFreq)
-            attCoef = self.computeAttenuationCoef(imgWindow, refWindow, windowDepth=min(100, imgWindow.shape[0]//5))
+            attCoef = self.computeAttenuationCoef(imgWindow, refWindow, windowDepth=min(100, imgWindow.shape[0]//3))
             bsc = self.computeBackscatterCoefficient(f, ps, rPs, attCoef, bscFreq, roiDepth=imgWindow.shape[0])
             uNakagami = self.computeNakagamiParams(imgWindow)[1]
             window.results.mbf = mbf # dB
@@ -287,7 +287,8 @@ class UtcAnalysis:
         convertedAttCoef = attCoef * npConversionFactor  # dB/cm/MHz -> Np/cm/MHz
         convertedRefAttCoef = self.refAttenuation * npConversionFactor # dB/cm/MHz -> Np/cm/MHz
         windowDepthCm = roiDepth*self.ultrasoundImage.axialResRf/10 # cm
-        
+        convertedAttCoef *= frequency/1e6 # Np/cm
+        convertedRefAttCoef *= frequency/1e6 # Np/cm        
         attComp=np.exp(4*windowDepthCm *(convertedAttCoef-convertedRefAttCoef)) 
         bsc = sRatio*self.refBackScatterCoef*attComp
             
