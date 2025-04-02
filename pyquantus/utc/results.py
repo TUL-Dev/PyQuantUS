@@ -2,7 +2,9 @@ from typing import List
 
 import cv2
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 
 from pyquantus.utc.analysis import UtcAnalysis
 from pyquantus.utc.transforms import condenseArr, expandArr
@@ -74,6 +76,7 @@ class UtcData:
         self.scBscIm: np.ndarray
         self.scUNakagamiIm: np.ndarray
         self.scWindowIdxMap: np.ndarray
+        self.cbarParamaps: List[plt.Figure] = []
 
         self.minMbf: float; self.maxMbf: float; self.mbfArr: List[float]
         self.minSs: float; self.maxSs: float; self.ssArr: List[float]
@@ -175,6 +178,48 @@ class UtcData:
                                         self.scConfig.startDepth, self.scConfig.endDepth, desiredHeight=self.scBmode.shape[0])
         self.scWindowIdxMap = scStruct.scArr
 
+    def formatParamaps(self):
+        """Adds colorbars to the parametric maps."""
+        if hasattr(self, "scConfig"):
+            paramaps = [self.scMbfIm, self.scSsIm, self.scSiIm, self.scAttCoefIm, self.scBscIm, self.scUNakagamiIm]
+        else:
+            paramaps = [self.mbfIm, self.ssIm, self.siIm, self.attCoefIm, self.bscIm, self.uNakagamiIm]
+        minParamVals = [self.minMbf, self.minSs, self.minSi, self.minAttCoef, self.minBsc, self.minUNakagami]
+        maxParamVals = [self.maxMbf, self.maxSs, self.maxSi, self.maxAttCoef, self.maxBsc, self.maxUNakagami]
+        paramNames = ["mbf (dB)", "ss (dB/MHz)", "si (dB)", "attCoef (dB/cm/MHz)", "bsc (1/cm-sr)", "uNakagami (shape)"]
+        cmaps = [self.mbfCmap, self.ssCmap, self.siCmap, self.attCoefCmap, self.bscCmap, self.uNakagamiCmap]
+        
+        for paramIx, paramap in enumerate(paramaps):
+            fig = plt.figure()
+            gs = GridSpec(1, 2, width_ratios=[20, 1])  # Adjust width ratios as needed
+
+            # Main image subplot
+            ax = fig.add_subplot(gs[0, 0])
+            ax.imshow(paramap, aspect="auto") # TODO: fix
+            ax.axis('off')
+
+            # Create a separate mappable for the colorbar
+            norm = mpl.colors.Normalize(vmin=0, vmax=255)
+            cmapMappable = mpl.cm.ScalarMappable(norm=norm, cmap=mpl.colors.ListedColormap(cmaps[paramIx]))
+
+            # Colorbar subplot with exact same height
+            cax = fig.add_subplot(gs[0, 1])
+            cbar = plt.colorbar(cmapMappable, cax=cax, orientation='vertical')
+            customTickLocations = [0, 255/5, 2*255/5, 3*255/5, 4*255/5, 255]  # Example: min, middle, max
+            minVal = minParamVals[paramIx]; maxVal = maxParamVals[paramIx]
+            valRange = maxVal - minVal
+            customTickLabels = [np.round(minVal, decimals=2), 
+                                np.round(minVal + valRange/5, decimals=2), 
+                                np.round(minVal + 2*valRange/5, decimals=2),
+                                np.round(minVal + 3*valRange/5, decimals=2), 
+                                np.round(minVal + 4*valRange/5, decimals=2), 
+                                np.round(maxVal, decimals=2)]       # Example: custom labels
+
+            cbar.set_ticks(customTickLocations)
+            cbar.set_ticklabels(customTickLabels)
+            cbar.set_label(paramNames[paramIx], fontweight='bold', fontsize=14)
+            fig.tight_layout()
+            self.cbarParamaps.append(fig)
 
     def plotPsData(self):
         """Plots the power spectrum data for each window in the ROI.
