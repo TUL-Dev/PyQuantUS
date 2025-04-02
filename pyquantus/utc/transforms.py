@@ -4,12 +4,62 @@ from numpy.matlib import repmat
 
 NUM_FOURIER_POINTS = 8192
 
-def computeHanningPowerSpec(rfData: np.ndarray, startFrequency: int, endFrequency: int, 
+def computeHanningPowerSpec3D(rfData: np.ndarray, startFrequency: int, endFrequency: int, 
+                             samplingFrequency: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Compute the power spectrum of 3D spatial RF data using a Hanning window.
+    
+    Args:
+        rfData (np.ndarray): 3D RF data from the ultrasound volume (n lateral lines x m axial samples x l elevational lines).
+        startFrequency (int): lower bound of the frequency range (Hz).
+        endFrequency (int): upper bound of the frequency range (Hz).
+        samplingFrequency (int): sampling frequency of the RF data (Hz).
+    
+    Returns:
+        Tuple: frequency range and power spectrum.
+    """
+    # Get dimensions of the RF data
+    n_lateral, m_axial, l_elevational = rfData.shape
+    
+    # Create Hanning Window Function for the axial dimension
+    unrmWind = np.hanning(m_axial)
+    windFuncComputations = unrmWind * np.sqrt(len(unrmWind) / sum(np.square(unrmWind)))
+    
+    # Reshape window function for proper broadcasting with 3D data
+    # The window will be applied along the axial dimension (axis 1)
+    windFunc = np.reshape(windFuncComputations, (1, m_axial, 1))
+    
+    # Frequency Range
+    frequency = np.linspace(0, samplingFrequency, NUM_FOURIER_POINTS)
+    fLow = round(startFrequency * (NUM_FOURIER_POINTS / samplingFrequency))
+    fHigh = round(endFrequency * (NUM_FOURIER_POINTS / samplingFrequency))
+    freqChop = frequency[fLow:fHigh]
+    
+    # Reshape the 3D data to process all lines (lateral and elevational) together
+    # From (n_lateral, m_axial, l_elevational) to (n_lateral*l_elevational, m_axial)
+    reshaped_rfData = rfData.reshape(-1, m_axial)
+    reshaped_windFunc = np.tile(windFuncComputations, (reshaped_rfData.shape[0], 1))
+    
+    # Apply window function to all lines
+    windowed_data = reshaped_rfData * reshaped_windFunc
+    
+    # Compute FFT for each line
+    fft_data = np.fft.fft(windowed_data, NUM_FOURIER_POINTS, axis=1) * reshaped_rfData.shape[1]
+    fft_magnitude = np.abs(fft_data) ** 2
+    
+    # Average power spectrum across all lateral and elevational lines
+    fullPS = np.mean(fft_magnitude, axis=0)
+    
+    # Extract the frequency range of interest
+    ps = fullPS[fLow:fHigh]
+    
+    return freqChop, ps
+
+def computeHanningPowerSpec3d(rfData: np.ndarray, startFrequency: int, endFrequency: int, 
                             samplingFrequency: int) -> Tuple[np.ndarray, np.ndarray]:
     """Compute the power spectrum of the RF data using a Hanning window.
 
     Args:
-        rfData (np.ndarray): RF data from the ultrasound image (n lines x m samples).
+        rfData (np.ndarray): RF data from the ultrasound image (n lines m slices x s samples).
         startFrequency (int): lower bound of the frequency range (Hz).
         endFrequency (int): upper bound of the frequency range (Hz).
         samplingFrequency (int): sampling frequency of the RF data (Hz).
@@ -39,7 +89,6 @@ def computeHanningPowerSpec(rfData: np.ndarray, startFrequency: int, endFrequenc
     ps = fullPS[fLow:fHigh]
 
     return freqChop, ps
-
 
 def computeSpectralParams(nps: np.ndarray, f: np.ndarray, 
                                lowF: int, highF: int) -> Tuple[float, np.ndarray, np.ndarray, np.ndarray]:
