@@ -19,6 +19,7 @@ class InfoStruct3d(InfoStruct):
         self.lateralLen: float
         self.coronalLen: float
         self.frameRate: float
+        self.scParams: ScParams
 
 def QbpFilter(rfData: np.ndarray, Fc1: float, Fc2: float, FiltOrd: int) -> Tuple[np.ndarray, np.ndarray]:
     FiltCoef = firwin(FiltOrd+1, [Fc1*2, Fc2*2], window="hamming", pass_zero="bandpass") # type: ignore
@@ -151,7 +152,7 @@ def getVolume(rfPath: Path, sipNumOutBits: int = 8, DRlowerdB: int = 20, DRupper
     SC_Vol = (SC_Vol - lowerLim)/(upperLim - lowerLim) * 255
     preSC_Vol = np.clip(dBEnvData_vol, lowerLim, upperLim)
     preSC_Vol = (preSC_Vol - lowerLim)/(upperLim - lowerLim) * 255
-    bmodePhysicalDims = [bmodePhysicalDims[2], bmodePhysicalDims[0], bmodePhysicalDims[1]]
+    # bmodePhysicalDims = [bmodePhysicalDims[2], bmodePhysicalDims[0], bmodePhysicalDims[1]]
     # rfDims = [rfDims[2], rfDims[0], rfDims[1]]
 
     Data = DataOutputStruct()
@@ -178,6 +179,7 @@ def getVolume(rfPath: Path, sipNumOutBits: int = 8, DRlowerdB: int = 20, DRupper
     Info.coronalRes = bmodePhysicalDims[0] / SC_Vol.shape[0] # mm/pixel
     Info.lateralRes = bmodePhysicalDims[1] / SC_Vol.shape[1] # mm/pixel
     Info.axialRes = bmodePhysicalDims[2] / SC_Vol.shape[2] # mm/pixel
+    Info.scParams = scParams
     
     return Data, Info
 

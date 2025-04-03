@@ -23,6 +23,18 @@ class Window:
         self.top: int 
         self.bottom: int 
         self.results = SpectralResults()
+        
+class Window3d:
+    """Class to store window data for 3D UTC analysis.
+    """
+    def __init__(self):
+        self.axMin: int
+        self.axMax: int
+        self.latMin: int
+        self.latMax: int
+        self.corMin: int
+        self.corMax: int
+        self.results = SpectralResults()
 
 class AnalysisConfig:
     """Class to store configuration data for UTC analysis.
@@ -37,6 +49,14 @@ class AnalysisConfig:
         self.axialOverlap: float  # % of ax window length to move before next window
         self.lateralOverlap: float  # % of lat window length to move before next window
         self.centerFrequency: float  # Hz
+        
+class AnalysisConfig3d(AnalysisConfig):
+    """Class to store configuration data for 3D UTC analysis.
+    """
+    def __init__(self):
+        super().__init__()
+        self.corWinSize: float  # coronal height per window (mm)
+        self.coronalOverlap: float  # % of cor window height to move before next window
 
 class UltrasoundImage:
     """Class to store ultrasound image and RF data.
@@ -50,3 +70,16 @@ class UltrasoundImage:
         self.lateralResRf: float # mm/pix
         self.xmap: np.ndarray # maps (y,x) in SC coords to x preSC coord
         self.ymap: np.ndarray # maps (y,x) in SC coords to y preSC coord
+
+class UltrasoundImage3d:
+    """Class to store ultrasound image and RF data.
+    """
+    def __init__(self):
+        self.scBmode: np.ndarray # rgb
+        self.bmode: np.ndarray # rgb
+        self.rf: np.ndarray
+        self.phantomRf: np.ndarray
+        self.axialResRf: float # mm/pix
+        self.lateralResRf: float # mm/pix
+        self.coronalResRf: float # mm/pix
+        self.coordMap3d: np.ndarray # maps (z,y,x) in SC coords to (x,y) preSC coord

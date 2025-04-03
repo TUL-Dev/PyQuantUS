@@ -3,13 +3,13 @@ from typing import List
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
-from pyquantus.utc.analysis import UtcAnalysis
-from pyquantus.utc.transforms import condenseArr, expandArr
-from pyquantus.parse.objects import ScConfig
-from pyquantus.parse.transforms import scanConvert
+from pyquantus.utc.analysis3d import UtcAnalysis3d
+from pyquantus.parse.objects import ScParams
+from pyquantus.parse.transforms import scanConvert3dVolumeSeries
 
-class UtcData:
+class UtcData3D:
     """Class to store UTC data and images after analysis.
     
     This class supports both scan converted and non-scan converted images. 
@@ -38,13 +38,13 @@ class UtcData:
         minSi (float): Minimum spectral intercept value in ROI
         maxSi (float): Maximum spectral intercept value in ROI
         siArr (List[float]): Spectral intercept values for each window in ROI
-        scConfig (ScConfig): Scan conversion configuration
+        scParams (ScParams): 3D scan conversion parameters
         mbfCmap (list): Midband fit colormap used for parametric maps
         ssCmap (list): Spectral slope colormap used for parametric maps
         siCmap (list): Spectral intercept colormap used for parametric maps        
     """
     def __init__(self):
-        self.utcAnalysis: UtcAnalysis
+        self.utcAnalysis: UtcAnalysis3d
         self.depth: float # mm
         self.width: float # mm
         self.roiWidthScale: int
@@ -64,7 +64,7 @@ class UtcData:
         self.minSs: float; self.maxSs: float; self.ssArr: List[float]
         self.minSi: float; self.maxSi: float; self.siArr: List[float]
 
-        self.scConfig: ScConfig
+        self.scParams: ScParams
         self.mbfCmap: list = plt.get_cmap("viridis").colors #type: ignore
         self.ssCmap: list = plt.get_cmap("magma").colors #type: ignore
         self.siCmap: list = plt.get_cmap("plasma").colors #type: ignore
@@ -72,60 +72,48 @@ class UtcData:
     def convertImagesToRGB(self):
         """Converts grayscale images to RGB for colormap application.
         """
-        self.utcAnalysis.ultrasoundImage.bmode = cv2.cvtColor(
-            np.array(self.utcAnalysis.ultrasoundImage.bmode).astype('uint8'),
-            cv2.COLOR_GRAY2RGB
-        )
+        self.utcAnalysis.ultrasoundImage.bmode -= np.amin(self.utcAnalysis.ultrasoundImage.bmode)
+        self.utcAnalysis.ultrasoundImage.bmode *= 255/np.amax(self.utcAnalysis.ultrasoundImage.bmode)
+        self.utcAnalysis.ultrasoundImage.bmode = np.array([cv2.cvtColor(
+            np.array(self.utcAnalysis.ultrasoundImage.bmode[i]).astype('uint8'),
+            cv2.COLOR_GRAY2RGB) for i in range(self.utcAnalysis.ultrasoundImage.bmode.shape[0])
+        ])
         if hasattr(self.utcAnalysis.ultrasoundImage, 'scBmode'):
-            self.utcAnalysis.ultrasoundImage.scBmode = cv2.cvtColor(
-                np.array(self.utcAnalysis.ultrasoundImage.scBmode).astype('uint8'),
-                cv2.COLOR_GRAY2RGB
-            )
+            self.utcAnalysis.ultrasoundImage.scBmode -= np.amin(self.utcAnalysis.ultrasoundImage.scBmode)
+            self.utcAnalysis.ultrasoundImage.scBmode *= 255/np.amax(self.utcAnalysis.ultrasoundImage.scBmode)
+            self.utcAnalysis.ultrasoundImage.scBmode = np.array([cv2.cvtColor(
+                np.array(self.utcAnalysis.ultrasoundImage.scBmode[i]).astype('uint8'),
+                cv2.COLOR_GRAY2RGB) for i in range(self.utcAnalysis.ultrasoundImage.scBmode.shape[0])
+])
 
     def drawCmaps(self):
         """Generates parametric maps for midband fit, spectral slope, and spectral intercept.
         """
-        if not len(self.utcAnalysis.roiWindows):
+        if not len(self.utcAnalysis.voiWindows):
             print("No analyzed windows to color")
             return
         
-        self.mbfArr = [window.results.mbf for window in self.utcAnalysis.roiWindows]
+        self.mbfArr = [window.results.mbf for window in self.utcAnalysis.voiWindows]
         self.minMbf = min(self.mbfArr); self.maxMbf = max(self.mbfArr)
-        self.ssArr = [window.results.ss for window in self.utcAnalysis.roiWindows]
+        self.ssArr = [window.results.ss for window in self.utcAnalysis.voiWindows]
         self.minSs = min(self.ssArr); self.maxSs = max(self.ssArr)
-        self.siArr = [window.results.si for window in self.utcAnalysis.roiWindows]
+        self.siArr = [window.results.si for window in self.utcAnalysis.voiWindows]
         self.minSi = min(self.siArr); self.maxSi = max(self.siArr)
 
-        if not len(self.utcAnalysis.ultrasoundImage.bmode.shape) == 3:
+        if not len(self.utcAnalysis.ultrasoundImage.bmode.shape) == 4:
             self.convertImagesToRGB()
         self.mbfIm = self.utcAnalysis.ultrasoundImage.bmode.copy()
         self.ssIm = self.mbfIm.copy(); self.siIm = self.ssIm.copy()
-        self.windowIdxMap = np.zeros((self.mbfIm.shape[0], self.mbfIm.shape[1])).astype(int)
+        self.windowIdxMap = np.zeros((self.mbfIm.shape[0], self.mbfIm.shape[1], self.mbfIm.shape[2])).astype(int)
 
-        for i, window in enumerate(self.utcAnalysis.roiWindows):
+        for i, window in enumerate(self.utcAnalysis.voiWindows):
             mbfColorIdx = int((255 / (self.maxMbf-self.minMbf))*(window.results.mbf-self.minMbf)) if self.minMbf != self.maxMbf else 125
             ssColorIdx = int((255 / (self.maxSs-self.minSs))*(window.results.ss-self.minSs)) if self.minSs != self.maxSs else 125
             siColorIdx = int((255 / (self.maxSi-self.minSi))*(window.results.si-self.minSi)) if self.minSi != self.maxSi else 125
-            self.mbfIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.mbfCmap[mbfColorIdx])*255
-            self.ssIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.ssCmap[ssColorIdx])*255
-            self.siIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.siCmap[siColorIdx])*255
-            self.windowIdxMap[window.top: window.bottom+1, window.left: window.right+1] = i+1
-
-    def scanConvertRGB(self, image: np.ndarray) -> np.ndarray:
-        """Converts a scan-converted grayscale image to RGB.
-
-        Args:
-            image (np.ndarray): Grayscale image to convert
-
-        Returns:
-            np.ndarray: RGB image
-        """
-        condensedIm = condenseArr(image)
-
-        scStruct, _, _ = scanConvert(condensedIm, self.scConfig.width, self.scConfig.tilt,
-                                        self.scConfig.startDepth, self.scConfig.endDepth, desiredHeight=self.scBmode.shape[0])
-
-        return expandArr(scStruct.scArr)
+            self.mbfIm[window.corMin: window.corMax+1, window.latMin: window.latMax+1, window.axMin: window.axMax+1] = np.array(self.mbfCmap[mbfColorIdx])*255
+            self.ssIm[window.corMin: window.corMax+1, window.latMin: window.latMax+1, window.axMin: window.axMax+1] = np.array(self.ssCmap[ssColorIdx])*255
+            self.siIm[window.corMin: window.corMax+1, window.latMin: window.latMax+1, window.axMin: window.axMax+1] = np.array(self.siCmap[siColorIdx])*255
+            self.windowIdxMap[window.corMin: window.corMax+1, window.latMin: window.latMax+1, window.axMin: window.axMax+1] = i+1
     
     def scanConvertCmaps(self):
         """Scan converts the parametric maps to match the B-mode image.
@@ -133,15 +121,21 @@ class UtcData:
         if self.mbfIm is None:
             print("Generate cmaps first")
             return
+        self.scWindowIdxMap, _, _ = scanConvert3dVolumeSeries(self.windowIdxMap, self.scParams, scale=False, interp='nearest', normalize=False)
+        self.scWindowIdxMap = self.scWindowIdxMap.astype(int)
         
-        self.scMbfIm = self.scanConvertRGB(self.mbfIm)
-        self.scSsIm = self.scanConvertRGB(self.ssIm)
-        self.scSiIm = self.scanConvertRGB(self.siIm)
-
-        scStruct, _, _ = scanConvert(self.windowIdxMap, self.scConfig.width, self.scConfig.tilt,
-                                        self.scConfig.startDepth, self.scConfig.endDepth, desiredHeight=self.scBmode.shape[0])
-        self.scWindowIdxMap = scStruct.scArr
-
+        self.scMbfIm = self.utcAnalysis.ultrasoundImage.scBmode.copy()
+        self.scSsIm = self.scMbfIm.copy(); self.scSiIm = self.scSsIm.copy()
+        for i, window in tqdm(enumerate(self.utcAnalysis.voiWindows), total=len(self.utcAnalysis.voiWindows)):
+            mbfColorIdx = int((255 / (self.maxMbf-self.minMbf))*(window.results.mbf-self.minMbf)) if self.minMbf != self.maxMbf else 125
+            ssColorIdx = int((255 / (self.maxSs-self.minSs))*(window.results.ss-self.minSs)) if self.minSs != self.maxSs else 125
+            siColorIdx = int((255 / (self.maxSi-self.minSi))*(window.results.si-self.minSi)) if self.minSi != self.maxSi else 125
+            
+            windowLoc = np.transpose(np.where(self.scWindowIdxMap == i+1))
+            for loc in windowLoc:
+                self.scMbfIm[loc[0], loc[1], loc[2]] = np.array(self.mbfCmap[mbfColorIdx])*255
+                self.scSiIm[loc[0], loc[1], loc[2]] = np.array(self.siCmap[siColorIdx])*255
+                self.scSsIm[loc[0], loc[1], loc[2]] = np.array(self.ssCmap[ssColorIdx])*255
 
     def plotPsData(self):
         """Plots the power spectrum data for each window in the ROI.
@@ -154,9 +148,9 @@ class UtcData:
 
         ssMean = np.mean(np.array(self.ssArr)/1e6)
         siMean = np.mean(self.siArr)
-        npsArr = [window.results.nps for window in self.utcAnalysis.roiWindows]
+        npsArr = [window.results.nps for window in self.utcAnalysis.voiWindows]
         avNps = np.mean(npsArr, axis=0)
-        f = self.utcAnalysis.roiWindows[0].results.f
+        f = self.utcAnalysis.voiWindows[0].results.f
         x = np.linspace(min(f), max(f), 100)
         y = ssMean*x + siMean
 
@@ -174,7 +168,7 @@ class UtcData:
     def bmode(self) -> np.ndarray:
         """Getter for RGB B-mode image (no scan conversion).
         """
-        assert len(self.utcAnalysis.ultrasoundImage.bmode.shape) == 3
+        assert len(self.utcAnalysis.ultrasoundImage.bmode.shape) == 4
         return self.utcAnalysis.ultrasoundImage.bmode
     
     @bmode.setter
@@ -187,7 +181,7 @@ class UtcData:
     def scBmode(self):
         """Getter for scan converted RGB B-mode image.
         """
-        assert len(self.utcAnalysis.ultrasoundImage.scBmode.shape) == 3
+        assert len(self.utcAnalysis.ultrasoundImage.scBmode.shape) == 4
         return self.utcAnalysis.ultrasoundImage.scBmode
     
     @property

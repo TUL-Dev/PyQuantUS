@@ -4,6 +4,14 @@ from numpy.matlib import repmat
 
 NUM_FOURIER_POINTS = 8192
 
+def map1dTo3d(coord, xDim, yDim, zDim):
+    x = coord // (zDim * yDim)
+    coord -= x * (zDim * yDim)
+    y = coord // zDim
+    z = coord - (y * zDim)
+    
+    return x, y, z
+
 def computeHanningPowerSpec3D(rfData: np.ndarray, startFrequency: int, endFrequency: int, 
                              samplingFrequency: int) -> Tuple[np.ndarray, np.ndarray]:
     """Compute the power spectrum of 3D spatial RF data using a Hanning window.
@@ -54,12 +62,12 @@ def computeHanningPowerSpec3D(rfData: np.ndarray, startFrequency: int, endFreque
     
     return freqChop, ps
 
-def computeHanningPowerSpec3d(rfData: np.ndarray, startFrequency: int, endFrequency: int, 
+def computeHanningPowerSpec(rfData: np.ndarray, startFrequency: int, endFrequency: int, 
                             samplingFrequency: int) -> Tuple[np.ndarray, np.ndarray]:
     """Compute the power spectrum of the RF data using a Hanning window.
 
     Args:
-        rfData (np.ndarray): RF data from the ultrasound image (n lines m slices x s samples).
+        rfData (np.ndarray): RF data from the ultrasound image (n lines x m samples).
         startFrequency (int): lower bound of the frequency range (Hz).
         endFrequency (int): upper bound of the frequency range (Hz).
         samplingFrequency (int): sampling frequency of the RF data (Hz).
