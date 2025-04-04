@@ -118,12 +118,13 @@ class UtcData:
         self.minSs = min(self.ssArr); self.maxSs = max(self.ssArr)
         self.siArr = [window.results.si for window in self.utcAnalysis.roiWindows]
         self.minSi = min(self.siArr); self.maxSi = max(self.siArr)
-        self.attCoefArr = [window.results.attCoef for window in self.utcAnalysis.roiWindows]
-        self.minAttCoef = min(self.attCoefArr); self.maxAttCoef = max(self.attCoefArr)
-        self.bscArr = [window.results.bsc for window in self.utcAnalysis.roiWindows]
-        self.minBsc = min(self.bscArr); self.maxBsc = max(self.bscArr)
-        self.uNakagamiArr = [window.results.uNakagami for window in self.utcAnalysis.roiWindows]
-        self.minUNakagami = min(self.uNakagamiArr); self.maxUNakagami = max(self.uNakagamiArr)
+        if self.utcAnalysis.computeExtraParamaps:
+            self.attCoefArr = [window.results.attCoef for window in self.utcAnalysis.roiWindows]
+            self.minAttCoef = min(self.attCoefArr); self.maxAttCoef = max(self.attCoefArr)
+            self.bscArr = [window.results.bsc for window in self.utcAnalysis.roiWindows]
+            self.minBsc = min(self.bscArr); self.maxBsc = max(self.bscArr)
+            self.uNakagamiArr = [window.results.uNakagami for window in self.utcAnalysis.roiWindows]
+            self.minUNakagami = min(self.uNakagamiArr); self.maxUNakagami = max(self.uNakagamiArr)
 
         if not len(self.utcAnalysis.ultrasoundImage.bmode.shape) == 3:
             self.convertImagesToRGB()
@@ -139,10 +140,14 @@ class UtcData:
             self.mbfIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.mbfCmap[mbfColorIdx])*255
             self.ssIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.ssCmap[ssColorIdx])*255
             self.siIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.siCmap[siColorIdx])*255
-            self.attCoefIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.attCoefCmap[mbfColorIdx])*255
-            self.bscIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.bscCmap[mbfColorIdx])*255
-            self.uNakagamiIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.uNakagamiCmap[mbfColorIdx])*255
             self.windowIdxMap[window.top: window.bottom+1, window.left: window.right+1] = i+1
+            if self.utcAnalysis.computeExtraParamaps:
+                attCoefColorIdx = int((255 / (self.maxAttCoef-self.minAttCoef))*(window.results.attCoef-self.minAttCoef)) if self.minAttCoef != self.maxAttCoef else 125
+                bscColorIdx = int((255 / (self.maxBsc-self.minBsc))*(window.results.bsc-self.minBsc)) if self.minBsc != self.maxBsc else 125
+                uNakagamiColorIdx = int((255 / (self.maxUNakagami-self.minUNakagami))*(window.results.uNakagami-self.minUNakagami)) if self.minUNakagami != self.maxUNakagami else 125
+                self.attCoefIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.attCoefCmap[attCoefColorIdx])*255
+                self.bscIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.bscCmap[bscColorIdx])*255
+                self.uNakagamiIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.uNakagamiCmap[uNakagamiColorIdx])*255
 
     def scanConvertRGB(self, image: np.ndarray) -> np.ndarray:
         """Converts a scan-converted grayscale image to RGB.
