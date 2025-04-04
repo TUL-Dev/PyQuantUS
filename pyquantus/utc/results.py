@@ -118,18 +118,18 @@ class UtcData:
         self.minSs = min(self.ssArr); self.maxSs = max(self.ssArr)
         self.siArr = [window.results.si for window in self.utcAnalysis.roiWindows]
         self.minSi = min(self.siArr); self.maxSi = max(self.siArr)
-        self.attCoefArr = [window.results.attCoef for window in self.utcAnalysis.roiWindows]
-        self.minAttCoef = min(self.attCoefArr); self.maxAttCoef = max(self.attCoefArr)
-        self.bscArr = [window.results.bsc for window in self.utcAnalysis.roiWindows]
-        self.minBsc = min(self.bscArr); self.maxBsc = max(self.bscArr)
-        self.uNakagamiArr = [window.results.uNakagami for window in self.utcAnalysis.roiWindows]
-        self.minUNakagami = min(self.uNakagamiArr); self.maxUNakagami = max(self.uNakagamiArr)
+        # self.attCoefArr = [window.results.attCoef for window in self.utcAnalysis.roiWindows]
+        # self.minAttCoef = min(self.attCoefArr); self.maxAttCoef = max(self.attCoefArr)
+        # self.bscArr = [window.results.bsc for window in self.utcAnalysis.roiWindows]
+        # self.minBsc = min(self.bscArr); self.maxBsc = max(self.bscArr)
+        # self.uNakagamiArr = [window.results.uNakagami for window in self.utcAnalysis.roiWindows]
+        # self.minUNakagami = min(self.uNakagamiArr); self.maxUNakagami = max(self.uNakagamiArr)
 
         if not len(self.utcAnalysis.ultrasoundImage.bmode.shape) == 3:
             self.convertImagesToRGB()
         self.mbfIm = self.utcAnalysis.ultrasoundImage.bmode.copy()
         self.ssIm = self.mbfIm.copy(); self.siIm = self.ssIm.copy()
-        self.attCoefIm = self.ssIm.copy(); self.bscIm = self.ssIm.copy(); self.uNakagamiIm = self.ssIm.copy()
+        # self.attCoefIm = self.ssIm.copy(); self.bscIm = self.ssIm.copy(); self.uNakagamiIm = self.ssIm.copy()
         self.windowIdxMap = np.zeros((self.mbfIm.shape[0], self.mbfIm.shape[1])).astype(int)
 
         for i, window in enumerate(self.utcAnalysis.roiWindows):
@@ -139,10 +139,10 @@ class UtcData:
             self.mbfIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.mbfCmap[mbfColorIdx])*255
             self.ssIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.ssCmap[ssColorIdx])*255
             self.siIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.siCmap[siColorIdx])*255
-            self.attCoefIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.attCoefCmap[mbfColorIdx])*255
-            self.bscIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.bscCmap[mbfColorIdx])*255
-            self.uNakagamiIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.uNakagamiCmap[mbfColorIdx])*255
-            self.windowIdxMap[window.top: window.bottom+1, window.left: window.right+1] = i+1
+            # self.attCoefIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.attCoefCmap[mbfColorIdx])*255
+            # self.bscIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.bscCmap[mbfColorIdx])*255
+            # self.uNakagamiIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.uNakagamiCmap[mbfColorIdx])*255
+            # self.windowIdxMap[window.top: window.bottom+1, window.left: window.right+1] = i+1
 
     def scanConvertRGB(self, image: np.ndarray) -> np.ndarray:
         """Converts a scan-converted grayscale image to RGB.
@@ -170,9 +170,9 @@ class UtcData:
         self.scMbfIm = self.scanConvertRGB(self.mbfIm)
         self.scSsIm = self.scanConvertRGB(self.ssIm)
         self.scSiIm = self.scanConvertRGB(self.siIm)
-        self.scAttCoefIm = self.scanConvertRGB(self.attCoefIm)
-        self.scBscIm = self.scanConvertRGB(self.bscIm)
-        self.scUNakagamiIm = self.scanConvertRGB(self.uNakagamiIm)
+        # self.scAttCoefIm = self.scanConvertRGB(self.attCoefIm)
+        # self.scBscIm = self.scanConvertRGB(self.bscIm)
+        # self.scUNakagamiIm = self.scanConvertRGB(self.uNakagamiIm)
 
         scStruct, _, _ = scanConvert(self.windowIdxMap, self.scConfig.width, self.scConfig.tilt,
                                         self.scConfig.startDepth, self.scConfig.endDepth, desiredHeight=self.scBmode.shape[0])
