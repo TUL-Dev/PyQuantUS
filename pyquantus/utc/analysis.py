@@ -54,6 +54,7 @@ class UtcAnalysis:
         self.splineX: np.ndarray # pix
         self.scSplineY: np.ndarray # pix
         self.splineY: np.ndarray # pix
+        self.computeExtraParamaps = False
 
     def initAnalysisConfig(self):
         """Compute the wavelength of the ultrasound signal and 
@@ -136,7 +137,7 @@ class UtcAnalysis:
                     newWindow.bottom = int(axial[axialInd + axialPixSize - 1])
                     self.roiWindows.append(newWindow)
     
-    def computeUtcWindows(self, extraParams=True, bscFreq=None) -> int:
+    def computeUtcWindows(self, extraParams=True, bscFreq=None, extraParamapParams=False) -> int:
         """Compute UTC parameters for each window in the ROI.
         
         extraParams (bool): Flag on whether to compute non-validated parameters.
@@ -152,6 +153,8 @@ class UtcAnalysis:
         
         if bscFreq is None:
             bscFreq = self.config.centerFrequency
+            
+        self.computeExtraParamaps = extraParams
     
         fs = self.config.samplingFrequency
         f0 = self.config.transducerFreqBand[0]
@@ -181,15 +184,17 @@ class UtcAnalysis:
 
             # Compute MBF, SS, and SI
             mbf, _, _, p = computeSpectralParams(nps, f, lowFreq, upFreq)
-            attCoef = self.computeAttenuationCoef(imgWindow, refWindow, windowDepth=min(100, imgWindow.shape[0]//3))
-            bsc = self.computeBackscatterCoefficient(f, ps, rPs, attCoef, bscFreq, roiDepth=imgWindow.shape[0])
-            uNakagami = self.computeNakagamiParams(imgWindow)[1]
             window.results.mbf = mbf # dB
             window.results.ss = p[0]*1e6 # dB/MHz
             window.results.si = p[1] # dB
-            window.results.attCoef = attCoef # dB/cm/MHz
-            window.results.bsc = bsc # 1/cm-sr
-            window.results.uNakagami = uNakagami
+            
+            if self.computeExtraParamaps:
+                attCoef = self.computeAttenuationCoef(imgWindow, refWindow, windowDepth=min(100, imgWindow.shape[0]//3))
+                bsc = self.computeBackscatterCoefficient(f, ps, rPs, attCoef, bscFreq, roiDepth=imgWindow.shape[0])
+                uNakagami = self.computeNakagamiParams(imgWindow)[1]
+                window.results.attCoef = attCoef # dB/cm/MHz
+                window.results.bsc = bsc # 1/cm-sr
+                window.results.uNakagami = uNakagami
             
         minLeft = min([window.left for window in self.roiWindows])
         maxRight = max([window.right for window in self.roiWindows])
