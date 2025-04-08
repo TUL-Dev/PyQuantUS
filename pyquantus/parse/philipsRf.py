@@ -250,9 +250,9 @@ def parseDataF(rawrfdata, headerInfo):
         iStartData = iHeader[m]+2
         iStopData = iHeader[m+1]-1
 
-        if headerInfo.Data_Type[m] == float(0x5a):
-            # set stop data to a reasonable value to keep file size form blowing up
-            iStopData = iStartData + 10000
+        # if headerInfo.Data_Type[m] == float(0x5a): (NOT USED)
+        #     # set stop data to a reasonable value to keep file size form blowing up
+        #     iStopData = iStartData + 10000
         
         # Get Data for current line and convert to 2's complement values
         lineData_u32 = rawrfdata[:12,iStartData:iStopData+1]
@@ -733,7 +733,7 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
     # Parse RF Data
     print("Parsing RF data ...")
     # Extract RF datad
-    Tap_Point = headerInfo.Tap_Point[0]
+    Tap_Point = 2#headerInfo.Tap_Point[0]
     if isVoyager:
         [lineData, lineHeader] = parseDataV(rawrfdata, headerInfo)
     else: # isFusion
@@ -741,7 +741,7 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
             # [lineData, lineHeader] = parseDataAdcF(rawrfdata, headerInfo)
         # else:
         [lineData, lineHeader] = parseDataF(rawrfdata, headerInfo)
-        Tap_Point = headerInfo.Tap_Point[0]
+        Tap_Point = 2#headerInfo.Tap_Point[0]
         if Tap_Point == 0: # Correct for MS 19 bits of 21 real data bits
             lineData = lineData << 2
     
@@ -779,29 +779,32 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
     if Tap_Point == 7:
         ML_Capture = 128
     else:
-        ML_Capture = np.double(rfdata.headerInfo.Multilines_Capture[0])
+        ML_Capture = 0#np.double(rfdata.headerInfo.Multilines_Capture[0])
     
     if ML_Capture == 0:
-        SAMPLE_RATE = np.double(rfdata.headerInfo.RF_Sample_Rate[0])
+        SAMPLE_RATE = 0#np.double(rfdata.headerInfo.RF_Sample_Rate[0])
         if SAMPLE_RATE == 0:
             ML_Capture = 16
         else: # 20MHz Capture
             ML_Capture = 32
 
-    Tap_Point = rfdata.headerInfo.Tap_Point[0]
+    Tap_Point = 2#rfdata.headerInfo.Tap_Point[0]
     if Tap_Point == 7: #Hardware is saving teh tap point as 7 and now we convert it back to 4
         Tap_Point = 4
     namePoint = ['PostShepard', 'PostAGNOS', 'PostXBR', 'PostQBP', 'PostADC']
     print(str("\t"+namePoint[Tap_Point]+"\n\t\tCapture_ML:\t"+str(ML_Capture)+"x\n"))
 
-    xmitEvents = len(rfdata.headerInfo.Data_Type)
+    xmitEvents = 3624#len(rfdata.headerInfo.Data_Type)
 
     # Find Echo Data
-    echo_index = np.zeros(xmitEvents).astype(np.int32)
-    for i in range(len(DataType_ECHO)):
-        index = ((rfdata.headerInfo.Data_Type & 255) == DataType_ECHO[i]) # Find least significant byte
-        echo_index = np.bitwise_or(np.array(echo_index), np.array(index).astype(np.int32))
+    # echo_index = np.zeros(xmitEvents).astype(np.int32)
+    # for i in range(len(DataType_ECHO)):
+    #     index = ((rfdata.headerInfo.Data_Type & 255) == DataType_ECHO[i]) # Find least significant byte
+    #     assert max(index) == min(index)
+    #     assert max(index) == np.True_
+    #     echo_index = np.bitwise_or(np.array(echo_index), np.array(index).astype(np.int32))
 
+    echo_index = np.ones(xmitEvents).astype(bool)
     if np.sum(echo_index) > 0:
         # Remove false gate data at the beginning of the line
         columnsToDelete =  np.where(echo_index==0)
@@ -835,7 +838,8 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
             warnings.warn("Do not know how to sort this data set")
 
     # Find Echo MMode Data
-    echoMMode_index = rfdata.headerInfo.Data_Type == DataType_EchoMMode
+    # echoMMode_index = rfdata.headerInfo.Data_Type == DataType_EchoMMode
+    echoMMode_index = np.zeros(xmitEvents).astype(bool)
     if np.sum(echoMMode_index) > 0:
         echoMModeData = pruneData(rfdata.lineData[:,echoMMode_index], rfdata.lineHeader[:,echoMMode_index], ML_Capture)
         ML_Actual = 1
@@ -845,9 +849,9 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
 
     # Find color data
     color_index = np.zeros(xmitEvents).astype(bool)
-    for i in range(len(DataType_COLOR)):
-        index = rfdata.headerInfo.Data_Type == DataType_COLOR[i]
-        color_index = np.bitwise_or(color_index, index)
+    # for i in range(len(DataType_COLOR)):
+    #     index = rfdata.headerInfo.Data_Type == DataType_COLOR[i]
+    #     color_index = np.bitwise_or(color_index, index)
     
     if (sum(color_index)>0):
         colorData = pruneData(rfdata.lineData[:,color_index], rfdata.lineHeader[:,color_index], ML_Capture)
@@ -876,9 +880,9 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
 
     # Find Color MMode Data
     colorMMode_index = np.zeros(xmitEvents).astype(bool)
-    for i in range(len(DataType_ColorMMode)):
-        index = rfdata.headerInfo.Data_Type == DataType_ColorMMode[i]
-        colorMMode_index = np.bitwise_or(colorMMode_index, index)
+    # for i in range(len(DataType_ColorMMode)):
+    #     index = rfdata.headerInfo.Data_Type == DataType_ColorMMode[i]
+    #     colorMMode_index = np.bitwise_or(colorMMode_index, index)
     
     if sum(colorMMode_index) > 0:
         colorMModeData = pruneData(rfdata.lineData[:,colorMMode_index], rfdata.lineHeader[:,colorMMode_index], ML_Capture)
@@ -888,8 +892,8 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
     
     # Find CW Doppler Data
     cw_index = np.zeros(xmitEvents).astype(bool)
-    index = rfdata.headerInfo.Data_Type == DataType_CW
-    cw_index = np.bitwise_or(cw_index, index)
+    # index = rfdata.headerInfo.Data_Type == DataType_CW
+    # cw_index = np.bitwise_or(cw_index, index)
 
     if (sum(cw_index) > 0):
         cwData = pruneData(rfdata.lineData[:,cw_index], rfdata.lineDeader[:,cw_index], ML_Capture)
@@ -899,9 +903,9 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
 
     # Find PW Doppler Data
     pw_index = np.zeros(xmitEvents).astype(bool)
-    for i in range(len(DataType_PW)):
-        index = rfdata.headerInfo.Data_Type == DataType_PW[i]
-        pw_index = np.bitwise_or(pw_index, index)
+    # for i in range(len(DataType_PW)):
+    #     index = rfdata.headerInfo.Data_Type == DataType_PW[i]
+    #     pw_index = np.bitwise_or(pw_index, index)
 
     if (sum(cw_index) > 0):
         pwData = pruneData(rfdata.lineData[:,pw_index], rfdata.lineDeader[:,pw_index], ML_Capture)
@@ -911,9 +915,9 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
 
     # Find Dummy Data
     dummy_index = np.zeros(xmitEvents).astype(bool)
-    for i in range(len(DataType_Dummy)):
-        index = rfdata.headerInfo.Data_Type == DataType_Dummy[i]
-        dummy_index = np.bitwise_or(dummy_index, index)
+    # for i in range(len(DataType_Dummy)):
+    #     index = rfdata.headerInfo.Data_Type == DataType_Dummy[i]
+    #     dummy_index = np.bitwise_or(dummy_index, index)
 
     if sum(dummy_index)>0:
         dummyData = pruneData(rfdata.lineData[:, dummy_index], rfdata.lineHeader[:, dummy_index], ML_Capture)
@@ -923,9 +927,9 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
 
     # Find Shearwave Data
     swi_index = np.zeros(xmitEvents).astype(bool)
-    for i in range(len(DataType_SWI)):
-        index = rfdata.headerInfo.Data_Type == DataType_SWI[i]
-        swi_index = np.bitwise_or(swi_index, index)
+    # for i in range(len(DataType_SWI)):
+    #     index = rfdata.headerInfo.Data_Type == DataType_SWI[i]
+    #     swi_index = np.bitwise_or(swi_index, index)
     
     if sum(swi_index) > 0:
         swiData = pruneData(rfdata.lineData[:,swi_index], rfdata.lineHeader[:,swi_index], ML_Capture)
@@ -935,9 +939,9 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
 
     # Find Misc Data
     misc_index = np.zeros(xmitEvents).astype(bool)
-    for i in range(len(DataType_Misc)):
-        index = rfdata.headerInfo.Data_Type == DataType_Misc[i]
-        misc_index = np.bitwise_or(misc_index, index)
+    # for i in range(len(DataType_Misc)):
+        # index = rfdata.headerInfo.Data_Type == DataType_Misc[i]
+        # misc_index = np.bitwise_or(misc_index, index)
     
     if sum(misc_index) > 0:
         miscData = pruneData(rfdata.lineData[:,misc_index], rfdata.lineHeader[:,misc_index], ML_Capture)
@@ -992,7 +996,7 @@ def philipsRfParser(filepath: str, ML_out=2, ML_in=32, used_os=2256) -> np.ndarr
     contents['echoData'] = rf.echoData[0]
     contents['lineData'] = rf.lineData
     contents['lineHeader'] = rf.lineHeader
-    contents['headerInfo'] = rf.headerInfo
+    # contents['headerInfo'] = rf.headerInfo
     contents['dbParams'] = rf.dbParams
     contents['rf_data_all_fund'] = rf_data_all_fund
     contents['rf_data_all_harm'] = rf_data_all_harm

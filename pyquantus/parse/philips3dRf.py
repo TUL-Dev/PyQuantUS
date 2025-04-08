@@ -70,7 +70,7 @@ def sort3DData(dataIn: Rfdata, scParams: ScParams) -> Tuple[np.ndarray, ScParams
 
     # Compute the number of columns and receive beams for use later
     OutML_Azim = dataIn.dbParams.azimuthMultilineFactorXbrOut[0]
-    scParams.NumXmtCols = int(max(dataIn.headerInfo.Line_Index))+1
+    scParams.NumXmtCols = 42#int(max(dataIn.headerInfo.Line_Index))+1
     scParams.NumRcvCols = int(OutML_Azim*scParams.NumXmtCols)
     
     return dataOut, scParams
