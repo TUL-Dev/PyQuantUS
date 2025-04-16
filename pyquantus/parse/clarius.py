@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tarfile
 from typing import Tuple
+from pathlib import Path
 
 # Third-Party Library Imports
 import numpy as np
@@ -53,10 +54,9 @@ class ClariusTarUnpacker():
         
         self.path = path
         self.extraction_mode = extraction_mode
-        #self.lzo_py_file_path = 'pyquantus/lzop/lzop.py'
         
-        # Using lzop.py file for Windows renamed to lzop.py to make it pip-accessible
-        self.lzo_py_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir)}\lzop\lzop.py"
+        # Using lzop.exe file for Windows renamed to lzop.py to make it pip-accessible
+        self.lzo_exe_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir)}\exe\lzop.py"
         
         # single tar extraction attibutes
         self.single_tar_extraction: bool = None
@@ -111,7 +111,6 @@ class ClariusTarUnpacker():
     
     def __run_single_sample_extraction(self):
         """Runs the extraction process for a single directory."""
-        self.delete_extracted_folders()
         self.extract_tar_files()
         self.set_path_of_extracted_folders()
         self.set_path_of_lzo_files_inside_extracted_folders()
@@ -149,23 +148,6 @@ class ClariusTarUnpacker():
         self.__run_single_sample_extraction()
             
     ###################################################################################
-           
-    def delete_extracted_folders(self):
-        """Deletes all extracted folders in the specified directory."""
-        extracted_folders = [
-            os.path.join(self.path, item)
-            for item in os.listdir(self.path)
-            if os.path.isdir(os.path.join(self.path, item)) and "extracted" in item
-        ]
-
-        for folder in extracted_folders:
-            try:
-                shutil.rmtree(folder)
-                logging.info(f"Deleted folder: {folder}")
-            except OSError as e:
-                logging.error(f"Error deleting folder {folder}: {e}")
-                    
-    ###################################################################################
         
     def extract_tar_files(self):
         """
@@ -188,7 +170,7 @@ class ClariusTarUnpacker():
                 
                 # Check if the item is a tar archive
                 if os.path.isfile(item_path) and item_name.endswith('.tar') and tarfile.is_tarfile(item_path):
-                    file_name = os.path.splitext(item_name)[0]
+                    file_name = Path(item_name).stem
                     extracted_folder = os.path.join(self.path, f"{file_name}_extracted")
                     os.makedirs(extracted_folder, exist_ok=True)
 
@@ -202,7 +184,7 @@ class ClariusTarUnpacker():
         elif self.single_tar_extraction:
             # Handle single tar extraction
             if os.path.isfile(self.tar_path) and self.tar_path.endswith('.tar') and tarfile.is_tarfile(self.tar_path):
-                file_name = os.path.splitext(os.path.basename(self.tar_path))[0]
+                file_name = Path(self.tar_path).stem
                 extracted_folder = os.path.join(os.path.dirname(self.tar_path), f"{file_name}_extracted")
                 os.makedirs(extracted_folder, exist_ok=True)
 
@@ -305,11 +287,11 @@ class ClariusTarUnpacker():
                
         if self.os == "windows":
             # Get the path of the current working directory
-            # working_space_path = os.getcwd()
+            working_space_path = os.getcwd()
             
-            # Construct the full path to the LZO executable, adding the .py extension
-            # path_of_lzo_py_file = os.path.join(working_space_path, self.lzo_py_file_path)
-            
+            # Construct the full path to the LZO executable, adding the .exe extension
+            path_of_lzo_exe_file = os.path.join(working_space_path, self.lzo_exe_file_path)
+
             # Log the path being checked
             logging.info(f'Checking path for LZO executable: {self.lzo_py_file_path}')
 
@@ -1899,7 +1881,7 @@ def read_tgc_file_v2(tgc_path, rf_timestamps):
     frames_data = [frame if "{" in frame else frame + "  - { 0.00mm, 15.00dB }\n  - { 120.00mm, 35.00dB }" for frame in frames_data]
     frames_dict = {timestamp: frame for frame in frames_data for timestamp in rf_timestamps if str(timestamp) in frame}
     missing_timestamps = [ts for ts in rf_timestamps if ts not in frames_dict]
-    if len(missing_timestamps) >= 2:
+    if len(missing_timestamps) >= 2 or len(missing_timestamps) == len(rf_timestamps):
         print("The number of missing timestamps for " + tgc_path + " is: " + str(len(missing_timestamps)) + ". Skipping this scan with current criteria.")
         return None
     elif len(missing_timestamps) == 1:

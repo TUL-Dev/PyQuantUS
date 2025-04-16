@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image, ImageDraw
 from scipy.signal import hilbert
 from scipy.optimize import curve_fit
+from tqdm import tqdm
 
 from pyquantus.utc.objects import UltrasoundImage, AnalysisConfig, Window
 from pyquantus.utc.transforms import computeHanningPowerSpec, computeSpectralParams
@@ -44,17 +45,16 @@ class UtcAnalysis:
         self.roiWindows: List[Window] = []
         self.waveLength: float
         self.nakagamiParams: Tuple
-        self.attenuationCoef: float
         self.refBackScatterCoef: float
         self.effectiveScattererDiameter: float
         self.effectiveScattererConcentration: float
         self.refAttenuation: float
-        self.backScatterCoef: float
 
         self.scSplineX: np.ndarray # pix
         self.splineX: np.ndarray # pix
         self.scSplineY: np.ndarray # pix
         self.splineY: np.ndarray # pix
+        self.computeExtraParamaps = False
 
     def initAnalysisConfig(self):
         """Compute the wavelength of the ultrasound signal and 
@@ -137,7 +137,7 @@ class UtcAnalysis:
                     newWindow.bottom = int(axial[axialInd + axialPixSize - 1])
                     self.roiWindows.append(newWindow)
     
-    def computeUtcWindows(self, extraParams=True, bscFreq=None) -> int:
+    def computeUtcWindows(self, extraParams=True, bscFreq=None, extraParamapParams=False) -> int:
         """Compute UTC parameters for each window in the ROI.
         
         extraParams (bool): Flag on whether to compute non-validated parameters.
@@ -153,6 +153,8 @@ class UtcAnalysis:
         
         if bscFreq is None:
             bscFreq = self.config.centerFrequency
+            
+        self.computeExtraParamaps = extraParams
     
         fs = self.config.samplingFrequency
         f0 = self.config.transducerFreqBand[0]
@@ -161,7 +163,7 @@ class UtcAnalysis:
         upFreq = self.config.analysisFreqBand[1]
 
         # Compute MBF, SS, and SI parameters for each window
-        for window in self.roiWindows:
+        for window in tqdm(self.roiWindows):
             # Compute normalized power spectrum (dB)
             imgWindow = self.ultrasoundImage.rf[window.top: window.bottom+1, window.left: window.right+1]
             refWindow = self.ultrasoundImage.phantomRf[window.top: window.bottom+1, window.left: window.right+1]
@@ -185,7 +187,15 @@ class UtcAnalysis:
             window.results.mbf = mbf # dB
             window.results.ss = p[0]*1e6 # dB/MHz
             window.results.si = p[1] # dB
-
+            
+            if self.computeExtraParamaps:
+                attCoef = self.computeAttenuationCoef(imgWindow, refWindow, windowDepth=min(100, imgWindow.shape[0]//3))
+                bsc = self.computeBackscatterCoefficient(f, ps, rPs, attCoef, bscFreq, roiDepth=imgWindow.shape[0])
+                uNakagami = self.computeNakagamiParams(imgWindow)[1]
+                window.results.attCoef = attCoef # dB/cm/MHz
+                window.results.bsc = bsc # 1/cm-sr
+                window.results.uNakagami = uNakagami
+            
         minLeft = min([window.left for window in self.roiWindows])
         maxRight = max([window.right for window in self.roiWindows])
         minTop = min([window.top for window in self.roiWindows])
@@ -194,10 +204,8 @@ class UtcAnalysis:
         if extraParams:
             imgWindow = self.ultrasoundImage.rf[minTop: maxBottom+1, minLeft: maxRight+1]
             refWindow = self.ultrasoundImage.phantomRf[minTop: maxBottom+1, minLeft: maxRight+1]
-            self.attenuationCoef = self.computeAttenuationCoef(imgWindow, refWindow)
-            self.backScatterCoef = self.computeBackscatterCoefficient(imgWindow, refWindow, bscFreq, roiDepth=minTop)
             self.nakagamiParams = self.computeNakagamiParams(imgWindow) # computing for entire ROI, but could also be easily computed for each window
-            self.effectiveScattererDiameter, self.effectiveScattererConcentration = self.computeEsdac(imgWindow, refWindow, apertureRadiusCm=6)
+            # self.effectiveScattererDiameter, self.effectiveScattererConcentration = self.computeEsdac(imgWindow, refWindow, apertureRadiusCm=6)
         
         return 0
     
@@ -249,48 +257,46 @@ class UtcAnalysis:
         # Compute attenuation for each frequency
         for fIdx in range(startIdx, endIdx):
             normalizedIntensities = np.subtract(psSample[:, fIdx], psRef[:, fIdx])
-            #p = np.polyfit(windowDepthsCm, normalizedIntensities, 1)
-            A = windowDepthsCm.reshape(-1, 1)  # or windowDepthsCm[:, np.newaxis]
-            p, _, _, _ = np.linalg.lstsq(A, normalizedIntensities, rcond=None)
+            p = np.polyfit(windowDepthsCm, normalizedIntensities, 1)
             localAttenuation = self.refAttenuation * f[fIdx] - (1 / 4) * p[0]  # dB/cm
             attenuationCoefficients.append( localAttenuation / f[fIdx])  # dB/cm/MHz
         attenuationCoef=np.mean(attenuationCoefficients)
         return attenuationCoef
     
-    def computeBackscatterCoefficient(self, rfData: np.ndarray, refRfData: np.ndarray,
+    def computeBackscatterCoefficient(self, freqArr: np.ndarray, scanPs: np.ndarray, refPs: np.ndarray, attCoef: float,
                                       frequency: int, roiDepth: int) -> float:
+        
         """Compute the backscatter coefficient of the ROI using the reference phantom method.
         Assumes instrumentation and beam terms have the same effect on the signal from both 
         image and phantom. 
-        source: Mamou & Oelze, page 52: https://doi.org/10.1007/978-94-007-6952-6
-
+        source: Yao et al. (1990) : https://doi.org/10.1177/016173469001200105. PMID: 2184569
         Args:
-            rfData (np.ndarray): RF data of the ROI (n lines x m samples).
-            refRfData (np.ndarray): RF data of the phantom (n lines x m samples).
+            freqArr (np.ndarray): Frequency array of power spectra (Hz).
+            scanPs (np.ndarray): Power spectrum of the analyzed scan at the current region.
+            refPs (np.ndarray): Power spectrum of the reference phantom at the currentn region.
+            attCoef (float): Attenuation coefficient of the current region (dB/cm/MHz).
+            frequency (int): Frequency on which to compute backscatter coefficient (should 
+                    match frequency of self.refBackScatterCoefficient) (Hz).
             roiDepth (int): Depth of the start of the ROI in samples.
-            frequency (int): Frequency on which to compute backscatter coefficient (MHz).
-            refAttenuation (float): Attenuation coefficient of the reference phantom.
             
         Returns:
             float: Backscatter coefficient of the ROI for the central frequency (1/cm-sr).
+            Updated and verified : Feb 2025 - IR
         """
-        f, ps = computeHanningPowerSpec(rfData, self.config.analysisFreqBand[0], self.config.analysisFreqBand[1],
-                                     self.config.samplingFrequency)
-        _, refPs = computeHanningPowerSpec(refRfData, self.config.analysisFreqBand[0], self.config.analysisFreqBand[1],
-                                     self.config.samplingFrequency)
-        
-        ps = ps[len(f)//2]
-        refPs = refPs[len(f)//2]
-        axialResM = self.ultrasoundImage.axialResRf/1000 # m
-        depthDistance = roiDepth*axialResM + 0.5*rfData.shape[0]*axialResM # m, center of ROI
+        index = np.argmin(np.abs(freqArr - frequency))
+        psSample=(scanPs[index])
+        psRef=(refPs[index])
+        sRatio = psSample/psRef
         
         npConversionFactor = np.log(10) / 20 
-        convertedAttCoef = self.attenuationCoef * npConversionFactor / 100 # dB/cm/MHz -> Np/m/MHz
-        convertedRefAttCoef = self.refAttenuation * npConversionFactor / 100 # dB/cm/MHz -> Np/m/MHz
-        convertedAttCoef *= frequency # Np/m
-        convertedRefAttCoef *= frequency # Np/m
-        
-        bsc = (ps/refPs)*self.refBackScatterCoef*np.exp(4*depthDistance*(convertedAttCoef - convertedRefAttCoef)) # 1/cm/sr
+        convertedAttCoef = attCoef * npConversionFactor  # dB/cm/MHz -> Np/cm/MHz
+        convertedRefAttCoef = self.refAttenuation * npConversionFactor # dB/cm/MHz -> Np/cm/MHz
+        windowDepthCm = roiDepth*self.ultrasoundImage.axialResRf/10 # cm
+        convertedAttCoef *= frequency/1e6 # Np/cm
+        convertedRefAttCoef *= frequency/1e6 # Np/cm        
+        attComp=np.exp(4*windowDepthCm *(convertedAttCoef-convertedRefAttCoef)) 
+        bsc = sRatio*self.refBackScatterCoef*attComp
+            
         return bsc
         
     def computeNakagamiParams(self, rfData: np.ndarray) -> Tuple[float, float]:
