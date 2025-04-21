@@ -1,0 +1,38 @@
+# Path inputs & analysis frame
+scan_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Terason RF/im.mat
+phantom_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Terason RF/phantom.mat
+seg_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Terason RF/roi.pkl
+config_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Terason RF/analysis.pkl
+
+# Core Pipeline Customization
+scan_loader: terason_rf
+analysis_type: full_paramap
+visualization_type: paramap_drawing
+
+# Data Loading Customization
+scan_loader_kwargs:
+parser_output_path: parsed_data.pkl
+seg_loader: pkl_roi
+seg_loader_kwargs:
+  assert_scan: True
+  assert_phantom: False
+config_loader: pkl_rf
+config_kwargs:
+  assert_scan: False
+  assert_phantom: False
+save_parsed_results: False
+
+# Analysis Customization
+analysis_kwargs:
+  ref_attenuation: 0.7
+  ref_backscatter_coef: 0.0006
+analysis_output_path: analysis_results.pkl
+save_analysis_results: False
+
+# Visualization Customization
+visualization_kwargs:
+  ps_plot_output_path: psPlot.png
+  paramap_folder_path: z-paramaps
+export_visualizations: True
+visualization_output_path: visualization_results.pkl
+save_visualization_class: False

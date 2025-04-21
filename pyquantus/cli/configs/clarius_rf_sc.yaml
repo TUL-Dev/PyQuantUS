@@ -1,0 +1,36 @@
+# Path inputs & analysis frame
+scan_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Clarius RF/PDG1738089148213.tar
+phantom_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Clarius RF/PDG1738089148213.tar
+seg_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Clarius RF/a896ef50-1922-4df2-8995-a57b5a46d800/roi.pkl
+config_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Clarius RF/analysis.pkl
+
+# Core Pipeline Customization
+scan_loader: clarius_rf_sc
+analysis_type: spectral_paramap_sc
+visualization_type: paramap_drawing_sc
+
+# Data Loading Customization
+scan_loader_kwargs:
+parser_output_path: parsed_data.pkl
+seg_loader: pkl_roi
+seg_loader_kwargs:
+  assert_scan: False
+  assert_phantom: False
+config_loader: pkl_rf
+config_kwargs:
+  assert_scan: False
+  assert_phantom: False
+save_parsed_results: False
+
+# Analysis Customization
+analysis_kwargs:
+analysis_output_path: analysis_results.pkl
+save_analysis_results: False
+
+# Visualization Customization
+visualization_kwargs:
+  ps_plot_output_path: psPlot.png
+  paramap_folder_path: z-paramaps
+export_visualizations: True
+visualization_output_path: visualization_results.pkl
+save_visualization_class: False
