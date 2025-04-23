@@ -3,10 +3,11 @@ import platform
 from pathlib import Path
 from datetime import datetime
 import warnings
-import ctypes as ct
+from tqdm import tqdm
 
 import numpy as np
 from scipy.io import savemat
+
 from philipsRfParser import getPartA, getPartB
 
 
@@ -685,9 +686,75 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
         numClumps = int(np.floor(readSize/32)) # 256 bit clumps
 
         offset = totalHeaderSize+readOffset
-        partA = callGetPartA(numClumps, filepath, offset)
-        partB = callGetPartB(numClumps, filepath, offset)
-        rawrfdata = np.concatenate((partA, partB))
+        
+        def get_partA(num_clumps, fn, offset_bytes):
+            # Preallocate output
+            partA = np.zeros(12 * num_clumps, dtype=np.uint32)
+
+            try:
+                with open(fn, 'rb') as f:
+                    f.seek(offset_bytes)
+                    total_bytes = 32 * num_clumps  # Each clump = 32 bytes = 256 bits
+                    raw = f.read(total_bytes)
+                    if len(raw) < total_bytes:
+                        print("Warning: Read less data than expected.")
+            except OSError as e:
+                print(f"File error: {e}")
+                raise
+
+            # Reverse the bits in each byte
+            bit_reverse_lookup = np.array([
+                f"{i:08b}"[::-1] for i in range(256)
+            ], dtype=str)
+            raw_array = np.frombuffer(raw, dtype=np.uint8)
+            reversed_bytes = bit_reverse_lookup[raw_array]
+
+            # Reshape into clumps: 32 bytes per clump
+            clump_data = reversed_bytes.reshape((num_clumps, 32))
+
+            idx = 0
+            for clump_idx in tqdm(range(num_clumps), desc="Reading Part A", unit="clump"):
+                clump_bits = ''.join(clump_data[clump_idx])
+                for i in range(12):
+                    partA[idx] = int(clump_bits[i*21:(i+1)*21][::-1], 2)
+                    idx += 1
+
+            return partA.reshape((12, -1), order='F')
+
+        def get_partB(num_clumps, fn, offset_bytes):
+            # equivalent to fread(fid, [1, numClumps], '1*ubit4', 252)
+            partB = np.zeros(num_clumps, dtype=np.uint8)
+            mask = 0b00001111  # 4-bit mask
+            x = 0
+            j = 0
+
+            try:
+                with open(fn, 'rb') as f:
+                    f.seek(offset_bytes)
+                    while j < num_clumps:
+                        bytes_read = f.read(32)  # read a block of 32 bytes
+                        if not bytes_read:
+                            print(f"EOF reached at column {j}")
+                            break
+                        cur_num = bytes_read[0] & mask  # grab lower 4 bits
+                        partB[x] = cur_num
+                        x += 1
+                        j += 1
+            except OSError as e:
+                print(f"File error: {e}")
+                raise
+
+            return partB.reshape((1, -1))
+
+        
+        # rawrfdata = read_custom_format(filepath, totalHeaderSize, readOffset, numClumps)
+        if platform.system() != 'Windows':
+            partA = callGetPartA(numClumps, filepath, offset)
+            partB = callGetPartB(numClumps, filepath, offset)
+        else: # Less efficient but works on all platforms (Python-based)
+            partA = get_partA(numClumps, filepath, offset)
+            partB = get_partB(numClumps, filepath, offset)
+        rawrfdata = np.concatenate((partA, partB), axis=0)
 
     # Reshape Raw RF Dawta
     if isVoyager:
@@ -716,6 +783,7 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
             rawrfdata = np.concatenate((temp[:]),axis=2)
         
     print(str("Elapsed time is "+str(-1*(start_time - datetime.now()))+" seconds."))
+    print("RF Data Shape:", rawrfdata.shape)
 
     # Parse Header
     print("Parsing header info ...")
@@ -1018,4 +1086,4 @@ def philipsRfParser(filepath: str, ML_out=2, ML_in=32, used_os=2256) -> np.ndarr
     return np.array(rf_data_all_fund).shape
 
 if __name__ == "__main__":
-    philipsRfParser("/Users/davidspector/Downloads/parserRF_pywrap-2-2/rfCapture_20220511_144204.rf")
+    philipsRfParser('/Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Philips RF 2D/sample.rf')
