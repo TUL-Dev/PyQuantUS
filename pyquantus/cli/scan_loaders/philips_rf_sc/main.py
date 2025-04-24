@@ -9,7 +9,7 @@ class EntryClass(ScUltrasoundRfImage):
     """
     
     def __init__(self, scan_path: str, phantom_path: str, **kwargs):
-        super().__init__()
+        super().__init__(scan_path, phantom_path)
         
         frame = kwargs.get("frame", 0)
         assert isinstance(frame, int)

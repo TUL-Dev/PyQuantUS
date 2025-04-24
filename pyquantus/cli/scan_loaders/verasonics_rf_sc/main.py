@@ -8,7 +8,7 @@ class EntryClass(ScUltrasoundRfImage):
     """
     
     def __init__(self, scan_path: str, phantom_path: str, **kwargs):
-        super().__init__()
+        super().__init__(scan_path, phantom_path)
         
         param_path = kwargs.get('param_path', None)
         if param_path is None:

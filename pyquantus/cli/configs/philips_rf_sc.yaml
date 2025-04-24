@@ -34,3 +34,8 @@ visualization_kwargs:
 export_visualizations: True
 visualization_output_path: visualization_results.pkl
 save_visualization_class: False
+
+# Data Export Customization
+data_export_type: mean_paramap_vals
+data_export_path: test.csv
+data_export_kwargs:

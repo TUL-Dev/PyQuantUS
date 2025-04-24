@@ -100,48 +100,14 @@ def core_pipeline(args) -> int:
     image_data = scan_loader(args.scan_path, args.phantom_path, frame=seg_data.frame, **args.scan_loader_kwargs) # Load signal data
     config = config_loader(args.config_path, scan_path=args.scan_path, phantom_path=args.phantom_path, **args.config_kwargs) # Load analysis config
     
-    if args.save_parsed_results:
-        # Save parsed data
-        parsed_data = [image_data, config, seg_data]
-        if Path(args.output_path).is_dir():
-            output_path = Path(args.output_path) / 'parsed_data.pkl'
-        elif Path(args.output_path).suffix != '.pkl':
-            output_path = Path(args.output_path).with_suffix('.pkl')
-        else:
-            output_path = Path(args.output_path)
-        with open(output_path, 'wb') as f:
-            pickle.dump(parsed_data, f)
-    
     # Analysis
     analysis_obj = analysis_class(image_data, config, seg_data, **args.analysis_kwargs)
     analysis_obj.compute_paramaps()
     analysis_obj.compute_single_window()
-    
-    if args.save_analysis_results:
-        # Save analysis results
-        if Path(args.analysis_output_path).is_dir():
-            output_path = Path(args.analysis_output_path) / 'analysis_results.pkl'
-        elif Path(args.analysis_output_path).suffix != '.pkl':
-            output_path = Path(args.analysis_output_path).with_suffix('.pkl')
-        else:
-            output_path = Path(args.analysis_output_path)
-        with open(output_path, 'wb') as f:
-            pickle.dump(analysis_obj, f)
             
     # Visualizations
     visualization_obj = visualization_class(analysis_obj, **args.visualization_kwargs)
     visualization_obj.compute_visualizations()
-    
-    if args.save_visualization_class:
-        # Save visualization class instance
-        if Path(args.visualization_output_path).is_dir():
-            output_path = Path(args.visualization_output_path) / 'visualizations.pkl'
-        elif Path(args.visualization_output_path).suffix != '.pkl':
-            output_path = Path(args.visualization_output_path).with_suffix('.pkl')
-        else:
-            output_path = Path(args.visualization_output_path)
-        with open(output_path, 'wb') as f:
-            pickle.dump(visualization_obj, f)
             
     # Data Export
     data_export_obj = data_export_class(analysis_obj, args.data_export_path, **args.data_export_kwargs)

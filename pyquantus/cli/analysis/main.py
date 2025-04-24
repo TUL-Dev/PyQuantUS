@@ -8,10 +8,6 @@ def analysis_args(parser: ArgumentParser):
                         help='Analysis type to complete. Available analysis types: ' + ', '.join(get_analysis_types().keys()))
     parser.add_argument('--analysis_kwargs', type=str, default='{}',
                         help='Analysis kwargs in JSON format needed for analysis class.')
-    parser.add_argument('--analysis_output_path', type=str, default='analysis_results.pkl',
-                        help='Path to output analysis results')
-    parser.add_argument('--save_analysis_results', type=bool, default=False,
-                        help='Save analysis results to ANALYSIS_OUTPUT_PATH')
     
     
 def get_analysis_types() -> dict:

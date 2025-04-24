@@ -17,6 +17,8 @@ class EntryClass(BaseDataExport):
         """Create pandas dataframe to export results."""
         params = self.analysis_obj.roi_windows[0].results.__dict__.keys()
         row = {}
+        row["Scan Name"] = self.analysis_obj.image_data.scan_name
+        row["Phantom Name"] = self.analysis_obj.image_data.phantom_name
         for param in params:
             if isinstance(getattr(self.analysis_obj.roi_windows[0].results, param), (str, list, np.ndarray)):
                 continue
