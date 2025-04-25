@@ -1,0 +1,42 @@
+# Screen 1: Workflow type
+workflow_type: utc # can be 'utc' or 'ceus' or 'saved_workflow'
+data_format: canon_iq
+coordinate_type: polar # can be 'cartesian' or 'polar'
+n_spatial_dims: 2 # can be 2 or 3
+
+# Screen 2: Scan inputs
+scan_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Canon IQ/Sample Patient 001/Preset_2/image.bin
+phantom_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Canon IQ/Phantom data/Preset_2/phantom2.bin
+scan_loader_kwargs:
+
+# Screen 3: Segmentation (either drawing or saved)
+seg_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Canon IQ/Sample Patient 001/Preset_2/roi.pkl
+seg_loader: pkl_roi
+seg_loader_kwargs:
+  assert_scan: True
+  assert_phantom: False
+
+# Screen 4: Analysis Type / Customization
+analysis_type: full_paramap
+analysis_kwargs:
+  ref_attenuation: 0.7
+  ref_backscatter_coef: 0.0006
+
+# Screen 5: Analysis Configuration (either from GUI or saved)
+config_path: /Users/davidspector/Home/Stanford/QuantUS Projects/Sample Data/Canon IQ/Sample Patient 001/Preset_2/analysisConfig.pkl
+config_loader: pkl_rf
+config_kwargs:
+  assert_scan: False
+  assert_phantom: False
+
+# Screen 6: Visualization Type / Customization
+visualization_type: paramap_drawing
+visualization_kwargs:
+  ps_plot_output_path: psPlot.png
+  paramap_folder_path: z-paramaps
+export_visualizations: True
+
+# Screen 7: Data Export Type / Customization
+data_export_type: mean_paramap_vals
+data_export_path: test.csv
+data_export_kwargs:
