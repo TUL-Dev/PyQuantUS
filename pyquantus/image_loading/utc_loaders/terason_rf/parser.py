@@ -3,7 +3,7 @@ from scipy.io import loadmat
 from scipy.signal import hilbert
 from typing import Tuple
 
-from pyquantus.parse.objects import DataOutputStruct, InfoStruct
+from .objects import DataOutputStruct, InfoStruct
 
 def readFileInfo(path: str) -> Tuple[InfoStruct, float, np.ndarray, np.ndarray]:
     """Reads the metadata and RF data from a Terason .mat file.

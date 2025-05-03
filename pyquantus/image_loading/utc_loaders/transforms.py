@@ -1,9 +1,18 @@
+# Helpful functions for scan conversion and RF conversion
+
 import numpy as np
 from numpy.matlib import repmat
 import scipy.signal as ssg    
 from typing import Tuple
+from dataclasses import dataclass
 
-from pyquantus.parse.objects import OutImStruct
+@dataclass
+class OutImStruct():
+    """Output image structure for scan converted images."""
+    scArr: np.ndarray
+    xmap: np.ndarray # sc (y,x) --> preSC x
+    ymap: np.ndarray # sc (y,x) --> preSC y
+    
 
 def iqToRf(iqData, rxFrequency, decimationFactor, carrierFrequency):
     """Convert IQ data to RF data."""
@@ -98,8 +107,5 @@ def scanConvert(inIm: np.ndarray, width: float, tilt: float, startDepth: float, 
     hCm = heightCm
     wCm = widthCm
     
-    OutIm = OutImStruct()
-    OutIm.scArr = outIm
-    OutIm.ymap = inIm_indy
-    OutIm.xmap = inIm_indx
+    OutIm = OutImStruct(outIm, inIm_indx, inIm_indy)
     return OutIm, hCm, wCm

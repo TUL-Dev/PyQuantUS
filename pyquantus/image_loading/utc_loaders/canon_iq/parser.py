@@ -4,8 +4,8 @@ import numpy as np
 from scipy.signal import hilbert
 from typing import Tuple
 
-from pyquantus.parse.objects import DataOutputStruct, InfoStruct
-from pyquantus.parse.transforms import scanConvert, iqToRf
+from .objects import DataOutputStruct, InfoStruct
+from ..transforms import scanConvert, iqToRf
 
 def findPreset(filename: str) -> int:
     """Find the preset of the Canon file (experiment-specific convention).

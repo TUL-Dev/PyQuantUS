@@ -1,11 +1,6 @@
 import numpy as np
 
-class OutImStruct():
-    """Output image structure for scan converted images."""
-    def __init__(self):
-        self.scArr: np.ndarray
-        self.xmap: np.ndarray # sc (y,x) --> preSC x
-        self.ymap: np.ndarray # sc (y,x) --> preSC y
+from ..transforms import OutImStruct
         
 class DataOutputStruct():
     """Data output structure for general RF/IQ data."""
@@ -16,15 +11,6 @@ class DataOutputStruct():
         self.bMode: np.ndarray
         self.widthPixels: int
         self.depthPixels: int
-        
-class ScConfig:
-    """Scan conversion configuration."""
-    def __init__(self):
-        self.width: int # deg
-        self.tilt: int
-        self.startDepth: float # mm
-        self.endDepth: float # mm
-        self.numSamplesDrOut: int
         
 class InfoStruct():
     """Metadata structure for RF/IQ data."""
