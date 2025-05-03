@@ -2,7 +2,7 @@ import pandas as pd
 from typing import List
 
 from ...data_objs.visualizations import ParamapDrawingBase
-from ...data_objs.export_data import BaseDataExport
+from ...data_objs.data_export import BaseDataExport
 from .functions import *
 
 class PKLExport(BaseDataExport):
