@@ -54,4 +54,6 @@ def get_visualization_types() -> Tuple[dict, dict]:
             # Handle the case where the functions module cannot be found
             functions[type_name] = {}
             
+    functions['paramap']['paramaps'] = None # Built-in function
+            
     return types, functions

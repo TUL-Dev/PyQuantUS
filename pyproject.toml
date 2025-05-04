@@ -69,15 +69,17 @@ dependencies = [
     "vtk>=9.2.6"
 ]
 
-#TODO: Add optional dev dependencies for sphinx and testing
-
 [project.urls]
 "Source" = "https://github.com/TUL-Dev/PyQuantUS"
 
-[tool.setuptools]
-ext-modules = [
-  {name = "philipsRfParser", sources = ["pyquantus/parse/philips_rf_parser.c"]},
-]
+[project.scripts]
+quantus = "pyquantus.full_workflow:main_yaml"
+quantus_cli = "pyquantus.cli:main_cli"
+
+# [tool.setuptools]
+# ext-modules = [
+#   {name = "philipsRfParser", sources = ["pyquantus/parse/philips_rf_parser.c"]},
+# ]
 
 [tool.setuptools.packages.find]
 where = ["."]

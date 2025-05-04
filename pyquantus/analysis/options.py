@@ -10,6 +10,33 @@ def analysis_args(parser: ArgumentParser):
     parser.add_argument('--analysis_kwargs', type=str, default='{}',
                         help='Analysis kwargs in JSON format needed for analysis class.')
     
+def get_required_kwargs(analysis_type: str, analysis_funcs: list) -> list:
+    """Get required kwargs for a given list of analysis functions.
+
+    Args:
+        analysis_type (str): the type of analysis to perform.
+        analysis_funcs (list): list of analysis functions to apply.
+
+    Returns:
+        list: List of required kwargs for the specified analysis functions.
+    """
+    
+    all_analysis_funcs = get_analysis_types()[1]
+    
+    # Find all required kwargs
+    required_kwargs = []
+    for name in analysis_funcs:
+        # Consider dependencies of analysis functions as well
+        for dep in all_analysis_funcs[analysis_type][name].get('deps', []):
+            if dep not in analysis_funcs:
+                analysis_funcs.append(dep)
+
+    for name in analysis_funcs:
+        required_kwargs.extend(all_analysis_funcs[analysis_type][name].get('kwarg_names', []))
+    required_kwargs = list(set(required_kwargs))  # Remove duplicates
+    
+    return required_kwargs
+    
 def get_analysis_types() -> Tuple[dict, dict]:
     """Get analysis types for the CLI.
     

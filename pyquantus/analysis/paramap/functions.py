@@ -176,7 +176,7 @@ def attenuation_coef(scan_rf_window: np.ndarray, phantom_rf_window: np.ndarray,
     # Fill in attributes defined in "output_vars" decorator
     window.results.att_coef = attenuation_coef # dB/cm/MHz
     
-@output_vars("bsc", "ref_bsc")
+@output_vars("bsc")
 @required_kwargs("ref_bsc", "ref_attenuation")
 @dependencies("compute_power_spectra", "attenuation_coef")
 def bsc(scan_rf_window: np.ndarray, phantom_rf_window: np.ndarray, 
@@ -231,7 +231,6 @@ def bsc(scan_rf_window: np.ndarray, phantom_rf_window: np.ndarray,
 
     # Fill in attributes defined in "output_vars" decorator
     window.results.bsc = bsc # 1/cm-sr
-    window.results.ref_bsc = ref_backscatter_coef # 1/cm-sr
 
 @output_vars("nak_w", "nak_u")
 def nakagami_params(scan_rf_window: np.ndarray, phantom_rf_window: np.ndarray, 

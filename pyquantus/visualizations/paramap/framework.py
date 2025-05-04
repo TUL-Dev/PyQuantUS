@@ -118,4 +118,4 @@ class ParamapVisualizations(ParamapDrawingBase):
             if func_name == "paramaps":
                 continue
             function = globals()[func_name]
-            function(self.analysis_obj, self.paramap_folder_path, **self.kwargs)
+            function(self.analysis_obj, self.paramap_folder_path)

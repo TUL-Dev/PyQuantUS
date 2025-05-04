@@ -101,22 +101,22 @@ def analysis_step(analysis_type: str, image_data: UltrasoundRfImage, config: RfA
     Returns:
         ParamapAnalysisBase: Analysis object containing the results.
     """
-    analysis_types, analysis_funcs = get_analysis_types()
+    all_analysis_types, all_analysis_funcs = get_analysis_types()
     
     # Find the analysis class
     try:
-        analysis_class = analysis_types[analysis_type]
+        analysis_class = all_analysis_types[analysis_type]
     except KeyError:
         print(f'Analysis type "{analysis_type}" is not available!')
-        print(f"Available analysis types: {', '.join(analysis_types.keys())}")
+        print(f"Available analysis types: {', '.join(all_analysis_types.keys())}")
         return 1
     
     # Check analysis setup
-    for name in analysis_funcs[analysis_type].keys():   
-        if name not in analysis_funcs[analysis_type]:
-            raise ValueError(f"Function '{name}' not found in {analysis_type} analysis type.\nAvailable functions: {', '.join(analysis_funcs[analysis_type].keys())}")
-        analysis_kwargs = analysis_funcs[analysis_type][name].get('kwarg_names', [])
-        for kwarg in analysis_kwargs:
+    for name in all_analysis_funcs[analysis_type].keys():   
+        if name not in all_analysis_funcs[analysis_type]:
+            raise ValueError(f"Function '{name}' not found in {analysis_type} analysis type.\nAvailable functions: {', '.join(all_analysis_funcs[analysis_type].keys())}")
+        required_analysis_kwargs = all_analysis_funcs[analysis_type][name].get('kwarg_names', [])
+        for kwarg in required_analysis_kwargs:
             if kwarg not in analysis_kwargs:
                 raise ValueError(f"analysis_kwargs: Missing required keyword argument '{kwarg}' for function '{name}' in {analysis_type} analysis type.")
             
@@ -139,20 +139,20 @@ def visualization_step(visualization_type: str, analysis_obj: ParamapAnalysisBas
     Returns:
         ParamapDrawingBase: Visualization object containing the results.
     """
-    visualization_types, visualization_funcs = get_visualization_types()
+    all_visualization_types, all_visualization_funcs = get_visualization_types()
     
     # Find the visualization class
     try:
-        visualization_class = visualization_types[visualization_type]
+        visualization_class = all_visualization_types[visualization_type]
     except KeyError:
         print(f'Visualization type "{visualization_type}" is not available!')
-        print(f"Available visualization types: {', '.join(visualization_types.keys())}")
+        print(f"Available visualization types: {', '.join(all_visualization_types.keys())}")
         return 1
     
     # Check visualization setup
-    for name in visualization_funcs[visualization_type].keys():
-        if name not in visualization_funcs[visualization_type]:
-            raise ValueError(f"Function '{name}' not found in {visualization_type} visualization type.\nAvailable functions: {', '.join(visualization_funcs[visualization_type].keys())}")
+    for name in visualization_funcs:
+        if name not in all_visualization_funcs[visualization_type]:
+            raise ValueError(f"Function '{name}' not found in {visualization_type} visualization type.\nAvailable functions: {', '.join(all_visualization_funcs[visualization_type].keys())}")
     
     # Perform visualization
     visualization_obj = visualization_class(analysis_obj, visualization_funcs, **visualization_kwargs)
@@ -172,19 +172,19 @@ def data_export_step(data_export_type: str, visualization_obj: ParamapDrawingBas
     Returns:
         BaseDataExport: Data export object containing the results.
     """
-    data_export_types, data_export_funcs = get_data_export_types()
+    all_data_export_types, all_data_export_funcs = get_data_export_types()
     
     # Find the data export class
     try:
-        data_export_class = data_export_types[data_export_type]
+        data_export_class = all_data_export_types[data_export_type]
     except KeyError:
         print(f'Data export type "{data_export_type}" is not available!')
-        print(f"Available data export types: {', '.join(data_export_types.keys())}")
+        print(f"Available data export types: {', '.join(all_data_export_types.keys())}")
         return 1
     
     # Check data export setup
-    for name in data_export_funcs[data_export_type].keys():
-        if name not in data_export_funcs[data_export_type]:
+    for name in data_export_funcs:
+        if name not in all_data_export_funcs[data_export_type].keys():
             raise ValueError(f"Function '{name}' not found in {data_export_type} data export type.\nAvailable functions: {', '.join(data_export_funcs[data_export_type].keys())}")
     
     # Perform data export
