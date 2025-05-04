@@ -7,7 +7,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 from .analysis import ParamapAnalysisBase
-from ..image_loading.utc_loaders.transforms import scanConvert
+from ..image_loading.utc_loaders.transforms import scanConvert, scanConvert3dVolumeSeries
 
 class ParamapDrawingBase(ABC):
     """Facilitate parametric map visualizations of ultrasound images.
@@ -63,8 +63,11 @@ class ParamapDrawingBase(ABC):
                                                     image_data.tilt, image_data.start_depth,
                                                     image_data.end_depth, desiredHeight=image_data.sc_bmode.shape[0])[0].scArr,
                                                   dtype=int)
+            elif image_data.sc_bmode.ndim == 3:
+                self.sc_window_idx_map = np.array(scanConvert3dVolumeSeries(self.window_idx_map, image_data.sc_params_3d, scale=False, interp='nearest')[0],
+                                                  dtype=int)
             else:
-                raise NotImplementedError("Scan conversion for 3D data is not implemented yet.")
+                raise NotImplementedError("Scan conversion only implemented for 2D and 3D data.")
             
         
     def draw_paramap(self, param: str, cmap: list) -> Tuple[np.ndarray, plt.Figure]:

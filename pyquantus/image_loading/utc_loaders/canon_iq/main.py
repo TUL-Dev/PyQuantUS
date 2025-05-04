@@ -14,7 +14,7 @@ class EntryClass(UltrasoundRfImage):
         super().__init__(scan_path, phantom_path)
         
         # Supported file extensions for this loader
-        assert Path(scan_path).suffix in self.extensions, f"File must end with {self.extensions[0]}"
+        assert Path(scan_path).suffix in self.extensions, f"File must end with {self.extensions}"
         
         imgData, imgInfo, refData, refInfo = canonIqParser(scan_path, phantom_path)
         self.rf_data = imgData.rf

@@ -38,12 +38,4 @@ class UltrasoundRfImage:
         self.sc_axial_res: float # mm/pix
         self.sc_lateral_res: float # mm/pix
         self.sc_coronal_res: float # mm/pix
-        self.apex_dist: float # distance of virtual apex to probe surface in mm
-        self.azim_steer_angle_start: float # azimuth steering angle (start) in degree
-        self.azim_steer_angle_end: float # azimuth steering angle (end) in degree
-        self.elev_steer_angle_start: float # elevation steering angle (start) in degree
-        self.elev_steer_angle_end: float # elevation steering angle (end) in degree
-        self.vol_depth: float # Coronal
-        self.vol_width: float # Lateral
-        self.vol_height: float # Axial
-        self.pix_per_mm: float # pixels/mm
+        self.sc_params_3d = None

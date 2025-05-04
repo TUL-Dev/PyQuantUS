@@ -10,4 +10,5 @@ class BmodeSeg:
         self.seg_name: str
         self.splines: List[np.ndarray] # [X, Y, (Z)]
         self.seg_mask: np.ndarray
+        self.sc_seg_mask: np.ndarray
         self.frame: int

@@ -34,7 +34,7 @@ class ParamapVisualizations(ParamapDrawingBase):
         self.legend_paramaps = []
         self.plots = []
         
-    def save_2d_paramap(self, bmode: np.ndarray, paramap: np.ndarray, legend: plt.Figure, dest_path: str) -> None:
+    def save_2d_paramap(self, bmode: np.ndarray, paramap: np.ndarray, legend: plt.Figure, dest_path: Path) -> None:
         """Saves the parametric map and legend to the specified path.
         
         Args:
@@ -43,7 +43,7 @@ class ParamapVisualizations(ParamapDrawingBase):
             legend (plt.Figure): The legend figure to save.
             dest_path (str): The destination path for saving the parametric map.
         """
-        assert dest_path.endswith('.png'), "Parametric map output path must end with .png"
+        assert str(dest_path).endswith('.png'), "Parametric map output path must end with .png"
         
         # Overlay the paramap on the B-mode image
         fig, ax = plt.subplots()
@@ -60,8 +60,8 @@ class ParamapVisualizations(ParamapDrawingBase):
         ax.set_aspect(abs((extent[1]-extent[0])/(extent[3]-extent[2]))/aspect)
         ax.axis('off')
         
-        fig.savefig(Path(dest_path).parent / (Path(dest_path).stem + '_paramap.png'), bbox_inches='tight', pad_inches=0)
-        legend.savefig(Path(dest_path).parent / (Path(dest_path).stem + '_legend.png'), bbox_inches='tight', pad_inches=0)
+        fig.savefig(dest_path.parent / (dest_path.stem + '_paramap.png'), bbox_inches='tight', pad_inches=0)
+        legend.savefig(dest_path.parent / (dest_path.stem + '_legend.png'), bbox_inches='tight', pad_inches=0)
         
     def save_general_paramap(self, paramap: np.ndarray, legend: plt.Figure, dest_path: Path) -> None:
         """Saves the parametric map to the specified path.
@@ -74,7 +74,7 @@ class ParamapVisualizations(ParamapDrawingBase):
         
         legend.savefig(dest_path.parent / (dest_path.stem + '_legend.png'), bbox_inches='tight', pad_inches=0)
         
-        with open(dest_path.aprent / (dest_path.stem + '_paramap.pkl'), 'wb') as f:
+        with open(dest_path.parent / (dest_path.stem + '_paramap.pkl'), 'wb') as f:
             pickle.dump(paramap, f)
         
     def export_visualizations(self):
@@ -95,11 +95,15 @@ class ParamapVisualizations(ParamapDrawingBase):
                 if self.analysis_obj.image_data.sc_bmode is not None:
                     with open(paramap_folder_path / 'bmode.pkl', 'wb') as f:
                         pickle.dump(self.analysis_obj.image_data.sc_bmode, f)
+                    with open(paramap_folder_path / 'segmentation.pkl', 'wb') as f:
+                        pickle.dump(self.analysis_obj.seg_data.sc_seg_mask, f)
                 else:
                     with open(paramap_folder_path / 'bmode.pkl', 'wb') as f:
                         pickle.dump(self.analysis_obj.image_data.bmode, f)
+                    with open(paramap_folder_path / 'segmentation.pkl', 'wb') as f:
+                        pickle.dump(self.analysis_obj.seg_data.seg_mask, f)
             
-            # Save paramaetric maps
+            # Save parametric maps
             params = self.analysis_obj.windows[0].results.__dict__.keys()
             cmap_ix = 0
             for param in params:
@@ -109,9 +113,9 @@ class ParamapVisualizations(ParamapDrawingBase):
                 cmap_ix += 1
                 
                 if bmode is not None:
-                    self.save_2d_paramap(bmode, paramap, legend, str(paramap_folder_path / f'{param}.png'))
+                    self.save_2d_paramap(bmode, paramap, legend, paramap_folder_path / f'{param}.png')
                 else:
-                    self.save_general_paramap(paramap, legend, str(paramap_folder_path / f'{param}.pkl'))
+                    self.save_general_paramap(paramap, legend, paramap_folder_path / f'{param}.pkl')
 
         # Complete all custom visualizations
         for func_name in self.visualization_funcs:

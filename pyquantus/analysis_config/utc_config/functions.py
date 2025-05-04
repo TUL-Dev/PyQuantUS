@@ -42,3 +42,5 @@ def philips_3d_config(analysis_path: str, **kwargs) -> RfAnalysisConfig:
     out.coronal_overlap = 0.5 # % of window overlap in coronal direction
     out.center_frequency = 4500000 # Hz
     out.sampling_frequency = 4*out.center_frequency # Hz
+
+    return out

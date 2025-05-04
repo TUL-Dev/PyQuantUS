@@ -27,7 +27,7 @@ class ParamapAnalysis(ParamapAnalysisBase):
         self.seg_data = seg
         self.image_data = image_data
         self.config = config
-        if len(self.seg_data.splines) == 2:
+        if hasattr(self.seg_data, "splines") and len(self.seg_data.splines) == 2:
             self.spline_x = seg.splines[0]
             self.spline_y = seg.splines[1]
         self.determine_func_order()
@@ -80,7 +80,7 @@ class ParamapAnalysis(ParamapAnalysisBase):
         coronal_start = np.min(np.where(np.any(self.seg_data.seg_mask, axis=(1, 2)))[0])
         coronal_end = np.max(np.where(np.any(self.seg_data.seg_mask, axis=(1, 2)))[0])
         
-        self.voi_windows = []
+        self.windows = []
         
         for axial_pos in np.arange(axial_start, axial_end, axial_increment):
             for lateral_pos in np.arange(lateral_start, lateral_end, lateral_increment):
@@ -111,7 +111,7 @@ class ParamapAnalysis(ParamapAnalysisBase):
                         new_window.lat_max = int(lateral_pos + lateral_pix_size)
                         new_window.cor_min = int(coronal_pos)
                         new_window.cor_max = int(coronal_pos + coronal_pix_size)
-                        self.voi_windows.append(new_window)
+                        self.windows.append(new_window)
         
     def generate_seg_windows(self):
         """Generate windows for parametric map analysis based on user-defined segmentation.
@@ -172,12 +172,24 @@ class ParamapAnalysis(ParamapAnalysisBase):
         Args:
             window (Window): Window object to store results.
         """
-        img_window = self.image_data.rf_data[
-            window.ax_min: window.ax_max + 1, window.lat_min: window.lat_max + 1
-        ]
-        phantom_window = self.image_data.phantom_rf_data[
-            window.ax_min: window.ax_max + 1, window.lat_min: window.lat_max + 1
-        ]
+        if self.image_data.bmode.ndim == 2:
+            img_window = self.image_data.rf_data[
+                window.ax_min: window.ax_max + 1, window.lat_min: window.lat_max + 1
+            ]
+            phantom_window = self.image_data.phantom_rf_data[
+                window.ax_min: window.ax_max + 1, window.lat_min: window.lat_max + 1
+            ]
+        elif self.image_data.bmode.ndim == 3:
+            img_window = self.image_data.rf_data[
+                window.cor_min: window.cor_max + 1, window.lat_min: window.lat_max + 1,
+                window.ax_min: window.ax_max + 1
+            ]
+            phantom_window = self.image_data.phantom_rf_data[
+                window.cor_min: window.cor_max + 1, window.lat_min: window.lat_max + 1,
+                window.ax_min: window.ax_max + 1
+            ]
+        else:
+            raise ValueError("Invalid RF data dimensions. Expected 2D or 3D data.")
         
         for function in self.function_order:
             function(img_window, phantom_window, window, self.config, self.image_data, **self.analysis_kwargs)
@@ -187,10 +199,16 @@ class ParamapAnalysis(ParamapAnalysisBase):
         max_ax = max([window.ax_max for window in self.windows])
         min_lat = min([window.lat_min for window in self.windows])
         max_lat = max([window.lat_max for window in self.windows])
+        if self.image_data.bmode.ndim == 3:
+            min_cor = min([window.cor_min for window in self.windows])
+            max_cor = max([window.cor_max for window in self.windows])
         
         self.single_window = Window()
         self.single_window.lat_min = min_lat
         self.single_window.lat_max = max_lat
         self.single_window.ax_min = min_ax
         self.single_window.ax_max = max_ax
+        if self.image_data.bmode.ndim == 3:
+            self.single_window.cor_min = min_cor
+            self.single_window.cor_max = max_cor
         self.compute_window_vals(self.single_window)
