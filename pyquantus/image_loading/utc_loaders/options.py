@@ -30,7 +30,9 @@ def get_scan_loaders() -> dict:
                 module = importlib.import_module(f"pyquantus.image_loading.utc_loaders.{folder.name}.main")
                 entry_class = getattr(module, "EntryClass", None)
                 if entry_class:
-                    classes[folder.name] = entry_class
+                    classes[folder.name] = {}
+                    classes[folder.name]['cls'] = entry_class
+                    classes[folder.name]['file_exts'] = entry_class.extensions
             except ModuleNotFoundError:
                 # Handle the case where the module cannot be found
                 pass
