@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pyquantus.data_objs import UltrasoundRfImage, BmodeSeg, RfAnalysisConfig, \
         ParamapAnalysisBase, ParamapDrawingBase, BaseDataExport
 from pyquantus.image_loading.utc_loaders.options import get_scan_loaders
@@ -27,7 +29,8 @@ def scan_loading_step(scan_type: str, scan_path: str, phantom_path: str, **scan_
     
     # Find the scan loader
     try:
-        scan_loader = scan_loaders[scan_type]
+        scan_loader = scan_loaders[scan_type]['cls']
+        assert Path(scan_path).suffix in scan_loaders[scan_type]['file_exts'], f"File must end with {scan_loaders[scan_type]['file_exts']}"
     except KeyError:
         print(f'Parser "{scan_type}" is not available!')
         print(f"Available parsers: {', '.join(scan_loaders.keys())}")

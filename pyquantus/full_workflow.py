@@ -1,6 +1,7 @@
 import json
 import yaml
 import argparse
+from pathlib import Path
 
 from pyquantus.image_loading.utc_loaders.options import get_scan_loaders, scan_loader_args
 from pyquantus.seg_loading.options import get_seg_loaders, seg_loader_args
@@ -55,7 +56,8 @@ def core_pipeline(args) -> int:
     
     # Get applicable plugins
     try:
-        scan_loader = scan_loaders[args.scan_loader]
+        scan_loader = scan_loaders[args.scan_loader]['cls']
+        assert Path(args.scan_path).suffix in scan_loaders[args.scan_loader]['file_exts'], f"File must end with {scan_loaders[args.scan_loader]['file_exts']}"
     except KeyError:
         print(f'Parser "{args.scan_loader}" is not available!')
         print(f"Available parsers: {', '.join(scan_loaders.keys())}")
