@@ -56,7 +56,7 @@ class ClariusTarUnpacker():
         self.extraction_mode = extraction_mode
         
         # Using lzop.exe file for Windows renamed to lzop.py to make it pip-accessible
-        self.lzo_exe_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir)}\exe\lzop.py"
+        self.lzo_py_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir)}\exe\lzop.py"
         
         # single tar extraction attibutes
         self.single_tar_extraction: bool = None
@@ -286,8 +286,6 @@ class ClariusTarUnpacker():
         logging.info(f'Detected operating system: {self.os}')
                
         if self.os == "windows":
-            # Construct the full path to the LZO executable
-            path_of_lzo_exe_file = self.lzo_exe_file_path
 
             # Log the path being checked
             logging.info(f'Checking path for LZO executable: {self.lzo_py_file_path}')
@@ -679,7 +677,7 @@ class ClariusParser():
 
     def read_ymls(self) -> None:
         """
-        Reads and parses multiple YAML files using the ClariusParser.YmlParser.
+        Reads and parses multiple YAML files using the ClariusParser.CalriusYmlParser.
 
         This function initializes YAML parser objects for different configuration files 
         and assigns them to instance attributes.
@@ -692,9 +690,9 @@ class ClariusParser():
         Returns:
             None
         """
-        self.rf_yml_obj = ClariusParser.YmlParser(self.rf_yml_path)
-        self.env_yml_obj = ClariusParser.YmlParser(self.env_yml_path)
-        self.env_tgc_yml_obj = ClariusParser.YmlParser(self.env_tgc_yml_path)
+        self.rf_yml_obj = ClariusParser.CalriusYmlParser(self.rf_yml_path)
+        self.env_yml_obj = ClariusParser.CalriusYmlParser(self.env_yml_path)
+        self.env_tgc_yml_obj = ClariusParser.CalriusYmlParser(self.env_tgc_yml_path)
         
     ###################################################################################
     
@@ -1421,7 +1419,7 @@ class ClariusParser():
         return rotated_flipped_array
     
     ###################################################################################
-    class YmlParser():
+    class CalriusYmlParser():
         """
         This class reads YAML file data related to ultrasound imaging parameters. 
         It extracts information from two YAML files:
@@ -1711,9 +1709,8 @@ class ClariusParser():
             """
             
             if self.extension == "env.tgc.yml":
-                return  # Ignoriere diese spezielle Datei
+                return  
 
-            # Prüfen, ob die Attribute existieren, bevor sie verwendet werden
             env_version = getattr(self, "env_software_version", None)
             rf_version = getattr(self, "rf_software_version", None)
 
@@ -1726,10 +1723,8 @@ class ClariusParser():
 
             if software_version in self.valid_versions:
                 logging.info(f"Version {software_version} is valid.")
-                return True
             else:
                 logging.warning(f"Version {software_version} is not valid. This might cause some problems.")
-                return False
 
         ###################################################################################
         
@@ -1760,7 +1755,7 @@ class ClariusParser():
 
 
 
-# function
+# main function
 ###################################################################################
 
 def clariusRfParser(imgFilename: str,
@@ -2230,7 +2225,7 @@ def clariusRfParser_old(imgFilename: str, imgTgcFilename: str, infoFilename: str
         Tuple: Image data, image metadata, phantom data, and phantom metadata.
     """
     # Check yml files
-    # YmlParser(imgTgcFilename); YmlParser(phantomTgcFilename); YmlParser(infoFilename); YmlParser(phantomInfoFilename)
+    # CalriusYmlParser(imgTgcFilename); CalriusYmlParser(phantomTgcFilename); CalriusYmlParser(infoFilename); CalriusYmlParser(phantomInfoFilename)
     
     imgData, imgInfo, scanConverted = readImg(imgFilename, imgTgcFilename, infoFilename, version, isPhantom=False)
     refData, refInfo, scanConverted = readImg(phantomFilename, phantomTgcFilename, phantomInfoFilename, version, isPhantom=False)
