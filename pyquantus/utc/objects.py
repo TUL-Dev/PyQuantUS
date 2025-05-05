@@ -16,6 +16,14 @@ class SpectralResults:
         self.ps: np.ndarray  # image power spectrum
         self.rPs: np.ndarray  # phantom power spectrum
         self.f: np.ndarray  # frequency array (Hz)
+        
+        # HKD Parameters
+        self.kappa: float # structure parameter
+        self.alpha: float # scatterer clustering parameter
+        self.mu: float # mean intensity
+        self.hk: float # ratio of coherent to diffuse signal
+        self.sigma: float # related to incoherent signal
+        self.omega: float # related to sigma
 
 class Window:
     """Class to store window data for UTC analysis.

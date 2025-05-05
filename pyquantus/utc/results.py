@@ -91,6 +91,14 @@ class UtcData:
         
         summerCmap = plt.get_cmap("summer")
         self.uNakagamiCmap: list = [summerCmap(i)[:3] for i in range(summerCmap.N)]
+        hotCmap = plt.get_cmap("hot")
+        self.kappaCmap: list = [hotCmap(i)[:3] for i in range(hotCmap.N)]
+        winterCmap = plt.get_cmap("winter")
+        self.alphaCmap: list = [winterCmap(i)[:3] for i in range(winterCmap.N)]
+        self.muCmap: list = [plt.get_cmap("cool")(i)[:3] for i in range(plt.get_cmap("cool").N)]
+        self.hkCmap: list = [plt.get_cmap("copper")(i)[:3] for i in range(plt.get_cmap("copper").N)]
+        self.sigmaCmap: list = [plt.get_cmap("bone")(i)[:3] for i in range(plt.get_cmap("bone").N)]
+        self.omegaCmap: list = [plt.get_cmap("twilight")(i)[:3] for i in range(plt.get_cmap("twilight").N)]
 
     def convertImagesToRGB(self):
         """Converts grayscale images to RGB for colormap application.
@@ -125,12 +133,27 @@ class UtcData:
             self.minBsc = min(self.bscArr); self.maxBsc = max(self.bscArr)
             self.uNakagamiArr = [window.results.uNakagami for window in self.utcAnalysis.roiWindows]
             self.minUNakagami = min(self.uNakagamiArr); self.maxUNakagami = max(self.uNakagamiArr)
+            self.kappaArr = [window.results.kappa for window in self.utcAnalysis.roiWindows if not np.isnan(window.results.kappa)]
+            self.minKappa = min(self.kappaArr); self.maxKappa = max(self.kappaArr)
+            self.alphaArr = [window.results.alpha for window in self.utcAnalysis.roiWindows if not np.isnan(window.results.alpha)]
+            self.minAlpha = min(self.alphaArr); self.maxAlpha = max(self.alphaArr)
+            self.muArr = [window.results.mu for window in self.utcAnalysis.roiWindows if not np.isnan(window.results.mu)]
+            self.minMu = min(self.muArr); self.maxMu = max(self.muArr)
+            self.hkArr = [window.results.hk for window in self.utcAnalysis.roiWindows if not np.isnan(window.results.hk)]
+            self.minHK = min(self.hkArr); self.maxHK = max(self.hkArr)
+            self.sigmaArr = [window.results.sigma for window in self.utcAnalysis.roiWindows if not np.isnan(window.results.sigma)]
+            self.minSigma = min(self.sigmaArr); self.maxSigma = max(self.sigmaArr)
+            self.omegaArr = [window.results.omega for window in self.utcAnalysis.roiWindows if not np.isnan(window.results.omega)]
+            self.minOmega = min(self.omegaArr); self.maxOmega = max(self.omegaArr)
 
         if not len(self.utcAnalysis.ultrasoundImage.bmode.shape) == 3:
             self.convertImagesToRGB()
         self.mbfIm = self.utcAnalysis.ultrasoundImage.bmode.copy()
         self.ssIm = self.mbfIm.copy(); self.siIm = self.ssIm.copy()
         self.attCoefIm = self.ssIm.copy(); self.bscIm = self.ssIm.copy(); self.uNakagamiIm = self.ssIm.copy()
+        self.kappaIm = self.ssIm.copy(); self.alphaIm = self.ssIm.copy()
+        self.muIm = self.ssIm.copy(); self.hkIm = self.ssIm.copy()
+        self.sigmaIm = self.ssIm.copy(); self.omegaIm = self.ssIm.copy()
         self.windowIdxMap = np.zeros((self.mbfIm.shape[0], self.mbfIm.shape[1])).astype(int)
 
         for i, window in enumerate(self.utcAnalysis.roiWindows):
@@ -148,6 +171,20 @@ class UtcData:
                 self.attCoefIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.attCoefCmap[attCoefColorIdx])*255
                 self.bscIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.bscCmap[bscColorIdx])*255
                 self.uNakagamiIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.uNakagamiCmap[uNakagamiColorIdx])*255
+                if np.isnan(window.results.kappa):
+                    continue
+                kappaColorIdx = int((255 / (self.maxKappa-self.minKappa))*(window.results.kappa-self.minKappa)) if self.minKappa != self.maxKappa else 125
+                alphaColorIdx = int((255 / (self.maxAlpha-self.minAlpha))*(window.results.alpha-self.minAlpha)) if self.minAlpha != self.maxAlpha else 125
+                muColorIdx = int((255 / (self.maxMu-self.minMu))*(window.results.mu-self.minMu)) if self.minMu != self.maxMu else 125
+                hkColorIdx = int((255 / (self.maxHK-self.minHK))*(window.results.hk-self.minHK)) if self.minHK != self.maxHK else 125
+                sigmaColorIdx = int((255 / (self.maxSigma-self.minSigma))*(window.results.sigma-self.minSigma)) if self.minSigma != self.maxSigma else 125
+                omegaColorIdx = int((255 / (self.maxOmega-self.minOmega))*(window.results.omega-self.minOmega)) if self.minOmega != self.maxOmega else 125
+                self.kappaIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.kappaCmap[kappaColorIdx])*255
+                self.alphaIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.alphaCmap[alphaColorIdx])*255
+                self.muIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.muCmap[muColorIdx])*255
+                self.hkIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.hkCmap[hkColorIdx])*255
+                self.sigmaIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.sigmaCmap[sigmaColorIdx])*255
+                self.omegaIm[window.top: window.bottom+1, window.left: window.right+1] = np.array(self.omegaCmap[omegaColorIdx])*255
 
     def scanConvertRGB(self, image: np.ndarray) -> np.ndarray:
         """Converts a scan-converted grayscale image to RGB.
@@ -178,6 +215,12 @@ class UtcData:
         self.scAttCoefIm = self.scanConvertRGB(self.attCoefIm)
         self.scBscIm = self.scanConvertRGB(self.bscIm)
         self.scUNakagamiIm = self.scanConvertRGB(self.uNakagamiIm)
+        self.scKappaIm = self.scanConvertRGB(self.kappaIm)
+        self.scAlphaIm = self.scanConvertRGB(self.alphaIm)
+        self.scMuIm = self.scanConvertRGB(self.muIm)
+        self.scHKIm = self.scanConvertRGB(self.hkIm)
+        self.scSigmaIm = self.scanConvertRGB(self.sigmaIm)
+        self.scOmegaIm = self.scanConvertRGB(self.omegaIm)
 
         scStruct, _, _ = scanConvert(self.windowIdxMap, self.scConfig.width, self.scConfig.tilt,
                                         self.scConfig.startDepth, self.scConfig.endDepth, desiredHeight=self.scBmode.shape[0])
