@@ -1,8 +1,10 @@
 import pickle
 from pathlib import Path
 
+from .decorators import extensions
 from ...data_objs.analysis_config import RfAnalysisConfig
 
+@extensions(".pkl", ".pickle")
 def pkl_rf(analysis_path: str, **kwargs) -> RfAnalysisConfig:
     """Function to load RF analysis configuration data from a pickle file saved from the QuantUS UI.
     
@@ -22,6 +24,7 @@ def pkl_rf(analysis_path: str, **kwargs) -> RfAnalysisConfig:
     
     return out
 
+@extensions()
 def philips_3d_config(analysis_path: str, **kwargs) -> RfAnalysisConfig:
     """Class to load RF analysis configuration data from a pickle file saved from the QuantUS UI.
     

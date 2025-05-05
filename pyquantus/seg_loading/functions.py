@@ -7,9 +7,11 @@ from PIL import Image, ImageDraw
 from scipy.ndimage import binary_closing
 
 from .transforms import map_1d_to_3d
+from .decorators import extensions
 from ..data_objs.seg import BmodeSeg
 from ..data_objs.image import UltrasoundRfImage
 
+@extensions(".pkl", ".pickle")
 def pkl_roi(image_data: UltrasoundRfImage, seg_path: str, **kwargs) -> BmodeSeg:
     """
     Function for loading ROI data from a pickle file saved from the QuantUS UI.
@@ -48,6 +50,7 @@ def pkl_roi(image_data: UltrasoundRfImage, seg_path: str, **kwargs) -> BmodeSeg:
     
     return out
     
+@extensions(".nii", ".nii.gz")
 def nifti_voi(image_data: UltrasoundRfImage, seg_path: str, **kwargs) -> BmodeSeg:
     """
     Function for loading ROI data from a pickle file saved from the QuantUS UI.

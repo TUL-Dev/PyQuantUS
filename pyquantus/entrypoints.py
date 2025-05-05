@@ -30,7 +30,8 @@ def scan_loading_step(scan_type: str, scan_path: str, phantom_path: str, **scan_
     # Find the scan loader
     try:
         scan_loader = scan_loaders[scan_type]['cls']
-        assert Path(scan_path).suffix in scan_loaders[scan_type]['file_exts'], f"File must end with {scan_loaders[scan_type]['file_exts']}"
+        assertions = [scan_path.endswith(ext) for ext in scan_loaders[scan_type]['file_exts']]
+        assert max(assertions), f"Scan file must end with {', '.join(scan_loaders[scan_type]['file_exts'])}"
     except KeyError:
         print(f'Parser "{scan_type}" is not available!')
         print(f"Available parsers: {', '.join(scan_loaders.keys())}")
@@ -58,6 +59,8 @@ def seg_loading_step(seg_type: str, image_data: UltrasoundRfImage, seg_path: str
     # Find the segmentation loader
     try:
         seg_loader = seg_loaders[seg_type]
+        assertions = [seg_path.endswith(ext) for ext in seg_loaders[seg_type]['exts']]
+        assert max(assertions), f"Segmentation file must end with {', '.join(seg_loaders[seg_type]['exts'])}"
     except KeyError:
         print(f'Segmentation loader "{seg_type}" is not available!')
         print(f"Available segmentation loaders: {', '.join(seg_loaders.keys())}")
@@ -83,6 +86,8 @@ def analysis_config_step(config_type: str, config_path: str, scan_path: str, pha
     # Find the config loader
     try:
         config_loader = config_loaders[config_type]
+        assertions = [config_path.endswith(ext) for ext in config_loaders[config_loader]['exts']]
+        assert max(assertions), f"Config file must end with {', '.join(config_loaders[config_loader]['exts'])}"
     except KeyError:
         print(f'Analysis config loader "{config_type}" is not available!')
         print(f"Available analysis config loaders: {', '.join(config_loaders.keys())}")

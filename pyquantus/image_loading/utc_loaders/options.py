@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 def scan_loader_args(parser: ArgumentParser):
     parser.add_argument('scan_path', type=str, help='Path to scan signals')
     parser.add_argument('phantom_path', type=str, help='Path to phantom signals')
-    parser.add_argument('scan_loader', type=str,
+    parser.add_argument('scan_type', type=str,
                         help='Scan loader to use. Available options: ' + ', '.join(get_scan_loaders().keys()))
     parser.add_argument('--parser_output_path', type=str, default='parsed_data.pkl', help='Path to output parser results')
     parser.add_argument('--save_parsed_results', type=bool, default=False, 

@@ -56,22 +56,22 @@ def core_pipeline(args) -> int:
     
     # Get applicable plugins
     try:
-        scan_loader = scan_loaders[args.scan_loader]['cls']
-        assert Path(args.scan_path).suffix in scan_loaders[args.scan_loader]['file_exts'], f"File must end with {scan_loaders[args.scan_loader]['file_exts']}"
+        scan_loader = scan_loaders[args.scan_type]['cls']
+        assert Path(args.scan_path).suffix in scan_loaders[args.scan_type]['file_exts'], f"File must end with {scan_loaders[args.scan_type]['file_exts']}"
     except KeyError:
-        print(f'Parser "{args.scan_loader}" is not available!')
+        print(f'Parser "{args.scan_type}" is not available!')
         print(f"Available parsers: {', '.join(scan_loaders.keys())}")
         return 1
     try:
-        seg_loader = seg_loaders[args.seg_loader]
+        seg_loader = seg_loaders[args.seg_type]['func']
     except KeyError:
-        print(f'Segmentation loader "{args.seg_loader}" is not available!')
+        print(f'Segmentation loader "{args.seg_type}" is not available!')
         print(f"Available segmentation loaders: {', '.join(seg_loaders.keys())}")
         return 1
     try:
-        config_loader = config_loaders[args.config_loader]
+        config_loader = config_loaders[args.config_type]['func']
     except KeyError:
-        print(f'Analysis config loader "{args.config_loader}" is not available!')
+        print(f'Analysis config loader "{args.config_type}" is not available!')
         print(f"Available analysis config loaders: {', '.join(config_loaders.keys())}")
         return 1
     try:
@@ -92,6 +92,18 @@ def core_pipeline(args) -> int:
         print(f'Data export type "{args.data_export_type}" is not available!')
         print(f"Available data export types: {', '.join(data_export_types.keys())}")
         return 1
+    
+    # Check scan paths
+    assertions = [args.scan_path.endswith(ext) for ext in scan_loaders[args.scan_type]['file_exts']]
+    assert max(assertions), f"Scan file must end with {', '.join(scan_loaders[args.scan_type]['file_exts'])}"
+    
+    # Check segmentation paths
+    assertions = [args.seg_path.endswith(ext) for ext in seg_loaders[args.seg_type]['exts']]
+    assert max(assertions), f"Segmentation file must end with {', '.join(seg_loaders[args.seg_type]['exts'])}"
+    
+    # Check config paths
+    assertions = [args.config_path.endswith(ext) for ext in config_loaders[args.config_type]['exts']]
+    assert max(assertions), f"Config file must end with {', '.join(config_loaders[args.config_type]['exts'])}"
     
     # Check analysis setup
     if args.analysis_funcs is None:
