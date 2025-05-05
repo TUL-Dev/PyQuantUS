@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Tuple
 from scipy.signal import hilbert
+from scipy.special import gamma, psi, factorial, kv
 
 from .transforms import compute_hanning_power_spec
 from .decorators import output_vars, required_kwargs, dependencies
@@ -260,3 +261,213 @@ def nakagami_params(scan_rf_window: np.ndarray, phantom_rf_window: np.ndarray,
     # Fill in attributes defined in "output_vars" decorator
     window.results.nak_w = w
     window.results.nak_u = u
+    
+@output_vars("kappa", "mu", "hk", "s", "omega", "alpha")
+def hkd_params(scan_rf_window: np.ndarray, phantom_rf_window: np.ndarray, 
+            window: Window, config: RfAnalysisConfig, 
+            image_data: UltrasoundRfImage, **kwargs) -> None:
+    """
+    Implemented: IR, April 2025
+    Compute Homodyned K distribution parameters for the ROI.
+    Based on: 
+        [1] Destrempes, F., et al. (2013). "Estimation Method of the Homodyned K-Distribution Based on the Mean Intensity and Two Log-Moments." SIAM J Imaging Sci 6(3): 1499-1530.
+        [2] Cristea, A., et al. (2020). "Quantitative assessment of media concentration using the Homodyned K distribution." Ultrasonics 101: 105986.
+        Args:
+    env: envelope of RF data
+    Returns:
+    alpha: scatterer clustering parameter
+    kappa: structure parameter
+    *****************************************************
+    Generally following notation in Destrempes 2013, the parameters are:
+    alpha = scatterer clustering parameter
+    kappa = structure parameter
+    mu = mean intensity
+    hk = ratio of coherent to diffuse signal
+    epsilon = coherent signal
+    sigma = related to incoherent signal
+    omega = related to sigma
+    """
+    def simplif_hyper_term1(alpha, gama):
+        value = 0.0
+        oldvalue = value
+        k = 0
+        vect = np.arange(1, k + 1) - alpha
+        prod_vect = np.prod(vect) if len(vect) > 0 else 1
+        value += (1 / ((k + 1) * factorial(k + 1))) * (1 / prod_vect) * (gama ** k)
+        while abs(value - oldvalue) > 0.001:
+            oldvalue = value
+            k += 1
+            vect = np.arange(1, k + 1) - alpha
+            prod_vect = np.prod(vect)
+            value += (1 / ((k + 1) * factorial(k + 1))) * (1 / prod_vect) * (gama ** k)
+        return value
+
+    def simplif_hyper_term2(alpha, gama):
+        value = 0.0
+        oldvalue = value
+        k = 0
+        vect = np.append(np.arange(1, k + 1), k) + alpha
+        prod_vect = np.prod(vect) if len(vect) > 0 else 1
+        value += alpha / factorial(k) * (1 / prod_vect) * (gama ** k)
+        while abs(value - oldvalue) > 0.001:
+            oldvalue = value
+            k += 1
+            vect = np.append(np.arange(1, k + 1), k) + alpha
+            prod_vect = np.prod(vect)
+            value += alpha / factorial(k) * (1 / prod_vect) * (gama ** k)
+        return value
+
+    def simplif_hyper_term3(alpha, gama):
+        value = 0.001
+        oldvalue = value
+        k = 0
+        vect = np.append(np.arange(2, k + 2), k + 1) + alpha
+        prod_vect = np.prod(vect) if len(vect) > 0 else 1
+        value += (alpha + 1) / factorial(k) * (1 / prod_vect) * (gama ** k)
+        while abs(value - oldvalue) > 0.001:
+            oldvalue = value
+            k += 1
+            vect = np.append(np.arange(2, k + 2), k + 1) + alpha
+            prod_vect = np.prod(vect)
+            value += (alpha + 1) / factorial(k) * (1 / prod_vect) * (gama ** k)
+        return value
+
+    def simplif_hyper_term4(alpha, gama):
+        value = 0.0
+        oldvalue = value
+        k = 0
+        vect = np.arange(2, k + 2) - alpha
+        prod_vect = np.prod(vect) if vect.size > 0 else 1
+        value += 1 / ((k + 1) * factorial(k + 1)) * (1 / prod_vect) * (gama ** k)
+        while abs(value - oldvalue) > 0.001:
+            oldvalue = value
+            k += 1
+            vect = np.arange(2, k + 2) - alpha
+            prod_vect = np.prod(vect) if vect.size > 0 else 1
+            value += 1 / ((k + 1) * factorial(k + 1)) * (1 / prod_vect) * (gama ** k)
+        return value
+
+    def UHK(gama, alpha):
+        eulergamma = 0.5772156649
+        term1 = -eulergamma - np.log(gama + alpha) + psi(alpha)
+        term2 = (np.pi / np.sin(np.pi * alpha) * gama ** alpha *
+                    simplif_hyper_term2(alpha, gama) /
+                    (alpha * gamma(alpha) * gamma(alpha + 1)))
+        if alpha < 1:
+            term3 = (-np.pi / np.sin(np.pi * (1 - alpha)) *
+                        gama / (gamma(alpha) * gamma(2 - alpha)) *
+                        simplif_hyper_term4(alpha, gama))
+        else:
+            term3 = gama / (alpha - 1) * simplif_hyper_term4(alpha, gama)
+        return term1 + term2 + term3
+
+    def UHK_loop(gama, alpha):
+        if round(alpha) == alpha:
+            Uhk1 = UHK(gama, alpha - 1e-7)
+            Uhk2 = UHK(gama, alpha + 1e-7)
+            return Uhk1 + (Uhk2 - Uhk1) / 2
+        else:
+            return UHK(gama, alpha)
+
+    def XHK(gama, alpha):
+        term0 = ((1 + 2 * alpha) / (gama + alpha) -
+                    2 * gama ** (alpha / 2 + 0.5) /
+                    ((gama + alpha) * gamma(alpha)) *
+                    kv(alpha + 1, 2 * np.sqrt(gama)))
+        term1 = simplif_hyper_term1(alpha, gama)
+        term2 = (-np.pi / np.sin(np.pi * alpha) *
+                    gama ** (alpha - 1) * simplif_hyper_term2(alpha, gama) /
+                    (gamma(alpha) * gamma(alpha + 1)))
+        term3 = (np.pi / np.sin(np.pi * (alpha + 1)) *
+                    gama ** alpha * simplif_hyper_term3(alpha, gama) /
+                    (gamma(alpha) * gamma(alpha + 2) * (1 + alpha)))
+        if alpha < 1:
+            term4 = (np.pi / np.sin(np.pi * (1 - alpha)) *
+                        alpha / (gamma(alpha) * gamma(2 - alpha)) *
+                        simplif_hyper_term4(alpha, gama))
+        else:
+            term4 = -alpha / (alpha - 1) * simplif_hyper_term4(alpha, gama)
+        return term0 + gama / (gama + alpha) * (term1 + term2 + term3 + term4)
+
+    def XHK_loop(gama, alpha):
+        if round(alpha) == alpha:
+            Xhk1 = XHK(gama, alpha - 1e-7)
+            Xhk2 = XHK(gama, alpha + 1e-7)
+            return Xhk1 + (Xhk2 - Xhk1) / 2
+        else:
+            return XHK(gama, alpha)
+
+    def compute_gama(alpha: float, X: float) -> float:
+        gama1 = 0
+        gama2 = 1
+        while XHK_loop(gama2, alpha) > X:
+            gama2 += 1
+        tol = 1e-4
+        while abs(gama1 - gama2) > tol:
+            gama = (gama1 + gama2) / 2
+            if XHK_loop(gama, alpha) <= X:
+                gama2 = gama
+            else:
+                gama1 = gama
+        return gama
+
+    def compute_gama_alpha(X, U):
+        alpha0 = 1 / (X - 1)
+        alpha1 = 0
+        if X <= 1:
+            alpha2 = 1
+            gama = compute_gama(alpha2, X)
+            while UHK_loop(gama, alpha2) > U:
+                alpha2 += 1
+                gama = compute_gama(alpha2, X)
+        else:
+            alpha2 = min(alpha0, 80)
+        tol = 1e-2
+        while abs(alpha1 - alpha2) > tol:
+            alpha = (alpha1 + alpha2) / 2
+            gama = compute_gama(alpha, X)
+            if UHK_loop(gama, alpha) <= U:
+                alpha2 = alpha
+            else:
+                alpha1 = alpha
+        return gama, alpha
+
+    # --- Envelope detection and moment statistics ---
+    env = np.abs(hilbert(scan_rf_window, axis=1))
+    #env = rfData()
+    data = env.flatten()
+    I = data ** 2
+    I = I.astype(float)
+    I[I == 0] = np.finfo(float).eps
+
+    MEAN = np.mean(I)
+    X = np.mean(I * np.log(I)) / MEAN - np.mean(np.log(I))
+    U = np.mean(np.log(I)) - np.log(MEAN)
+
+    if X <= 1:
+        alpha_star = 80.0
+    else:
+        alpha0 = 1.0 / (X - 1)
+        alpha_star = min(alpha0, 80.0)
+
+    computed_gamma = compute_gama(alpha_star, X)
+
+    if UHK_loop(computed_gamma, alpha_star) <= U:
+        computed_gamma, alpha = compute_gama_alpha(X, U)
+    else:
+        alpha = alpha_star
+
+    epsilon = np.sqrt(MEAN * computed_gamma / (computed_gamma + alpha))
+    sigma = np.sqrt(MEAN / (2 * (computed_gamma + alpha)))
+    kappa = epsilon**2 / (2 * sigma**2 * alpha)
+    mu = np.mean(env**2)
+    hk = epsilon / (sigma * np.sqrt(alpha))
+    omega = mu / (hk**2 + 2)
+    s = hk * np.sqrt(omega)
+    
+    window.results.kappa = kappa
+    window.results.mu = mu
+    window.results.hk = hk
+    window.results.s = s
+    window.results.omega = omega
+    window.results.alpha = alpha

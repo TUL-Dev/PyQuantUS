@@ -39,10 +39,10 @@ class ParamapAnalysis(ParamapAnalysisBase):
         to be applied to the data based on the provided function names.
         """
         self.function_order = []; self.results_names = []
-        ordered_funcs = []
+        self.ordered_func_names = []
         
         def process_deps(func_name):
-            if func_name in ordered_funcs:
+            if func_name in self.ordered_func_names:
                 return
             if func_name in globals():
                 function = globals()[func_name]
@@ -53,9 +53,9 @@ class ParamapAnalysis(ParamapAnalysisBase):
             else:
                 raise ValueError(f"Function '{func_name}' not found!")
             
-            ordered_funcs.append(func_name)
+            self.ordered_func_names.append(func_name)
             self.results_names.extend(results_names)
-            self.function_order.append(function['func'])
+            self.function_order.append(function)
         
         for function_name in self.function_names:
             process_deps(function_name)
@@ -191,8 +191,15 @@ class ParamapAnalysis(ParamapAnalysisBase):
         else:
             raise ValueError("Invalid RF data dimensions. Expected 2D or 3D data.")
         
-        for function in self.function_order:
-            function(img_window, phantom_window, window, self.config, self.image_data, **self.analysis_kwargs)
+        for i, function in enumerate(self.function_order):
+            try:
+                function['func'](img_window, phantom_window, window, self.config, self.image_data, **self.analysis_kwargs)
+            except Exception as e:
+                print(f"Error in function {self.ordered_func_names[i]}: {e}")
+                print(f"Setting {', '.join(function['outputs'])} window values to NaN.")
+                for val in function['outputs']:
+                    setattr(window.results, val, np.nan)
+                
 
     def compute_single_window(self):
         min_ax = min([window.ax_min for window in self.windows])

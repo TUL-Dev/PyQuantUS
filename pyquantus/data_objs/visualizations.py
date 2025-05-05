@@ -73,11 +73,11 @@ class ParamapDrawingBase(ABC):
     def draw_paramap(self, param: str, cmap: list) -> Tuple[np.ndarray, plt.Figure]:
         """Draws RGB parametric map for parameter with a specified colormap and get the legend.
         """
-        assert hasattr(self.analysis_obj.windows[0].results, param), "Given parameter cannot be found in results"
-        
         param_vals = []
         for window in self.analysis_obj.windows:
             param_val = getattr(window.results, param)
+            if np.isnan(param_val):
+                continue
             param_vals.append(param_val)
         min_val = min(param_vals); max_val = max(param_vals)
          
@@ -86,8 +86,11 @@ class ParamapDrawingBase(ABC):
         colored_paramap = np.zeros(idx_map.shape + (4,), dtype=np.uint8)
         for point in window_points:
             window = self.analysis_obj.windows[int(np.round(idx_map[*point])-1)]
+            param_val = getattr(window.results, param)
+            if np.isnan(param_val):
+                continue
             color_ix = int((255 / (max_val-min_val)
-                                     )*(getattr(window.results, param)-min_val)
+                                     )*(param_val-min_val)
                                     ) if min_val != max_val else 125
             colored_paramap[*point, :3] = (np.array(cmap[color_ix])*255).astype(np.uint8)
             colored_paramap[*point, 3] = 255
