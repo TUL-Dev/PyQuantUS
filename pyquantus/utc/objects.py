@@ -9,6 +9,9 @@ class SpectralResults:
         self.mbf: float  # midband fit (dB)
         self.ss: float  # spectral slope (dB/MHz)
         self.si: float  # spectral intercept (dB)
+        self.attCoef: float  # attenuation coefficient (dB/cm/MHz)
+        self.bsc: float # backscatter coefficient (1/cm-sr)
+        self.uNakagami: float # shape parameter for Nakagami distribution
         self.nps: np.ndarray  # normalized power spectrum
         self.ps: np.ndarray  # image power spectrum
         self.rPs: np.ndarray  # phantom power spectrum
