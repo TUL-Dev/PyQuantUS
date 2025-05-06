@@ -27,10 +27,10 @@
   <widget class="QWidget" name="horizontalLayoutWidget_4">
    <property name="geometry">
     <rect>
-     <x>-470</x>
-     <y>20</y>
+     <x>-230</x>
+     <y>-50</y>
      <width>2555</width>
-     <height>871</height>
+     <height>1327</height>
     </rect>
    </property>
    <layout class="QHBoxLayout" name="full_screen_layout" stretch="1,0,0,0,0">
@@ -562,7 +562,7 @@
      </layout>
     </item>
     <item>
-     <layout class="QVBoxLayout" name="draw_roi_layout" stretch="1,0,0,0,10,1">
+     <layout class="QVBoxLayout" name="draw_roi_layout" stretch="1,0,0,0,10,0">
       <property name="spacing">
        <number>0</number>
       </property>
@@ -903,7 +903,7 @@
         </item>
        </layout>
       </item>
-      <item>
+      <item alignment="Qt::AlignHCenter|Qt::AlignVCenter">
        <widget class="QFrame" name="draw_freehand_buttons">
         <property name="maximumSize">
          <size>
@@ -1067,7 +1067,7 @@ QPushButton:checked {
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="accept_roi_buttons">
+          <widget class="QPushButton" name="accept_freehand_button">
            <property name="minimumSize">
             <size>
              <width>141</width>
@@ -1099,7 +1099,7 @@ QPushButton:checked {
         </layout>
        </widget>
       </item>
-      <item>
+      <item alignment="Qt::AlignHCenter|Qt::AlignVCenter">
        <widget class="QFrame" name="draw_rect_buttons">
         <property name="maximumSize">
          <size>
@@ -1127,6 +1127,12 @@ QPushButton:checked {
 	color: white;
 	font-size: 16px;
 	background: rgb(90, 37, 255);
+	border-radius: 15px;
+}
+QPushButton:checked {
+	color:white; 
+	font-size: 16px;
+	background: rgb(45, 0, 110);
 	border-radius: 15px;
 }
 </string>
@@ -1177,7 +1183,7 @@ QPushButton:checked {
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="accept_rectangle_buttons">
+          <widget class="QPushButton" name="accept_rectangle_button">
            <property name="minimumSize">
             <size>
              <width>241</width>
@@ -1213,11 +1219,11 @@ QPushButton:checked {
         </layout>
        </widget>
       </item>
-      <item>
+      <item alignment="Qt::AlignHCenter|Qt::AlignVCenter">
        <widget class="QFrame" name="draw_options_buttons">
         <property name="maximumSize">
          <size>
-          <width>804</width>
+          <width>16777215</width>
           <height>16777215</height>
          </size>
         </property>
@@ -1289,7 +1295,7 @@ QPushButton:checked {
             <string>Draw Rectangle</string>
            </property>
            <property name="checkable">
-            <bool>true</bool>
+            <bool>false</bool>
            </property>
            <property name="checked">
             <bool>false</bool>
@@ -1301,6 +1307,12 @@ QPushButton:checked {
       </item>
       <item alignment="Qt::AlignHCenter|Qt::AlignVCenter">
        <widget class="QFrame" name="im_display_frame">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>10</horstretch>
+          <verstretch>10</verstretch>
+         </sizepolicy>
+        </property>
         <property name="minimumSize">
          <size>
           <width>501</width>
@@ -1518,7 +1530,7 @@ QPushButton:checked {
        <number>30</number>
       </property>
       <item>
-       <widget class="QLabel" name="selectFrameLabel">
+       <widget class="QLabel" name="select_frame_label">
         <property name="styleSheet">
          <string notr="true">QLabel {
 	font-size: 29px;

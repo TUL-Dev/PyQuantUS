@@ -9,7 +9,7 @@ app = QApplication(sys.argv)
 widget = QStackedWidget()
 start_window = SelectImageGUI()
 
-widget.setMinimumWidth(1000)
+widget.setMinimumWidth(1400)
 widget.addWidget(start_window)
 widget.show()
 

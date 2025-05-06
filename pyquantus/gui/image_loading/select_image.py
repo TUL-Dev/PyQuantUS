@@ -19,10 +19,13 @@ def select_image_helper(path_input, file_exts):
         else:
             return
 
-class SelectImageGUI(QDialog):
+from .select_image_ui import Ui_selectImage
+class SelectImageGUI(QDialog, Ui_selectImage):
     def __init__(self):
-        super(SelectImageGUI, self).__init__()
-        loadUi(str(Path("pyquantus/gui/image_loading/select_image.ui")), self)
+        super().__init__()
+        self.setupUi(self)
+        # super(SelectImageGUI, self).__init__()
+        # loadUi(str(Path("pyquantus/gui/image_loading/select_image.ui")), self)
         
         self.scan_type_dropdown.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setLayout(self.full_screen_layout)
