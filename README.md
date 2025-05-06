@@ -4,13 +4,30 @@ PyQuantUS is the pip-accessible backend engine for [QuantUS](https://github.com/
 
 Complete software documentation for QuantUS and PyQuantUS can be found [here](https://tul-dev.github.io/PyQuantUS/).
 
-## Installation
+## Installation for External Use
 
 Requires `Python>=3.10.0`.
 
 ```shell
 pip install git+https://github.com/TUL-Dev/PyQuantUS
 ```
+
+## Installation for Developers
+
+Requires `Python>=3.10.0`. We will refer to the path of such a Python version as `$PYTHON` below.
+
+Below are steps to create a new python virtual environment for PyQuantUS. Note lines commented with `# Unix` should only be run on MacOS or Linux while lines commented with `# Windows (cmd)` should only be run on the Windows command prompt. These commands should be run from the directory of this repository.
+
+```shell
+$PYTHON -m pip install virtualenv
+$PYTHON -m virtualenv .venv
+source .venv/bin/activate # Unix
+.venv\Scripts\activate # Windows (cmd)
+sudo apt-get update & sudo apt-get install python3-dev # Linux
+pip install -r requirements.txt
+```
+
+This environment is activated using `source .venv/bin/activate | .venv\Scripts\activate` and deactivated using the `deactivate` command.
 
 ### Linux Users
 
@@ -28,6 +45,6 @@ See the notebooks in the [CLI-Demos](CLI-Demos/) folder for examples of analysis
 - [x] SI
 - [x] Attenuation Coefficient
 - [x] Nakagami Parameters (w, u)
-- [ ] Backscatter Coefficient
+- [x] Backscatter Coefficient
 - [ ] Effective Scatterer Diameter
 - [ ] Effective Scatterer Concentration
