@@ -16,6 +16,9 @@ class UltrasoundRfImage:
         self.lateral_res: float # mm/pix
         self.scan_name = Path(scan_path).stem
         self.phantom_name = Path(phantom_path).stem
+        self.scan_path = scan_path
+        self.phantom_path = phantom_path
+        self.spatial_dims: int
         
         # Scan conversion parameters
         self.sc_bmode: np.ndarray = None

@@ -1,10 +1,8 @@
 import numpy as np
 from typing import List
 
-from ...data_objs.analysis import ParamapAnalysisBase, Window
-from ...data_objs.image import UltrasoundRfImage
-from ...data_objs.seg import BmodeSeg
-from ...data_objs.analysis_config import RfAnalysisConfig
+from pyquantus.data_objs import UltrasoundRfImage, BmodeSeg, RfAnalysisConfig, ParamapAnalysisBase
+from pyquantus.data_objs.analysis import Window
 from .functions import *
 
 class_name = "ParamapAnalysis"

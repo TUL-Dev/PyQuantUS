@@ -41,7 +41,7 @@ def pkl_roi(image_data: UltrasoundRfImage, seg_path: str, **kwargs) -> BmodeSeg:
         spline_x = rf_spline_x; spline_y = rf_spline_y
     
     spline = [(spline_x[i], spline_y[i]) for i in range(len(spline_x))]
-    mask = Image.new("L", (image_data.rf_data.shape[1], image_data.rf_data.shape[0]), 0)
+    mask = Image.new("L", (image_data.phantom_rf_data.shape[1], image_data.phantom_rf_data.shape[0]), 0)
     ImageDraw.Draw(mask).polygon(spline, outline=1, fill=1)
 
     out.seg_mask = np.array(mask)

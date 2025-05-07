@@ -33,6 +33,7 @@ def get_scan_loaders() -> dict:
                     classes[folder.name] = {}
                     classes[folder.name]['cls'] = entry_class
                     classes[folder.name]['file_exts'] = entry_class.extensions
+                    classes[folder.name]['spatial_dims'] = entry_class.spatial_dims
             except ModuleNotFoundError:
                 # Handle the case where the module cannot be found
                 pass

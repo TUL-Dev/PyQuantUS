@@ -1,11 +1,12 @@
 import os
 from pathlib import Path
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import QDialog, QApplication, QFileDialog
 from PyQt6.uic.load_ui import loadUi
 
 from pyquantus.image_loading.utc_loaders.options import get_scan_loaders
+from pyquantus.data_objs import UltrasoundRfImage
 from pyquantus.entrypoints import scan_loading_step
 
 
@@ -17,6 +18,29 @@ def select_image_helper(path_input, file_exts):
             path_input.setText(file_name)
         else:
             return
+        
+class ScanLoadingWorker(QThread):
+    """Worker thread for time-consuming operations."""
+    finished = pyqtSignal(UltrasoundRfImage)  # Signal when process is done
+    error_msg = pyqtSignal(str)  # Signal for error messages
+
+    def __init__(self, scan_type, image_path, phantom_path, scan_loader_kwargs):
+        super().__init__()
+        self.scan_type = scan_type
+        self.image_path = image_path
+        self.phantom_path = phantom_path
+        self.scan_loader_kwargs = scan_loader_kwargs
+        
+    def run(self):
+        try:
+            image_data = scan_loading_step(self.scan_type, self.image_path, self.phantom_path, **self.scan_loader_kwargs)
+        except Exception as e:
+            self.error_msg.emit(f"Error loading image: {e}")
+            self.finished.emit(UltrasoundRfImage("",""))
+            return
+        
+        # Emit the finished signal when done
+        self.finished.emit(image_data)
 
 from .select_image_ui import Ui_selectImage
 class SelectImageGUI(QDialog, Ui_selectImage):
@@ -36,6 +60,7 @@ class SelectImageGUI(QDialog, Ui_selectImage):
         self.scan_type = None
         self.file_exts = None
         self.image_data = None
+        self.scan_loading_worker = None
         
         self.accept_type_button.clicked.connect(self.type_accepted)
         self.choose_image_path_button.clicked.connect(self.select_image_helper)
@@ -144,13 +169,27 @@ class SelectImageGUI(QDialog, Ui_selectImage):
             return
         
         self.loading_screen_label.show()
-        try:
-            self.image_data = scan_loading_step(self.scan_type, self.image_path_input.text(), self.phantom_path_input.text(), **scan_loader_kwargs)
-        except Exception as e:
-            self.select_image_error_msg.setText(f"Error loading image: {e}")
+        self.generate_image_button.hide()
+        
+        self.scan_loading_worker = ScanLoadingWorker(self.scan_type, self.image_path_input.text(), self.phantom_path_input.text(), scan_loader_kwargs)
+        self.scan_loading_worker.error_msg.connect(self.select_image_error_msg.setText)
+        self.scan_loading_worker.finished.connect(self.generate_image_complete)
+        self.scan_loading_worker.start()
+        
+    def generate_image_complete(self, image_data: UltrasoundRfImage):
+        """This function is called when the image generation is complete."""
+        self.loading_screen_label.hide()
+        self.generate_image_button.show()
+        if image_data.scan_path == "":
             self.select_image_error_msg.show()
-        finally:
-            self.loading_screen_label.hide()
+            return
+        self.image_data = image_data
+        
+    def closeEvent(self, event):
+        # Wait for thread to finish if it's running
+        if self.scan_loading_worker is not None and self.scan_loading_worker.isRunning():
+            self.scan_loading_worker.wait()
+        super().closeEvent(event)
 
 
 if __name__ == "__main__":

@@ -47,6 +47,8 @@ def main_yaml() -> int:
     return core_pipeline(args)
     
 def core_pipeline(args) -> int:
+    """Runs the full QuantUS workflow. Different from entrypoints in that all requirements are checked at the start rather than dynamically.
+    """
     scan_loaders = get_scan_loaders()
     seg_loaders = get_seg_loaders()
     config_loaders = get_config_loaders()
@@ -135,6 +137,15 @@ def core_pipeline(args) -> int:
     config = config_loader(args.config_path, scan_path=args.scan_path, phantom_path=args.phantom_path, **args.config_kwargs) # Load analysis config
     
     # Analysis
+    if image_data.spatial_dims < image_data.rf_data.ndim:
+        image_data.rf_data = image_data.rf_data[seg_data.frame]
+        image_data.bmode = image_data.bmode[seg_data.frame]
+        if image_data.sc_bmode is not None:
+            image_data.sc_bmode = image_data.sc_bmode[seg_data.frame]
+        assert image_data.bmode.ndim == image_data.spatial_dims, \
+            "Bmode data dimensions do not match spatial dimensions!"
+    elif image_data.spatial_dims > image_data.rf_data.ndim:
+        raise ValueError("Spatial dimensions are greater than RF data dimensions!")
     analysis_obj = analysis_class(image_data, config, seg_data, args.analysis_funcs, **args.analysis_kwargs)
     analysis_obj.compute_paramaps()
     analysis_obj.compute_single_window()

@@ -225,7 +225,7 @@
 }</string>
           </property>
           <property name="text">
-           <string>Region of Interest (ROI) Selection</string>
+           <string>Segmentation Selection</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignCenter</set>

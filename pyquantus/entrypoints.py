@@ -1,4 +1,4 @@
-from pathlib import Path
+import copy
 
 from pyquantus.data_objs import UltrasoundRfImage, BmodeSeg, RfAnalysisConfig, \
         ParamapAnalysisBase, ParamapDrawingBase, BaseDataExport
@@ -37,7 +37,9 @@ def scan_loading_step(scan_type: str, scan_path: str, phantom_path: str, **scan_
         print(f"Available parsers: {', '.join(scan_loaders.keys())}")
         return 1
     
-    return scan_loader(scan_path, phantom_path, **scan_loader_kwargs)
+    image_data: UltrasoundRfImage = scan_loader(scan_path, phantom_path, **scan_loader_kwargs)
+    image_data.spatial_dims = scan_loaders[scan_type]['spatial_dims']
+    return image_data
 
 def seg_loading_step(seg_type: str, image_data: UltrasoundRfImage, seg_path: str, 
                      scan_path: str, phantom_path: str, **seg_loader_kwargs) -> BmodeSeg:
@@ -58,7 +60,7 @@ def seg_loading_step(seg_type: str, image_data: UltrasoundRfImage, seg_path: str
     
     # Find the segmentation loader
     try:
-        seg_loader = seg_loaders[seg_type]
+        seg_loader = seg_loaders[seg_type]['func']
         assertions = [seg_path.endswith(ext) for ext in seg_loaders[seg_type]['exts']]
         assert max(assertions), f"Segmentation file must end with {', '.join(seg_loaders[seg_type]['exts'])}"
     except KeyError:
@@ -85,9 +87,9 @@ def analysis_config_step(config_type: str, config_path: str, scan_path: str, pha
     
     # Find the config loader
     try:
-        config_loader = config_loaders[config_type]
-        assertions = [config_path.endswith(ext) for ext in config_loaders[config_loader]['exts']]
-        assert max(assertions), f"Config file must end with {', '.join(config_loaders[config_loader]['exts'])}"
+        config_loader = config_loaders[config_type]['func']
+        assertions = [config_path.endswith(ext) for ext in config_loaders[config_type]['exts']]
+        assert max(assertions), f"Config file must end with {', '.join(config_loaders[config_type]['exts'])}"
     except KeyError:
         print(f'Analysis config loader "{config_type}" is not available!')
         print(f"Available analysis config loaders: {', '.join(config_loaders.keys())}")
@@ -129,7 +131,18 @@ def analysis_step(analysis_type: str, image_data: UltrasoundRfImage, config: RfA
                 raise ValueError(f"analysis_kwargs: Missing required keyword argument '{kwarg}' for function '{name}' in {analysis_type} analysis type.")
             
     # Perform analysis
-    analysis_obj = analysis_class(image_data, config, seg_data, analysis_funcs, **analysis_kwargs)
+    analyzed_image_data = copy.deepcopy(image_data)
+    if analyzed_image_data.spatial_dims < analyzed_image_data.rf_data.ndim:
+        analyzed_image_data.rf_data = analyzed_image_data.rf_data[seg_data.frame]
+        analyzed_image_data.bmode = analyzed_image_data.bmode[seg_data.frame]
+        if analyzed_image_data.sc_bmode is not None:
+            analyzed_image_data.sc_bmode = analyzed_image_data.sc_bmode[seg_data.frame]
+        assert analyzed_image_data.bmode.ndim == analyzed_image_data.spatial_dims, \
+            "Bmode data dimensions do not match spatial dimensions!"
+    elif analyzed_image_data.spatial_dims > analyzed_image_data.rf_data.ndim:
+        raise ValueError("Spatial dimensions are greater than RF data dimensions!")
+    
+    analysis_obj = analysis_class(analyzed_image_data, config, seg_data, analysis_funcs, **analysis_kwargs)
     analysis_obj.compute_paramaps()
     analysis_obj.compute_single_window()
     

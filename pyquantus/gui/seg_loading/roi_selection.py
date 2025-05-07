@@ -16,6 +16,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.uic.load_ui import loadUi
 
 from pyquantus.seg_loading.options import get_seg_loaders
+from pyquantus.entrypoints import seg_loading_step
 from pyquantus.data_objs import UltrasoundRfImage, BmodeSeg
 
 
@@ -62,6 +63,8 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
         self.clear_seg_path_button.clicked.connect(self.seg_path_input.clear)
         self.accept_seg_path_button.clicked.connect(self.load_segmentation)
         self.back_from_confirm_button.clicked.connect(self.back_to_select)
+        self.frame_slider.valueChanged.connect(self.preview_frame_changed)
+        self.accept_frame_button.clicked.connect(self.accept_preview_frame)
         
         self.image_data = image_data
         self.seg_drawing_screen_2d = None
@@ -77,6 +80,14 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
         self.bmode_confirmation_layout.addWidget(self.canvas)
+        
+        # Prepare B-Mode display plot
+        self.bmode_draw_layout = QHBoxLayout(self.im_display_frame)
+        self.bmode_draw_layout.setObjectName("bmode_draw_layout")
+        self.figure_draw = plt.figure()
+        self.canvas_draw = FigureCanvas(self.figure_draw)
+        self.ax_draw = self.figure_draw.add_subplot(111)
+        self.bmode_draw_layout.addWidget(self.canvas_draw)
             
     def hide_seg_confirmation_layout(self):
         self.segmentation_confirmation_label.hide()
@@ -117,14 +128,6 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
         self.of_frames_label.show()
         self.total_frames_label.show()
         self.accept_frame_button.show()
-        
-    def move_to_draw(self):
-        self.full_screen_layout.removeItem(self.seg_loading_layout)
-        self.hide_seg_loading_layout()
-        self.full_screen_layout.addItem(self.draw_roi_layout)
-        self.show_draw_seg_start()
-        self.full_screen_layout.setStretchFactor(self.side_bar_layout, 1)
-        self.full_screen_layout.setStretchFactor(self.draw_roi_layout, 10)
             
     def hide_frame_selection_layout(self):
         self.select_frame_label.hide()
@@ -241,13 +244,12 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
             self.seg_kwargs_box.setText("{\n\t'assert_scan': False,\t\t# Checks if the seg is initially from the same scan\n\t'assert_phantom': False,\t\t# Checks if the seg is initially from the same phantom\n}")
         else:
             if self.im_array.ndim == 3: # need to select frame
-                raise NotImplementedError("3D segmentation not implemented yet.")
                 self.full_screen_layout.removeItem(self.select_type_layout)
                 self.hide_type_selection_layout()
                 self.full_screen_layout.addItem(self.frame_preview_layout)
                 self.show_frame_preview_layout()
                 self.full_screen_layout.setStretchFactor(self.side_bar_layout, 1)
-                self.full_screen_layout.setStretchFactor(self.seg_loading_layout, 10)
+                self.full_screen_layout.setStretchFactor(self.frame_preview_layout, 10)
                 
                 self.displayed_im = np.array(self.im_array[self.frame]).reshape(self.im_array.shape[1], self.im_array.shape[2])
                 self.displayed_im = np.require(self.displayed_im, np.uint8, 'C')
@@ -258,48 +260,73 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
                 self.total_frames_label.setText(str(self.im_array.shape[0]-1))
                 self.frame_slider.setMinimum(0)
                 self.frame_slider.setMaximum(self.im_array.shape[0]-1)
-                self.frame_slider.valueChanged.connect(self.frameChanged)
-                self.cur_frame_label.setText("0")
+                self.cur_frame_label.setText(str(self.frame))
                 
             elif self.im_array.ndim == 2: # only need to draw ROI
                 self.full_screen_layout.removeItem(self.select_type_layout)
                 self.hide_type_selection_layout()
-                self.full_screen_layout.addItem(self.draw_roi_layout)
-                self.show_draw_seg_start()
-                self.full_screen_layout.setStretchFactor(self.side_bar_layout, 1)
-                self.full_screen_layout.setStretchFactor(self.draw_roi_layout, 10)
                 self.displayed_im = self.im_array
+                self.start_2d_seg_drawing()
                 
-                if self.image_data.sc_bmode is not None:
-                    lateral_res = self.image_data.sc_lateral_res
-                    axial_res = self.image_data.sc_axial_res
-                else:
-                    lateral_res = self.image_data.lateral_res
-                    axial_res = self.image_data.axial_res
+    def accept_preview_frame(self):
+        self.full_screen_layout.removeItem(self.frame_preview_layout)
+        self.hide_frame_preview_layout()
+        self.back_button.clicked.disconnect()
+        self.back_button.clicked.connect(self.back_to_preview)
+        self.displayed_im = np.array(self.im_array[self.frame]).reshape(self.im_array.shape[1], self.im_array.shape[2])
+        self.start_2d_seg_drawing()
+        
+    def back_to_preview(self):
+        self.full_screen_layout.removeItem(self.draw_roi_layout)
+        self.hide_draw_roi_layout()
+        self.accept_seg_type()
                 
-                self.physical_width_val.setText(
-                    str(np.round(lateral_res*self.displayed_im.shape[1]/10, decimals=2))
-                )
-                self.physical_depth_val.setText(
-                    str(np.round(axial_res*self.displayed_im.shape[0]/10, decimals=2))
-                )
-                self.pixel_width_val.setText(str(self.displayed_im.shape[1]))
-                self.pixel_depth_val.setText(str(self.displayed_im.shape[0]))
+    def start_2d_seg_drawing(self):
+        self.full_screen_layout.addItem(self.draw_roi_layout)
+        self.show_draw_seg_start()
+        self.full_screen_layout.setStretchFactor(self.side_bar_layout, 1)
+        self.full_screen_layout.setStretchFactor(self.draw_roi_layout, 10)
+        
+        if self.image_data.sc_bmode is not None:
+            lateral_res = self.image_data.sc_lateral_res
+            axial_res = self.image_data.sc_axial_res
+        else:
+            lateral_res = self.image_data.lateral_res
+            axial_res = self.image_data.axial_res
+        
+        self.physical_width_val.setText(
+            str(np.round(lateral_res*self.displayed_im.shape[1]/10, decimals=2))
+        )
+        self.physical_depth_val.setText(
+            str(np.round(axial_res*self.displayed_im.shape[0]/10, decimals=2))
+        )
+        self.pixel_width_val.setText(str(self.displayed_im.shape[1]))
+        self.pixel_depth_val.setText(str(self.displayed_im.shape[0]))
+        
+        if self.seg_drawing_screen_2d is not None:
+            self.draw_freehand_button.clicked.disconnect(); self.user_draw_rectangle_button.clicked.disconnect()
+            self.draw_rectangle_button.clicked.disconnect(); self.draw_roi_button.clicked.disconnect()
+            self.back_from_rectangle_button.clicked.disconnect(); self.undo_last_pt_button.clicked.disconnect()
+            self.close_roi_button.clicked.disconnect(); self.redraw_roi_button.clicked.disconnect()
+            self.back_from_freehand_button.clicked.disconnect(); self.save_freehand_button.clicked.disconnect()
+            self.save_rect_button.clicked.disconnect(); self.back_from_save_button.clicked.disconnect()
+            self.choose_save_folder_button.clicked.disconnect(); self.clear_save_folder_button.clicked.disconnect()
+            self.save_roi_button.clicked.disconnect()
+            del self.seg_drawing_screen_2d
+            self.seg_drawing_screen_2d = None
+        
+        self.seg_drawing_screen_2d = SegSelectionGUI.DrawNewSeg2d(self.image_data, self.displayed_im, self)
+        self.seg_drawing_screen_2d.plot_on_canvas()
+        
                 
-                if self.seg_drawing_screen_2d is not None:
-                    self.draw_freehand_button.clicked.disconnect(); self.user_draw_rectangle_button.clicked.disconnect()
-                    self.draw_rectangle_button.clicked.disconnect(); self.draw_roi_button.clicked.disconnect()
-                    self.draw_roi_button.clicked.disconnect(); self.back_from_rectangle_button.clicked.disconnect()
-                    self.undo_last_pt_button.clicked.disconnect(); self.close_roi_button.clicked.disconnect()
-                    self.redraw_roi_button.clicked.disconnect(); self.back_from_freehand_button.clicked.disconnect()
-                    self.save_freehand_button.clicked.disconnect(); self.save_rect_button.clicked.disconnect()
-                    self.back_from_save_button.clicked.disconnect(); self.choose_save_folder_button.clicked.disconnect()
-                    self.clear_save_folder_button.clicked.disconnect(); self.save_roi_button.clicked.disconnect()
-                    del self.seg_drawing_screen_2d
-                    self.seg_drawing_screen_2d = None
-                
-                self.seg_drawing_screen_2d = SegSelectionGUI.DrawNewSeg2d(self.image_data, self.displayed_im, self)
-                self.seg_drawing_screen_2d.plot_on_canvas()
+    def preview_frame_changed(self, value):
+        self.frame = value
+        self.cur_frame_label.setText(str(value))
+        self.displayed_im = np.array(self.im_array[self.frame]).reshape(self.im_array.shape[1], self.im_array.shape[2])
+        self.displayed_im = np.require(self.displayed_im, np.uint8, 'C')
+        self.bytes_line = self.displayed_im.strides[0]; self.ar_height, self.ar_width = self.displayed_im.shape
+        self.q_im = QImage(self.displayed_im, self.ar_width, self.ar_height, self.bytes_line, QImage.Format.Format_Grayscale8)
+        self.im_preview.setPixmap(QPixmap.fromImage(self.q_im).scaled(self.im_preview.width(), self.im_preview.height(), Qt.AspectRatioMode.IgnoreAspectRatio))
                 
     def load_segmentation(self):
         if [self.seg_path_input.text().endswith(ext) for ext in self.file_exts].count(True) == 0:
@@ -322,8 +349,7 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
             self.select_seg_error_msg.show()
             return
         
-        function = self.seg_loaders[self.seg_type]["func"]
-        self.seg_data = function(self.image_data, self.seg_path_input.text(), **scan_loader_kwargs)
+        self.seg_data = seg_loading_step(self.seg_type, self.image_data, self.seg_path_input.text(), self.image_data.scan_path, self.image_data.phantom_path, **scan_loader_kwargs)
         self.frame = self.seg_data.frame
         bmode = self.image_data.sc_bmode if self.image_data.sc_bmode is not None else self.image_data.bmode
         
@@ -395,15 +421,8 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
             self.points_plotted_x = []; self.points_plotted_y = []
             self.scattered_points = []; self.rect_coords = []
             
-            # Prepare B-Mode display plot
-            self.bmode_layout = QHBoxLayout(self.seg_gui.im_display_frame)
-            self.bmode_layout.setObjectName("bmode_layout")
-            self.figure = plt.figure()
-            self.canvas = FigureCanvas(self.figure)
-            self.ax = self.figure.add_subplot(111)
-            self.bmode_layout.addWidget(self.canvas)
             self.selector = RectangleSelector(
-                self.ax,
+                self.seg_gui.ax_draw,
                 self.draw_rect,
                 useblit=True,
                 props=dict(linestyle="-", color="cyan", fill=False),
@@ -456,15 +475,15 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
                 y_spline *= self.displayed_im.shape[0]
                 x_spline = np.clip(x_spline, a_min=0, a_max=self.displayed_im.shape[1]-1)
                 y_spline = np.clip(y_spline, a_min=0, a_max=self.displayed_im.shape[0]-1)
-                self.spline = self.ax.plot(
+                self.spline = self.seg_gui.ax_draw.plot(
                     x_spline, y_spline, color="cyan", zorder=1, linewidth=0.75
                 )
-                self.figure.subplots_adjust(
+                self.seg_gui.figure_draw.subplots_adjust(
                     left=0, right=1, bottom=0, top=1, hspace=0.2, wspace=0.2
                 )
-                self.ax.tick_params(bottom=False, left=False)
+                self.seg_gui.ax_draw.tick_params(bottom=False, left=False)
             self.scattered_points.append(
-                self.ax.scatter(
+                self.seg_gui.ax_draw.scatter(
                     self.points_plotted_x[-1],
                     self.points_plotted_y[-1],
                     marker="o", # type: ignore
@@ -473,13 +492,13 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
                     zorder=500,
                 )
             )
-            self.canvas.draw()
+            self.seg_gui.canvas_draw.draw()
             
         def clear_rect(self, event):
-            if len(self.ax.patches) > 0:
-                rect = self.ax.patches[0]
+            if len(self.seg_gui.ax_draw.patches) > 0:
+                rect = self.seg_gui.ax_draw.patches[0]
                 rect.remove()
-                self.canvas.draw()
+                self.seg_gui.canvas_draw.draw()
                 
         def plot_patch(self):
             if len(self.rect_coords) > 0:
@@ -492,10 +511,10 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
                     edgecolor="cyan",
                     facecolor="none",
                 )
-                if len(self.ax.patches) > 0:
-                    self.ax.patches.pop()
+                if len(self.seg_gui.ax_draw.patches) > 0:
+                    self.seg_gui.ax_draw.patches.pop()
 
-                self.ax.add_patch(rect)
+                self.seg_gui.ax_draw.add_patch(rect)
 
                 mpl_pix_width = abs(right - left)
                 lateral_res = self.image_data.lateral_res if self.image_data.sc_bmode is None else self.image_data.sc_lateral_res
@@ -507,11 +526,11 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
                 cm_height = mpl_pix_height * axial_res / 10
                 self.seg_gui.physical_rect_height_val.setText(str(np.round(cm_height, decimals=2)))
 
-                self.figure.subplots_adjust(
+                self.seg_gui.figure_draw.subplots_adjust(
                     left=0, right=1, bottom=0, top=1, hspace=0.2, wspace=0.2
                 )
-                self.ax.tick_params(bottom=False, left=False)
-                self.canvas.draw()
+                self.seg_gui.ax_draw.tick_params(bottom=False, left=False)
+                self.seg_gui.canvas_draw.draw()
                 
         def undo_last_pt(self):  # When drawing ROI, undo last point plotted
             if len(self.points_plotted_x) > 0 and self.seg_gui.draw_roi_button.isCheckable():
@@ -531,13 +550,13 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
                         y_spline = np.clip(y_spline, a_min=0, a_max=self.displayed_im.shape[0]-1)
                         self.spline_x = x_spline
                         self.spline_y = y_spline
-                        self.spline = self.ax.plot(
+                        self.spline = self.seg_gui.ax_draw.plot(
                             self.spline_x,
                             self.spline_y,
                             color="cyan",
                             linewidth=0.75,
                         )
-                self.canvas.draw()
+                self.seg_gui.canvas_draw.draw()
                 self.seg_gui.draw_roi_button.setChecked(True)
                 self.draw_freehand_clicked()
                 
@@ -563,7 +582,7 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
                 self.seg_gui.draw_roi_button.setCheckable(False)
                 self.seg_gui.redraw_roi_button.show()
                 self.seg_gui.close_roi_button.hide()
-                self.cid = self.figure.canvas.mpl_disconnect(self.cid)
+                self.cid = self.seg_gui.figure_draw.canvas.mpl_disconnect(self.cid)
                 self.plot_on_canvas()
             
         def undo_last_roi(self):  # Remove previously drawn roi and prepare user to draw a new one
@@ -582,7 +601,7 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
             self.show_rect_buttons()
                 
         def plot_on_canvas(self):
-            self.ax.clear()
+            self.seg_gui.ax_draw.clear()
             if self.image_data.sc_bmode is not None:
                 width = self.displayed_im.shape[1]*self.image_data.sc_lateral_res
                 height = self.displayed_im.shape[0]*self.image_data.sc_axial_res
@@ -590,18 +609,18 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
                 width = self.displayed_im.shape[1]*self.image_data.lateral_res
                 height = self.displayed_im.shape[0]*self.image_data.axial_res
             aspect = width/height
-            im = self.ax.imshow(self.displayed_im, cmap="gray")
+            im = self.seg_gui.ax_draw.imshow(self.displayed_im, cmap="gray")
             extent = im.get_extent()
-            self.ax.set_aspect(abs((extent[1]-extent[0])/(extent[3]-extent[2]))/aspect)
-            self.figure.set_facecolor((0, 0, 0, 0)) #type: ignore
-            self.ax.axis("off")
+            self.seg_gui.ax_draw.set_aspect(abs((extent[1]-extent[0])/(extent[3]-extent[2]))/aspect)
+            self.seg_gui.figure_draw.set_facecolor((0, 0, 0, 0)) #type: ignore
+            self.seg_gui.ax_draw.axis("off")
             
             if hasattr(self, 'spline_x') and len(self.spline_x):
-                self.spline = self.ax.plot(self.spline_x, self.spline_y, 
+                self.spline = self.seg_gui.ax_draw.plot(self.spline_x, self.spline_y, 
                                         color="cyan", zorder=1, linewidth=0.75)
             elif len(self.points_plotted_x) > 0:
                 self.scattered_points.append(
-                    self.ax.scatter(
+                    self.seg_gui.ax_draw.scatter(
                         self.points_plotted_x[-1],
                         self.points_plotted_y[-1],
                         marker="o", #type: ignore
@@ -618,36 +637,36 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
                     y_spline *= self.displayed_im.shape[0]
                     x_spline = np.clip(x_spline, a_min=0, a_max=self.displayed_im.shape[1]-1)
                     y_spline = np.clip(y_spline, a_min=0, a_max=self.displayed_im.shape[0]-1)
-                    self.spline = self.ax.plot(
+                    self.spline = self.seg_gui.ax_draw.plot(
                         x_spline, y_spline, color="cyan", zorder=1, linewidth=0.75
                     )
 
-            self.figure.subplots_adjust(
+            self.seg_gui.figure_draw.subplots_adjust(
                 left=0, right=1, bottom=0, top=1, hspace=0.2, wspace=0.2
             )
             plt.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
-            self.canvas.draw()  # Refresh canvas
+            self.seg_gui.canvas_draw.draw()  # Refresh canvas
             
         def draw_freehand_clicked(self):
             if self.seg_gui.draw_roi_button.isChecked():  # Set up b-mode to be drawn on
-                self.cid = self.figure.canvas.mpl_connect(
+                self.cid = self.seg_gui.figure_draw.canvas.mpl_connect(
                     "button_press_event", self.interpolate_points
                 )
             else:  # No longer let b-mode be drawn on
                 if hasattr(self, "cid"):
-                    self.cid = self.figure.canvas.mpl_disconnect(self.cid)
-            self.canvas.draw()
+                    self.cid = self.seg_gui.figure_draw.canvas.mpl_disconnect(self.cid)
+            self.seg_gui.canvas_draw.draw()
             
         def draw_rect_clicked(self):
             if self.seg_gui.draw_rectangle_button.isChecked():  # Set up b-mode to be drawn on
                 self.selector.set_active(True)
-                self.cid = self.figure.canvas.mpl_connect(
+                self.cid = self.seg_gui.figure_draw.canvas.mpl_connect(
                     "button_press_event", self.clear_rect
                 )
             else:  # No longer let b-mode be drawn on
-                self.cid = self.figure.canvas.mpl_disconnect(self.cid)
+                self.cid = self.seg_gui.figure_draw.canvas.mpl_disconnect(self.cid)
                 self.selector.set_active(False)
-            self.canvas.draw()
+            self.seg_gui.canvas_draw.draw()
             
         def back_from_rect(self):
             self.seg_gui.physical_rect_height_val.setText("0")
@@ -658,9 +677,9 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
             self.seg_gui.show_draw_seg_start()
             self.rect_coords = []
             self.selector.set_active(False)
-            if len(self.ax.patches) > 0:
-                self.ax.patches.pop()
-            self.canvas.draw()
+            if len(self.seg_gui.ax_draw.patches) > 0:
+                self.seg_gui.ax_draw.patches.pop()
+            self.seg_gui.canvas_draw.draw()
             
         def hide_rect_buttons(self):
             self.seg_gui.draw_rect_buttons.hide()
@@ -759,11 +778,11 @@ class SegSelectionGUI(QDialog, Ui_constructRoi):
             dest_path = save_folder / (self.seg_gui.save_name_input.text() + ".pkl")
             
             if not len(self.spline_x): # Rectangle ROI case
-                left, bottom = self.ax.patches[0].get_xy()
+                left, bottom = self.seg_gui.ax_draw.patches[0].get_xy()
                 left = int(left)
                 bottom = int(bottom)
-                width = int(self.ax.patches[0].get_width())
-                height = int(self.ax.patches[0].get_height())
+                width = int(self.seg_gui.ax_draw.patches[0].get_width())
+                height = int(self.seg_gui.ax_draw.patches[0].get_height())
                 self.points_plotted_x = (
                     list(range(left, left + width))
                     + list(np.ones(height).astype(int) * (left + width - 1))

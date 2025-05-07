@@ -20,10 +20,7 @@ def run_start_window(old_widget: QDialog = None):
             app.quit()
             sys.exit(0)
             
-    if start_window.image_data.bmode.ndim == 2:
-        seg_window = SegSelectionGUI(start_window.image_data)
-    else:
-        raise ValueError("Image data is not 2D. Please check the image data format.")
+    seg_window = SegSelectionGUI(start_window.image_data)
 
     if old_widget is not None:
         widget.removeWidget(old_widget)
