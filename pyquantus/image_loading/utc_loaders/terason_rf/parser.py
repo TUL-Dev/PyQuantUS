@@ -26,7 +26,7 @@ def readFileInfo(path: str) -> Tuple[InfoStruct, float, np.ndarray, np.ndarray]:
     Info.centerFrequency = 9000000 #Hz
     
     Info.lines = input["NumberOfLines"][0][0]
-    Info.depth = input["SectorDepthCM"][0][0] * 10 #mm
+    Info.depth = input["SectorDepthCM"][0][0] * 100 #mm
     Info.samplingFrequency = input["FPS"][0][0] * 1000000 #Hz
     Info.clipFact = 1
     Info.dynRange = 40

@@ -7,7 +7,6 @@ from PyQt6.uic.load_ui import loadUi
 
 from pyquantus.image_loading.utc_loaders.options import get_scan_loaders
 from pyquantus.entrypoints import scan_loading_step
-from pyquantus.gui.seg_loading.roi_selection import RoiSelectionGUI
 
 
 def select_image_helper(path_input, file_exts):

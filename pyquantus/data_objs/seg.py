@@ -12,3 +12,6 @@ class BmodeSeg:
         self.seg_mask: np.ndarray
         self.sc_seg_mask: np.ndarray
         self.frame: int
+        
+        # Scan conversion parameters
+        self.sc_splines: List[np.ndarray] # [X, Y, (Z)]

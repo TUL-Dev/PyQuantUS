@@ -37,6 +37,7 @@ def pkl_roi(image_data: UltrasoundRfImage, seg_path: str, **kwargs) -> BmodeSeg:
         # Define the ROI spline on the same coordinates as the RF data
         rf_spline_x = np.array([image_data.xmap[int(y), int(x)] for x, y in zip(spline_x, spline_y)])
         rf_spline_y = np.array([image_data.ymap[int(y), int(x)] for x, y in zip(spline_x, spline_y)])
+        out.sc_splines = [spline_x, spline_y]
         spline_x = rf_spline_x; spline_y = rf_spline_y
     
     spline = [(spline_x[i], spline_y[i]) for i in range(len(spline_x))]

@@ -3,7 +3,7 @@ import sys
 from PyQt6.QtWidgets import QStackedWidget, QApplication, QDialog
 
 from pyquantus.gui.image_loading.select_image import SelectImageGUI
-from pyquantus.gui.seg_loading.roi_selection import RoiSelectionGUI
+from pyquantus.gui.seg_loading.roi_selection import SegSelectionGUI
 
 app = QApplication(sys.argv)
 widget = QStackedWidget()
@@ -21,7 +21,7 @@ def run_start_window(old_widget: QDialog = None):
             sys.exit(0)
             
     if start_window.image_data.bmode.ndim == 2:
-        seg_window = RoiSelectionGUI(start_window.image_data)
+        seg_window = SegSelectionGUI(start_window.image_data)
     else:
         raise ValueError("Image data is not 2D. Please check the image data format.")
 
@@ -34,7 +34,7 @@ def run_start_window(old_widget: QDialog = None):
     widget.show()
     run_seg_window(seg_window)
             
-def run_seg_window(seg_window: RoiSelectionGUI):
+def run_seg_window(seg_window: SegSelectionGUI):
     while seg_window.isVisible():
         app.processEvents()
         if not seg_window.isVisible():
