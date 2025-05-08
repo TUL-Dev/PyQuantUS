@@ -24,7 +24,7 @@ from pyquantus.parse.transforms import scanConvert
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-#logging.disable(logging.CRITICAL)
+#logging.disable(logging.INFO)
 
 
 # tar file unpacker    
@@ -1131,18 +1131,20 @@ class ClariusParser():
             self.delay_samples = delay_samples
         
         ###################################################################################
-
-        def image_envelope_2d(self, envelope_type: str, title: str) -> None:
+          
+        def image_envelope_2d(self, envelope_type: str, title: str, clip_fact: float = 0.8, dyn_range: float = 60) -> None:
             """
             Plots a 2D signal envelope in decibels.
 
             This function takes a 2D array representing a signal envelope, applies 
             a rotation and flipping transformation, converts it to a logarithmic 
-            decibel scale, and displays it as an image plot.
+            decibel scale, applies clipping and normalization, and displays it as an image plot.
 
             Args:
-                envelope (np.ndarray): The 2D signal envelope to be plotted.
+                envelope_type (str): 'TGC' or 'No TGC'
                 title (str): The title of the plot.
+                clip_fact (float): Clipping factor for dynamic range.
+                dyn_range (float): Dynamic range in dB.
 
             Returns:
                 None
@@ -1162,13 +1164,19 @@ class ClariusParser():
             rotated_flipped_array = self.rotate_flip(envelope)
 
             log_envelope_2d = 20 * np.log10(np.abs(1 + rotated_flipped_array))
-            
-            logging.debug("Calculated log envelope 2D.")
+
+            # Step 2: Clip and normalize
+            clipped_max = clip_fact * np.amax(log_envelope_2d)
+            log_envelope_2d = np.clip(log_envelope_2d, clipped_max - dyn_range, clipped_max)
+            log_envelope_2d -= np.amin(log_envelope_2d)
+            log_envelope_2d *= (255 / np.amax(log_envelope_2d))
+
+            logging.debug("Calculated and normalized log envelope 2D.")
 
             plt.figure(figsize=(8, 6))
             plt.imshow(log_envelope_2d, cmap='gray', aspect='auto')
             plt.title(title)
-            plt.colorbar(label='dB')
+            plt.colorbar()
             logging.info("Displayed 2D Signal Envelope.")
 
             plt.tight_layout()
