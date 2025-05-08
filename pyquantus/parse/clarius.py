@@ -470,6 +470,7 @@ class ClariusTarUnpacker():
 
 # parser
 ###################################################################################  
+
 def get_signal_envelope_xd(signal_xd: np.ndarray, hilbert_transform_axis: int) -> np.ndarray:
     """
     Computes the envelope of an x-dimensional signal using the Hilbert transform.
@@ -601,7 +602,7 @@ class ClariusParser():
         
         # Compute no TGC envelope
         self.no_tgc_envelope_3d = get_signal_envelope_xd(self.rf_no_tgc_raw_data_3d,
-                                                              hilbert_transform_axis=self.hilbert_transform_axis)
+                                                        hilbert_transform_axis=self.hilbert_transform_axis)
         
         # Format outputs
         self.set_data_of_clarius_info_struct()
@@ -810,7 +811,6 @@ class ClariusParser():
             logging.warning("No TGC data inputted. No TGC was used.")
             rf_no_tgc_raw = np.copy(self.rf_raw_data_3d).astype(np.float64)
                 
-
         self.rf_no_tgc_raw_data_3d = rf_no_tgc_raw
         
     ###################################################################################
@@ -1112,6 +1112,7 @@ class ClariusParser():
 
         ###################################################################################
         
+    ###################################################################################
     class ParserVisualizations():
         """
         This class is responsible for visualizing the data processed by the ClariusParser.
@@ -1308,3 +1309,5 @@ def clariusRfParser(imgFilename: str,
     scanConverted = phantom_sample_obj.scan_converted
     
     return imgData, imgInfo, refData, refInfo, scanConverted
+
+###################################################################################
