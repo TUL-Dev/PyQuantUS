@@ -12,6 +12,12 @@ import warnings
 import logging
 from datetime import datetime
 
+import os
+import logging
+import numpy as np
+from datetime import datetime
+from typing import Tuple
+
 import numpy as np
 from scipy.io import savemat
 from philipsRfParser import getPartA, getPartB
@@ -1196,18 +1202,58 @@ def parseRF_problem(filepath: str, readOffset: int, readSize: int) -> Rfdata:
 ###################################################################################
 
 def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
-    """Open and parse RF data file."""
+    """Main function to parse an RF data file (Voyager or Fusion format)."""
     logging.info(f"Opening RF file: {filepath}")
-
-    rfdata = Rfdata()
     start_time = datetime.now()
 
-    # File Headers for Voyager and Fusion
-    VHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 160, 160]
-    FHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 11, 11]
+    rfdata = Rfdata()
+    VHeader, FHeader = get_known_headers()
     fileHeaderSize = len(VHeader)
 
-    # Open file
+    # Determine file format and read initial header info
+    isVoyager, hasFileHeader, totalHeaderSize = analyze_header(filepath, VHeader, FHeader, fileHeaderSize, rfdata)
+    endianness = 'big' if isVoyager else 'little'
+
+    # Align file read boundaries based on format
+    readOffset, readSize = align_offsets(filepath, readOffset, readSize, totalHeaderSize, isVoyager)
+
+    # Load raw data from file (either full or in parts)
+    rawrfdata = load_raw_data(filepath, readOffset, readSize, totalHeaderSize, isVoyager)
+
+    # Parse metadata headers from raw data
+    headerInfo = parse_header_info(rawrfdata, isVoyager)
+
+    # Parse actual signal data
+    lineData, lineHeader, Tap_Point = parse_rf_data(rawrfdata, headerInfo, isVoyager)
+
+    # Store parsed values in rfdata structure
+    rfdata.lineData = lineData
+    rfdata.lineHeader = lineHeader
+    rfdata.headerInfo = headerInfo
+    del rawrfdata  # Free memory
+
+    # Determine multi-line capture configuration and correct Tap Point
+    ML_Capture, Tap_Point = determine_capture_info(headerInfo, Tap_Point)
+
+    # Log parsed capture metadata
+    log_capture_info(Tap_Point, ML_Capture)
+
+    # Final organization of RF data
+    organize_rfdata(rfdata, ML_Capture, isVoyager)
+
+    logging.info(f"Completed parseRF(). Total elapsed time: {datetime.now() - start_time}")
+    return rfdata
+
+
+def get_known_headers() -> Tuple[list, list]:
+    """Returns predefined headers for Voyager and Fusion files."""
+    VHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 160, 160]
+    FHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 11, 11]
+    return VHeader, FHeader
+
+
+def analyze_header(filepath, VHeader, FHeader, fileHeaderSize, rfdata) -> Tuple[bool, bool, int]:
+    """Analyzes the file header to determine file type and header size."""
     with open(filepath, 'rb') as file_obj:
         fileHeader = list(file_obj.read(fileHeaderSize))
         isVoyager = fileHeader == VHeader
@@ -1215,30 +1261,24 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
 
         if hasFileHeader:
             logging.info("Header information found.")
-            if isVoyager:
-                logging.info("Parsing Voyager RF capture file...")
-            else:
-                logging.info("Parsing Fusion RF capture file...")
+            logging.info("Parsing Voyager RF capture file..." if isVoyager else "Parsing Fusion RF capture file...")
+            endianness = 'big' if isVoyager else 'little'
+            rfdata.dbParams, numFileHeaderBytes = parseFileHeader(file_obj, endianness)
+            totalHeaderSize = fileHeaderSize + 8 + numFileHeaderBytes  # 8 = version and size fields
         else:
             logging.info("Parsing legacy Voyager RF capture file (no standard header).")
             isVoyager = True
-
-        # Determine endianness
-        endianness = 'big' if isVoyager else 'little'
-
-        # Read file-specific parameters if present
-        if hasFileHeader:
-            rfdata.dbParams, numFileHeaderBytes = parseFileHeader(file_obj, endianness)
-            totalHeaderSize = fileHeaderSize + 8 + numFileHeaderBytes  # 8 bytes from fileVersion and header size fields
-        else:
             totalHeaderSize = 0
 
-    # Handle read offset and size
-    readOffset *= (2**20)
-    readSize *= (2**20)
+    return isVoyager, hasFileHeader, totalHeaderSize
+
+
+def align_offsets(filepath, readOffsetMB, readSizeMB, totalHeaderSize, isVoyager) -> Tuple[int, int]:
+    """Aligns read offset and size to block boundaries specific to file format."""
+    readOffset = readOffsetMB * (2**20)  # Convert MB to bytes
+    readSize = readSizeMB * (2**20)
     remainingSize = os.stat(filepath).st_size - totalHeaderSize
 
-    # Align readOffset and readSize
     alignment = 36 if isVoyager else 32
     aligned = np.arange(0, remainingSize + 1, alignment)
 
@@ -1246,70 +1286,72 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
     readSize = aligned[np.searchsorted(aligned, readSize)]
 
     logging.info(f"Reading from offset {readOffset} bytes, size {readSize} bytes.")
+    return readOffset, readSize
 
-    # Read the raw RF data
+
+def load_raw_data(filepath, readOffset, readSize, totalHeaderSize, isVoyager) -> bytes:
+    """Reads the actual binary data from the file."""
     with open(filepath, 'rb') as f:
         f.seek(totalHeaderSize + readOffset)
         rawrfdata = f.read(readSize)
 
-    # Process raw data
     if isVoyager:
-        numClumps = int(np.floor(len(rawrfdata) / 36))
-        # TODO: You might want to split huge files into manageable chunks here (advanced)
+        return rawrfdata
     else:
+        # For Fusion, use external decoders to split the data
         numClumps = int(np.floor(readSize / 32))
         offset = totalHeaderSize + readOffset
+        logging.info("Calling external data splitters for Fusion format...")
         partA = callGetPartA(numClumps, filepath, offset)
         partB = callGetPartB(numClumps, filepath, offset)
-        rawrfdata = np.concatenate((partA, partB))
+        return np.concatenate((partA, partB))
 
-    logging.info(f"Raw RF data loaded. Elapsed time: {datetime.now() - start_time}")
 
-    # Parse Header Info
+def parse_header_info(rawrfdata, isVoyager):
+    """Parses header metadata depending on file type."""
     logging.info("Parsing header info...")
-    if isVoyager:
-        headerInfo = parseHeaderV(rawrfdata)
-    else:
-        headerInfo = parseHeaderF(rawrfdata)
+    return parseHeaderV(rawrfdata) if isVoyager else parseHeaderF(rawrfdata)
 
-    logging.info(f"Header parsing completed. Elapsed time: {datetime.now() - start_time}")
 
-    # Parse RF Data
+def parse_rf_data(rawrfdata, headerInfo, isVoyager):
+    """Extracts the actual RF signal data from the raw bytes."""
     logging.info("Parsing RF data...")
     Tap_Point = headerInfo.Tap_Point[0]
+
     if isVoyager:
         lineData, lineHeader = parseDataV(rawrfdata, headerInfo)
     else:
         lineData, lineHeader = parseDataF(rawrfdata, headerInfo)
         if Tap_Point == 0:
-            lineData <<= 2  # Correct MSB shift if needed
+            logging.info("Shifting Fusion Tap Point 0 data by 2 bits left")
+            lineData <<= 2  # Correct MSB shift
 
-    rfdata.lineData = lineData
-    rfdata.lineHeader = lineHeader
-    rfdata.headerInfo = headerInfo
-    del rawrfdata  # Free memory
+    return lineData, lineHeader, Tap_Point
 
-    # Determine ML Capture
+
+def determine_capture_info(headerInfo, Tap_Point) -> Tuple[float, int]:
+    """Determines the number of lines captured in the RF data and adjusts tap point."""
     if Tap_Point == 7:
         ML_Capture = 128
     else:
-        ML_Capture = np.double(rfdata.headerInfo.Multilines_Capture[0])
+        ML_Capture = np.double(headerInfo.Multilines_Capture[0])
 
     if ML_Capture == 0:
-        SAMPLE_RATE = np.double(rfdata.headerInfo.RF_Sample_Rate[0])
+        SAMPLE_RATE = np.double(headerInfo.RF_Sample_Rate[0])
         ML_Capture = 16 if SAMPLE_RATE == 0 else 32
 
-    Tap_Point = 4 if Tap_Point == 7 else Tap_Point
+    if Tap_Point == 7:
+        Tap_Point = 4  # Normalize to PostADC for processing
 
+    return ML_Capture, Tap_Point
+
+
+def log_capture_info(Tap_Point, ML_Capture):
+    """Logs human-readable capture metadata."""
     namePoint = ['PostShepard', 'PostAGNOS', 'PostXBR', 'PostQBP', 'PostADC']
     logging.info(f"Capture Tap Point: {namePoint[Tap_Point]}")
     logging.info(f"ML Capture: {ML_Capture}x")
 
-    # Organize data
-    organize_rfdata(rfdata, ML_Capture, isVoyager)
-
-    logging.info(f"Completed parseRF(). Total elapsed time: {datetime.now() - start_time}")
-    return rfdata
 
 ###################################################################################
 
