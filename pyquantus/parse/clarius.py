@@ -24,7 +24,7 @@ from pyquantus.parse.transforms import scanConvert
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-#logging.disable(logging.CRITICAL)
+#logging.disable(logging.INFO)
 
 
 # tar file unpacker    
@@ -56,7 +56,7 @@ class ClariusTarUnpacker():
         self.extraction_mode = extraction_mode
         
         # Using lzop.exe file for Windows renamed to lzop.py to make it pip-accessible
-        self.lzo_exe_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir)}\exe\lzop.py"
+        self.lzo_py_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir)}\exe\lzop.py"
         
         # single tar extraction attibutes
         self.single_tar_extraction: bool = None
@@ -286,8 +286,6 @@ class ClariusTarUnpacker():
         logging.info(f'Detected operating system: {self.os}')
                
         if self.os == "windows":
-            # Construct the full path to the LZO executable
-            path_of_lzo_exe_file = self.lzo_exe_file_path
 
             # Log the path being checked
             logging.info(f'Checking path for LZO executable: {self.lzo_py_file_path}')
@@ -472,6 +470,7 @@ class ClariusTarUnpacker():
 
 # parser
 ###################################################################################  
+
 def get_signal_envelope_xd(signal_xd: np.ndarray, hilbert_transform_axis: int) -> np.ndarray:
     """
     Computes the envelope of an x-dimensional signal using the Hilbert transform.
@@ -603,7 +602,7 @@ class ClariusParser():
         
         # Compute no TGC envelope
         self.no_tgc_envelope_3d = get_signal_envelope_xd(self.rf_no_tgc_raw_data_3d,
-                                                              hilbert_transform_axis=self.hilbert_transform_axis)
+                                                        hilbert_transform_axis=self.hilbert_transform_axis)
         
         # Format outputs
         self.set_data_of_clarius_info_struct()
@@ -615,8 +614,17 @@ class ClariusParser():
                                                         self.default_frame, self.rf_yml_obj.rf_sampling_rate,
                                                         self.full_depth_mm, self.delay_samples,
                                                         self.hilbert_transform_axis)
-        visualizer.image_envelope_2d("TGC", title="rf_raw")
-        visualizer.image_envelope_2d("No TGC", title="rf_no_tgc_raw")
+            
+        visualizer.image_envelope_2d("TGC",
+                                     title="rf_raw",
+                                     clip_fact=self.clarius_info_struct.clipFact,
+                                     dyn_range=self.clarius_info_struct.dynRange)
+        
+        visualizer.image_envelope_2d("No TGC",
+                                     title="rf_no_tgc_raw",
+                                     clip_fact=self.clarius_info_struct.clipFact,
+                                     dyn_range=self.clarius_info_struct.dynRange)
+        
         visualizer.plot_1d_signal_and_fft("TGC", title="rf_raw")
         visualizer.plot_1d_signal_and_fft("No TGC", title="rf_no_tgc_raw")
         
@@ -748,7 +756,7 @@ class ClariusParser():
         previous_data_dict = None
 
         # Ensure each timestamp has valid TGC data
-        if self.env_tgc_yml_path is not None:
+        if self.env_tgc_yml_path is not None and len(self.env_tgc_yml_obj.timestamps.items()):
             for timestamp, data_list in self.env_tgc_yml_obj.timestamps.items():
                 logging.debug(f"Processing {timestamp}: {data_list}")
 
@@ -812,7 +820,6 @@ class ClariusParser():
             logging.warning("No TGC data inputted. No TGC was used.")
             rf_no_tgc_raw = np.copy(self.rf_raw_data_3d).astype(np.float64)
                 
-
         self.rf_no_tgc_raw_data_3d = rf_no_tgc_raw
         
     ###################################################################################
@@ -1114,6 +1121,7 @@ class ClariusParser():
 
         ###################################################################################
         
+    ###################################################################################
     class ParserVisualizations():
         """
         This class is responsible for visualizing the data processed by the ClariusParser.
@@ -1132,24 +1140,26 @@ class ClariusParser():
             self.delay_samples = delay_samples
         
         ###################################################################################
-
-        def image_envelope_2d(self, envelope_type: str, title: str) -> None:
+          
+        def image_envelope_2d(self, envelope_type: str, title: str, clip_fact: float, dyn_range: float) -> None:
             """
             Plots a 2D signal envelope in decibels.
 
             This function takes a 2D array representing a signal envelope, applies 
             a rotation and flipping transformation, converts it to a logarithmic 
-            decibel scale, and displays it as an image plot.
+            decibel scale, applies clipping and normalization, and displays it as an image plot.
 
             Args:
-                envelope (np.ndarray): The 2D signal envelope to be plotted.
+                envelope_type (str): 'TGC' or 'No TGC'
                 title (str): The title of the plot.
+                clip_fact (float): Clipping factor for dynamic range.
+                dyn_range (float): Dynamic range in dB.
 
             Returns:
                 None
             """
             logging.info("Starting the plot function.")
-            
+                        
             if envelope_type == "TGC":
                 tgc_signal_2d = self.rf_raw_data_3d[:, :, self.default_frame]
                 envelope = get_signal_envelope_xd(tgc_signal_2d, hilbert_transform_axis=self.hilbert_transform_axis)
@@ -1163,13 +1173,19 @@ class ClariusParser():
             rotated_flipped_array = self.rotate_flip(envelope)
 
             log_envelope_2d = 20 * np.log10(np.abs(1 + rotated_flipped_array))
-            
-            logging.debug("Calculated log envelope 2D.")
+
+            # Step 2: Clip and normalize
+            clipped_max = clip_fact * np.amax(log_envelope_2d)
+            log_envelope_2d = np.clip(log_envelope_2d, clipped_max - dyn_range, clipped_max)
+            log_envelope_2d -= np.amin(log_envelope_2d)
+            log_envelope_2d *= (255 / np.amax(log_envelope_2d))
+
+            logging.debug("Calculated and normalized log envelope 2D.")
 
             plt.figure(figsize=(8, 6))
             plt.imshow(log_envelope_2d, cmap='gray', aspect='auto')
             plt.title(title)
-            plt.colorbar(label='dB')
+            plt.colorbar()
             logging.info("Displayed 2D Signal Envelope.")
 
             plt.tight_layout()
@@ -1310,3 +1326,5 @@ def clariusRfParser(imgFilename: str,
     scanConverted = phantom_sample_obj.scan_converted
     
     return imgData, imgInfo, refData, refInfo, scanConverted
+
+###################################################################################
