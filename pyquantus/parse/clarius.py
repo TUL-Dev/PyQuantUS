@@ -756,7 +756,7 @@ class ClariusParser():
         previous_data_dict = None
 
         # Ensure each timestamp has valid TGC data
-        if self.env_tgc_yml_path is not None:
+        if self.env_tgc_yml_path is not None and len(self.env_tgc_yml_obj.timestamps.items()):
             for timestamp, data_list in self.env_tgc_yml_obj.timestamps.items():
                 logging.debug(f"Processing {timestamp}: {data_list}")
 
