@@ -9,7 +9,12 @@ import numpy as np
 from scipy.io import savemat
 from philipsRfParser import getPartA, getPartB
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configure logging with more detailed format
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 ###################################################################################
 class PhilipsRFParser:
@@ -445,43 +450,59 @@ class PhilipsRFParser:
 
     def parse_rf(self, filepath: str, readOffset: int, readSize: int) -> Rfdata:
         """Main method to parse an RF data file."""
-        logging.info(f"Opening RF file: {filepath}")
+        logging.info(f"Starting parseRF for file: {filepath}")
         start_time = datetime.now()
 
         rfdata = self.Rfdata()
+        logging.info(f"Initialized Rfdata structure")
 
         # Determine file format and read initial header info
         isVoyager, hasFileHeader, totalHeaderSize = self._analyze_header(filepath)
+        logging.info(f"File analysis results - isVoyager: {isVoyager}, hasFileHeader: {hasFileHeader}, totalHeaderSize: {totalHeaderSize}")
+        
         endianness = 'big' if isVoyager else 'little'
+        logging.info(f"Using {endianness} endianness for parsing")
 
         # Align file read boundaries based on format
         readOffset, readSize = self._align_offsets(filepath, readOffset, readSize, totalHeaderSize, isVoyager)
+        logging.info(f"Aligned read parameters - offset: {readOffset}, size: {readSize}")
 
         # Load raw data from file
+        logging.info("Loading raw data from file...")
         rawrfdata = self._load_raw_data(filepath, readOffset, readSize, totalHeaderSize, isVoyager)
+        logging.info(f"Loaded raw data of size: {len(rawrfdata) if isinstance(rawrfdata, bytes) else rawrfdata.shape}")
 
         # Parse metadata headers from raw data
+        logging.info("Parsing metadata headers...")
         headerInfo = self.parse_header_v(rawrfdata) if isVoyager else self.parse_header_f(rawrfdata)
+        logging.info("Header parsing completed")
 
         # Parse actual signal data
+        logging.info("Parsing RF signal data...")
         lineData, lineHeader, Tap_Point = self._parse_rf_data(rawrfdata, headerInfo, isVoyager)
+        logging.info(f"Signal data parsed - lineData shape: {lineData.shape}, lineHeader shape: {lineHeader.shape}")
 
         # Store parsed values in rfdata structure
         rfdata.lineData = lineData
         rfdata.lineHeader = lineHeader
         rfdata.headerInfo = headerInfo
         del rawrfdata  # Free memory
+        logging.info("Stored parsed data in rfdata structure")
 
         # Determine multi-line capture configuration and correct Tap Point
         ML_Capture, Tap_Point = self._determine_capture_info(headerInfo, Tap_Point)
+        logging.info(f"Capture configuration determined - ML_Capture: {ML_Capture}, Tap_Point: {Tap_Point}")
 
         # Log parsed capture metadata
         self._log_capture_info(Tap_Point, ML_Capture)
 
         # Final organization of RF data
+        logging.info("Organizing RF data into different types...")
         self._organize_rfdata(rfdata, ML_Capture, isVoyager)
+        logging.info("RF data organization completed")
 
-        logging.info(f"Completed parseRF(). Total elapsed time: {datetime.now() - start_time}")
+        elapsed_time = datetime.now() - start_time
+        logging.info(f"Completed parseRF(). Total elapsed time: {elapsed_time}")
         return rfdata
 
 ###################################################################################
@@ -624,36 +645,44 @@ class PhilipsRFParser:
     def parse(self, filepath: str, ML_out=2, ML_in=32, used_os=2256) -> np.ndarray:
         """Parse Philips RF data file and save to .mat file."""
         logging.info(f"Starting philipsRfParser for file: {filepath}")
+        logging.info(f"Parameters - ML_out: {ML_out}, ML_in: {ML_in}, used_os: {used_os}")
 
         # Parse RF file
+        logging.info("Parsing RF file...")
         rf = self.parse_rf(filepath, 0, 2000)
+        logging.info("RF file parsing completed")
 
         # Check even/odd line index to remove duplicate lines
+        logging.info("Checking for duplicate lines...")
         if rf.headerInfo.Line_Index[249] == rf.headerInfo.Line_Index[250]:
             rf.lineData = rf.lineData[:, np.arange(2, rf.lineData.shape[1], 2)]
-            logging.info("Detected even-indexed duplicate, skipping even lines.")
+            logging.info("Detected even-indexed duplicate, skipping even lines")
         else:
             rf.lineData = rf.lineData[:, np.arange(1, rf.lineData.shape[1], 2)]
-            logging.info("Detected odd-indexed duplicate, skipping odd lines.")
+            logging.info("Detected odd-indexed duplicate, skipping odd lines")
 
         txBeamperFrame = np.array(rf.dbParams.num2DCols).flat[0]
         NumSonoCTAngles = rf.dbParams.numOfSonoCTAngles2dActual[0]
+        logging.info(f"Beam parameters - txBeamperFrame: {txBeamperFrame}, NumSonoCTAngles: {NumSonoCTAngles}")
 
         # Calculate parameters
         numFrame = int(np.floor(rf.lineData.shape[1] / (txBeamperFrame * NumSonoCTAngles)))
         multilinefactor = ML_in
         pt = int(np.floor((rf.lineData.shape[0] - used_os) / multilinefactor))
-
-        logging.info(f"Frames detected: {numFrame}, SonoCT Angles: {NumSonoCTAngles}, points: {pt}")
+        logging.info(f"Calculated parameters - numFrame: {numFrame}, multilinefactor: {multilinefactor}, points: {pt}")
 
         # Initialize arrays
+        logging.info("Initializing data arrays...")
         rftemp_all_harm = np.zeros((pt, ML_out * txBeamperFrame))
         rftemp_all_fund = np.zeros((pt, ML_out * txBeamperFrame))
         rf_data_all_harm = np.zeros((numFrame, NumSonoCTAngles, pt, ML_out * txBeamperFrame))
         rf_data_all_fund = np.zeros((numFrame, NumSonoCTAngles, pt, ML_out * txBeamperFrame))
+        logging.info("Array initialization completed")
 
         # Fill data arrays
+        logging.info("Filling data arrays...")
         for k0 in range(numFrame):
+            logging.info(f"Processing frame {k0+1}/{numFrame}")
             for k1 in range(NumSonoCTAngles):
                 for k2 in range(txBeamperFrame):
                     bi = k0 * txBeamperFrame * NumSonoCTAngles + k1 * txBeamperFrame + k2
@@ -666,8 +695,10 @@ class PhilipsRFParser:
 
                 rf_data_all_harm[k0, k1] = rftemp_all_harm
                 rf_data_all_fund[k0, k1] = rftemp_all_fund
+        logging.info("Data array filling completed")
 
         # Prepare contents for .mat saving
+        logging.info("Preparing data for .mat file...")
         contents = {
             'echoData': rf.echoData[0],
             'lineData': rf.lineData,
@@ -685,22 +716,29 @@ class PhilipsRFParser:
         # Add optional fields
         if len(rf.echoData) > 1 and len(rf.echoData[1]):
             contents['echoData1'] = rf.echoData[1]
+            logging.info("Added echoData1 to contents")
         if len(rf.echoData) > 2 and len(rf.echoData[2]):
             contents['echoData2'] = rf.echoData[2]
+            logging.info("Added echoData2 to contents")
         if len(rf.echoData) > 3 and len(rf.echoData[3]):
             contents['echoData3'] = rf.echoData[3]
+            logging.info("Added echoData3 to contents")
         if hasattr(rf, 'echoMModeData'):
             contents['echoMModeData'] = rf.echoMModeData
+            logging.info("Added echoMModeData to contents")
         if hasattr(rf, 'miscData'):
             contents['miscData'] = rf.miscData
+            logging.info("Added miscData to contents")
 
         # Save to .mat
         destination = filepath.rsplit('.', 1)[0] + '.mat'
         if os.path.exists(destination):
+            logging.info(f"Removing existing file: {destination}")
             os.remove(destination)
 
+        logging.info(f"Saving data to {destination}")
         savemat(destination, contents)
-        logging.info(f"Saved parsed data to {destination}")
+        logging.info(f"Successfully saved parsed data to {destination}")
 
         return rf_data_all_fund.shape
 
