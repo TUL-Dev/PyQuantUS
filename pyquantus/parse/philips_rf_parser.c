@@ -15,17 +15,32 @@
 #define close _close
 #define lseek _lseek
 #define read _read
+#define O_BINARY _O_BINARY
 typedef long ssize_t;
 #else // Unix-like includes and definitions
 #include <unistd.h>
+#ifndef O_BINARY
+#define O_BINARY 0
 #endif
+#endif
+
+// Helper to get file size
+long long get_file_size(const char* fn) {
+    struct stat st;
+    if (stat(fn, &st) == 0) {
+        return (long long)st.st_size;
+    }
+    return -1;
+}
 
 int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
     printf("[get_array_shape] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
     long long i = 0;
     char* bytes_read = calloc(256, 1);
+    long long fsize = get_file_size(fn);
+    printf("[get_array_shape] File size: %lld bytes\n", fsize);
 
-    int fd = open(fn, O_RDONLY);
+    int fd = open(fn, O_RDONLY | O_BINARY);
     if (fd == -1) {
         perror("open");
         exit(errno);
@@ -34,10 +49,10 @@ int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
         perror("lseek");
         exit(errno);
     }
+    printf("[get_array_shape] Seeked to offset: %d\n", offset_bytes);
 
     while (i < num_clumps) {
         ssize_t num_bytes_read = read(fd, bytes_read, 32);
-        printf("[get_array_shape] Iteration %lld, bytes_read=%zd\n", i, num_bytes_read);
         if (num_bytes_read == -1) {
             perror("read");
             free(bytes_read);
@@ -56,18 +71,21 @@ int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
 
 int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
     printf("[get_partA] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
-    int fd = open(fn, O_RDONLY);
+    long long fsize = get_file_size(fn);
+    printf("[get_partA] File size: %lld bytes\n", fsize);
+    int fd = open(fn, O_RDONLY | O_BINARY);
     if (fd == -1) {
         perror("open");
         exit(errno);
     }
-
-    int* partA = calloc(12*num_clumps, sizeof(int));
-    char* bytes_read = calloc(256, 1);
     if (lseek(fd, offset_bytes, SEEK_SET) == -1) {
         perror("lseek");
         exit(errno);
     }
+    printf("[get_partA] Seeked to offset: %d\n", offset_bytes);
+
+    int* partA = calloc(12*num_clumps, sizeof(int));
+    char* bytes_read = calloc(256, 1);
 
     int i = 0, x = 0, j = 0, bits_left = 0;
     int bit_offset = 4;
@@ -156,18 +174,21 @@ static PyObject* py_get_partA(PyObject* self, PyObject* args) {
 
 int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
     printf("[get_partB] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
-    int fd = open(fn, O_RDONLY);
+    long long fsize = get_file_size(fn);
+    printf("[get_partB] File size: %lld bytes\n", fsize);
+    int fd = open(fn, O_RDONLY | O_BINARY);
     if (fd == -1) {
         perror("open");
         exit(errno);
     }
-
-    int* partB = calloc(num_clumps, sizeof(int));
-    char* bytes_read = calloc(256, 1);
     if (lseek(fd, offset_bytes, SEEK_SET) == -1) {
         perror("lseek");
         exit(errno);
     }
+    printf("[get_partB] Seeked to offset: %d\n", offset_bytes);
+
+    int* partB = calloc(num_clumps, sizeof(int));
+    char* bytes_read = calloc(256, 1);
 
     int x = 0, j = 0;
     unsigned char cur_num, mask;
