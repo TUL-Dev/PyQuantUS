@@ -21,10 +21,9 @@ typedef long ssize_t;
 #endif
 
 int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
+    printf("[get_array_shape] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
     long long i = 0;
     char* bytes_read = calloc(256, 1);
-
-    printf("%s\n", fn);
 
     int fd = open(fn, O_RDONLY);
     if (fd == -1) {
@@ -38,6 +37,7 @@ int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
 
     while (i < num_clumps) {
         ssize_t num_bytes_read = read(fd, bytes_read, 32);
+        printf("[get_array_shape] Iteration %lld, bytes_read=%zd\n", i, num_bytes_read);
         if (num_bytes_read == -1) {
             perror("read");
             free(bytes_read);
@@ -45,23 +45,23 @@ int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
             exit(errno);
         }
         if (!num_bytes_read) {
+            printf("[get_array_shape] EOF reached at i=%lld\n", i);
             break;
         }
         ++i;    
     }
+    printf("[get_array_shape] Returning i=%lld\n", i);
     return i;
 }
 
 int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
-    // equivalent to "partA = fread(fid, [12, numClumps], '12*ubit21',4);" in MATLAB
-
+    printf("[get_partA] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
     int fd = open(fn, O_RDONLY);
     if (fd == -1) {
         perror("open");
         exit(errno);
     }
 
-    // get partA
     int* partA = calloc(12*num_clumps, sizeof(int));
     char* bytes_read = calloc(256, 1);
     if (lseek(fd, offset_bytes, SEEK_SET) == -1) {
@@ -78,6 +78,7 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
             assert(bit_offset == 4);
             bit_offset = 8;
             ssize_t num_bytes_read = read(fd, bytes_read, 32);
+            printf("[get_partA] Reading new 32-byte block at j=%d, bytes_read=%zd\n", j, num_bytes_read);
             if (num_bytes_read == -1) {
                 perror("read");
                 free(bytes_read);
@@ -86,7 +87,7 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
                 exit(errno);
             }
             if (!num_bytes_read) {
-                printf("EOF reached at column %i\n", j); 
+                printf("[get_partA] EOF reached at column %i\n", j); 
                 break;
             }
             ++j; i = 0;
@@ -121,11 +122,13 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
             }
             full_num[0] = first; full_num[1] = second; full_num[2] = third;
             partA[x] = *((int*)full_num);
+            printf("[get_partA] Writing partA[%d]=%d\n", x, partA[x]);
             ++x;
             i += 2;
         }
     }
 
+    printf("[get_partA] Finished, returning partA pointer\n");
     free(bytes_read);
     free(full_num);
     close(fd);
@@ -134,6 +137,7 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
 }
 
 static PyObject* py_get_partA(PyObject* self, PyObject* args) {
+    printf("[py_get_partA] Called\n");
     long long num_clumps;
     const char* fn;
     int offset_bytes;
@@ -148,19 +152,18 @@ static PyObject* py_get_partA(PyObject* self, PyObject* args) {
         PyList_SetItem(list, i, PyLong_FromLong(partA[i]));
     }
     free(partA);
+    printf("[py_get_partA] Returning Python list\n");
     return list;
 }
 
 int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
-    // equivalent to "partB = fread(fid, [1, numClumps], '1*ubit4', 252);" in MATLAB
-
+    printf("[get_partB] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
     int fd = open(fn, O_RDONLY);
     if (fd == -1) {
         perror("open");
         exit(errno);
     }
 
-    // get partB
     int* partB = calloc(num_clumps, sizeof(int));
     char* bytes_read = calloc(256, 1);
     if (lseek(fd, offset_bytes, SEEK_SET) == -1) {
@@ -174,6 +177,7 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
     mask = ~((uint32_t)(~0)<<4);
     while (j < num_clumps) {
         ssize_t num_bytes_read = read(fd, bytes_read, 32);
+        printf("[get_partB] Iteration j=%d, bytes_read=%zd\n", j, num_bytes_read);
         if (num_bytes_read == -1) {
             perror("read");
             free(bytes_read);
@@ -182,16 +186,18 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
             exit(errno);
         }
         if (!num_bytes_read) {
-            printf("EOF reached at column %i\n", j); 
+            printf("[get_partB] EOF reached at column %i\n", j); 
             break;
         }
         ++j;
         cur_num = bytes_read[0];
         cur_num &= mask;
         partB[x] = (int)cur_num;
+        printf("[get_partB] Writing partB[%d]=%d\n", x, partB[x]);
         ++x;
     }
 
+    printf("[get_partB] Finished, returning partB pointer\n");
     free(bytes_read);
     free(full_num);
     close(fd);
@@ -200,6 +206,7 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
 }
 
 static PyObject* py_get_partB(PyObject* self, PyObject* args) {
+    printf("[py_get_partB] Called\n");
     long long num_clumps;
     const char* fn;
     int offset_bytes;
@@ -214,6 +221,7 @@ static PyObject* py_get_partB(PyObject* self, PyObject* args) {
         PyList_SetItem(list, i, PyLong_FromLong(partB[i]));
     }
     free(partB);
+    printf("[py_get_partB] Returning Python list\n");
     return list;
 }
 
