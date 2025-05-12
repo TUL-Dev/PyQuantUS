@@ -1300,3 +1300,39 @@ if __name__ == "__main__":
     parser = PhilipsRFParser(r"D:\Omid\0_samples\Philips\David\sample.rf",  save_format='npy')
     
 ###################################################################################
+
+
+
+"""
+2025-05-12 14:06:08 - INFO - [__run] - Starting philipsRfParser for file: /home/omid/job/David/sample.rf
+2025-05-12 14:06:08 - INFO - [_parse_rf_file] - Parsing RF file...
+2025-05-12 14:06:08 - INFO - [_parse_rf] - Starting parseRF for file: /home/omid/job/David/sample.rf
+2025-05-12 14:06:08 - INFO - [_parse_rf] - Initialized Rfdata structure
+2025-05-12 14:06:08 - INFO - [_analyze_header] - Header information found.
+2025-05-12 14:06:08 - INFO - [_analyze_header] - Parsing Fusion RF capture file...
+2025-05-12 14:06:08 - INFO - [_analyze_header] - Parsing file header with endianness: little
+2025-05-12 14:06:08 - INFO - [_parse_file_header] - Starting parseFileHeader.
+2025-05-12 14:06:08 - INFO - [_parse_file_header] - File Version: 3
+2025-05-12 14:06:08 - INFO - [_parse_file_header] - Header Size: 892 bytes
+2025-05-12 14:06:08 - INFO - [_analyze_header] - Total header size: 920
+2025-05-12 14:06:08 - INFO - [_parse_rf] - File analysis results - isVoyager: False, hasFileHeader: True, totalHeaderSize: 920
+2025-05-12 14:06:08 - INFO - [_align_offsets] - Remaining size: 430964736
+2025-05-12 14:06:08 - INFO - [_parse_rf] - Aligned read parameters - offset: 0, size: 430964704
+2025-05-12 14:06:08 - INFO - [_parse_rf] - Loading raw data from file...
+2025-05-12 14:06:09 - INFO - [call_get_part_a] - Calling getPartA with numClumps=13467647, filename='/home/omid/job/David/sample.rf', offset=920
+2025-05-12 14:06:37 - INFO - [call_get_part_b] - Calling getPartB with numClumps=13467647, filename='/home/omid/job/David/sample.rf', offset=920
+2025-05-12 14:06:50 - INFO - [_parse_rf] - Loaded raw data of size: (13, 13467647)
+2025-05-12 14:06:50 - INFO - [_parse_rf] - Parsing metadata headers...
+2025-05-12 14:06:50 - INFO - [parse_header_f] - Starting parseHeaderF function.
+2025-05-12 14:06:50 - INFO - [parse_header_f] - Found 2342 headers using pattern
+2025-05-12 14:06:50 - INFO - [parse_header_f] - Processing 2342 headers
+2025-05-12 14:06:50 - INFO - [parse_header_f] - Successfully parsed 2342 headers
+2025-05-12 14:06:50 - INFO - [_parse_rf] - Header parsing completed
+2025-05-12 14:06:50 - INFO - [_parse_rf] - Parsing RF signal data...
+2025-05-12 14:06:50 - INFO - [_parse_rf_data] - Tap Point: 4
+2025-05-12 14:06:50 - INFO - [parse_data_f] - Starting parseDataF function.
+2025-05-12 14:06:50 - INFO - [parse_data_f] - Found 2342 data sections
+2025-05-12 14:06:50 - INFO - [parse_data_f] - Initialized arrays with shape: (11491, 2342)
+2025-05-12 14:06:51 - INFO - [parse_data_f] - Processed data shape: lineData (11491, 2342), lineHeader (11491, 2342)
+2025-05-12 14:06:51 - INFO - [_parse_rf] - Signal data parsed - lineData shape: (11491, 2342), lineHeader shape: (11491, 2342)
+"""
