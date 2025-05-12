@@ -236,7 +236,7 @@ class PhilipsRFParser:
         self.ML_out=2 # Output multiline factor (default: 2)
         self.ML_in=32 # Input multiline factor (default: 32)
         self.used_os=2256 # Used oversampling (default: 2256)
-        self.save_format='mat' # Format to save data in ('mat', 'npz', 'npy', or 'both') (default: 'mat')
+        self.save_format=save_format # Format to save data in ('mat', 'npz', 'npy', or 'both') (default: 'mat')
         
         # State (results)
         self.rfdata = None
@@ -930,231 +930,88 @@ class PhilipsRFParser:
         return lineData, lineHeader
     
     ###################################################################################
-    def _clean_duplicate_lines(self):
-        """Check for and remove duplicate lines in self.rf.lineData."""
-        logging.info("Checking for duplicate lines...")
-        if self.rf.headerInfo.Line_Index[249] == self.rf.headerInfo.Line_Index[250]:
-            self.rf.lineData = self.rf.lineData[:, np.arange(2, self.rf.lineData.shape[1], 2)]
-            logging.info("Detected even-indexed duplicate, skipping even lines")
+    
+    def _determine_capture_info(self, headerInfo, Tap_Point):
+        """Determine capture configuration."""
+        if Tap_Point == 7:
+            ML_Capture = 128
         else:
-            self.rf.lineData = self.rf.lineData[:, np.arange(1, self.rf.lineData.shape[1], 2)]
-            logging.info("Detected odd-indexed duplicate, skipping odd lines")
+            ML_Capture = np.double(headerInfo.Multilines_Capture[0])
+
+        if ML_Capture == 0:
+            SAMPLE_RATE = np.double(headerInfo.RF_Sample_Rate[0])
+            ML_Capture = 16 if SAMPLE_RATE == 0 else 32
+
+        if Tap_Point == 7:
+            Tap_Point = 4
+
+        return ML_Capture, Tap_Point
+    
+    ###################################################################################
+    
+    def _log_capture_info(self, Tap_Point, ML_Capture):
+        """Log capture configuration."""
+        namePoint = ['PostShepard', 'PostAGNOS', 'PostXBR', 'PostQBP', 'PostADC']
+        logging.info(f"Capture Tap Point: {namePoint[Tap_Point]}")
+        logging.info(f"ML Capture: {ML_Capture}x")
+    
+    ###################################################################################
+    
+    def _organize_rfdata(self, rfdata, ML_Capture, isVoyager):
+        """Organize RF data into different types."""
+        DataType_ECHO = np.arange(1, 15)
+        DataType_EchoMMode = 26
+        DataType_COLOR = [17, 21, 22, 23, 24]
+        DataType_ColorMMode = [27, 28]
+        DataType_CW = 16
+        DataType_PW = [18, 19]
+        DataType_Dummy = [20, 25, 29, 30, 31]
+        DataType_SWI = [90, 91]
+        DataType_Misc = [15, 88, 89]
+
+        def find_indices(dataTypes):
+            xmitEvents = len(rfdata.headerInfo.Data_Type)
+            mask = np.zeros(xmitEvents, dtype=bool)
+            for dt in dataTypes:
+                mask = np.bitwise_or(mask, rfdata.headerInfo.Data_Type == dt)
+            return mask
+
+        # Process each data type
+        for data_type, name in [
+            (DataType_ECHO, 'echoData'),
+            ([DataType_EchoMMode], 'echoMModeData'),
+            (DataType_COLOR, 'colorData'),
+            (DataType_ColorMMode, 'colorMModeData'),
+            ([DataType_CW], 'cwData'),
+            (DataType_PW, 'pwData'),
+            (DataType_Dummy, 'dummyData'),
+            (DataType_SWI, 'swiData'),
+            (DataType_Misc, 'miscData')
+        ]:
+            mask = find_indices(data_type)
+            if np.sum(mask) > 0:
+                data = self.prune_data(rfdata.lineData[:, mask], rfdata.lineHeader[:, mask], ML_Capture)
+                result = self.sort_rf(data, ML_Capture, ML_Capture, 1, isVoyager)
+                setattr(rfdata, name, result)
 
     ###################################################################################
-
-    def _calculate_parameters(self):
-        """Calculate and set main parameters as instance variables."""
-        self.txBeamperFrame = np.array(self.rf.dbParams.num2DCols).flat[0]
-        self.NumSonoCTAngles = self.rf.dbParams.numOfSonoCTAngles2dActual[0]
-        logging.info(f"Beam parameters - txBeamperFrame: {self.txBeamperFrame}, NumSonoCTAngles: {self.NumSonoCTAngles}")
-        self.numFrame = int(np.floor(self.rf.lineData.shape[1] / (self.txBeamperFrame * self.NumSonoCTAngles)))
-        self.multilinefactor = self.ML_in
-        self.pt = int(np.floor((self.rf.lineData.shape[0] - self.used_os) / self.multilinefactor))
-        logging.info(f"Calculated parameters - numFrame: {self.numFrame}, multilinefactor: {self.multilinefactor}, points: {self.pt}")
-
-    ###################################################################################
-
-    def _initialize_data_arrays(self):
-        """Initialize and set data arrays as instance variables."""
-        logging.info("Initializing data arrays...")
-        self.rftemp_all_harm = np.zeros((self.pt, self.ML_out * self.txBeamperFrame))
-        self.rftemp_all_fund = np.zeros((self.pt, self.ML_out * self.txBeamperFrame))
-        self.rf_data_all_harm = np.zeros((self.numFrame, self.NumSonoCTAngles, self.pt, self.ML_out * self.txBeamperFrame))
-        self.rf_data_all_fund = np.zeros((self.numFrame, self.NumSonoCTAngles, self.pt, self.ML_out * self.txBeamperFrame))
-        logging.info("Array initialization completed")
-
-    ###################################################################################
-
-    def _fill_data_arrays(self):
-        """Fill the data arrays using instance variables."""
-        logging.info("Filling data arrays...")
-        for k0 in range(self.numFrame):
-            logging.info(f"Processing frame {k0+1}/{self.numFrame}")
-            for k1 in range(self.NumSonoCTAngles):
-                for k2 in range(self.txBeamperFrame):
-                    bi = k0 * self.txBeamperFrame * self.NumSonoCTAngles + k1 * self.txBeamperFrame + k2
-                    temp = np.transpose(
-                        np.reshape(self.rf.lineData[self.used_os + np.arange(self.pt * self.multilinefactor), bi],
-                                 (self.multilinefactor, self.pt), order='F')
-                    )
-                    self.rftemp_all_harm[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [0, 2]]
-                    self.rftemp_all_fund[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [9, 11]]
-                self.rf_data_all_harm[k0, k1] = self.rftemp_all_harm
-                self.rf_data_all_fund[k0, k1] = self.rftemp_all_fund
-        logging.info("Data array filling completed")
-
-    ###################################################################################
-
-    def _prepare_save_contents(self):
-        """Prepare the contents dictionary for saving, using instance variables."""
-        logging.info("Preparing data for saving...")
-        self.contents = {
-            'echoData': self.rf.echoData[0],
-            'lineData': self.rf.lineData,
-            'lineHeader': self.rf.lineHeader,
-            'headerInfo': self.rf.headerInfo,
-            'dbParams': self.rf.dbParams,
-            'rf_data_all_fund': self.rf_data_all_fund,
-            'rf_data_all_harm': self.rf_data_all_harm,
-            'NumFrame': self.numFrame,
-            'NumSonoCTAngles': self.NumSonoCTAngles,
-            'pt': self.pt,
-            'multilinefactor': self.multilinefactor,
-        }
-        if len(self.rf.echoData) > 1 and len(self.rf.echoData[1]):
-            self.contents['echoData1'] = self.rf.echoData[1]
-            logging.info("Added echoData1 to contents")
-        if len(self.rf.echoData) > 2 and len(self.rf.echoData[2]):
-            self.contents['echoData2'] = self.rf.echoData[2]
-            logging.info("Added echoData2 to contents")
-        if len(self.rf.echoData) > 3 and len(self.rf.echoData[3]):
-            self.contents['echoData3'] = self.rf.echoData[3]
-            logging.info("Added echoData3 to contents")
-        if hasattr(self.rf, 'echoMModeData'):
-            self.contents['echoMModeData'] = self.rf.echoMModeData
-            logging.info("Added echoMModeData to contents")
-        if hasattr(self.rf, 'miscData'):
-            self.contents['miscData'] = self.rf.miscData
-            logging.info("Added miscData to contents")
-
-    ###################################################################################
-
-    def _save_contents(self):
-        """Save the contents dictionary to disk using instance variables."""
-        base_path = self.filepath.rsplit('.', 1)[0]
-        if self.save_format in ['mat', 'both']:
-            mat_path = base_path + '.mat'
-            if os.path.exists(mat_path):
-                logging.info(f"Removing existing file: {mat_path}")
-                os.remove(mat_path)
-            logging.info(f"Saving data to {mat_path}")
-            savemat(mat_path, self.contents)
-            logging.info(f"Successfully saved parsed data to {mat_path}")
-        if self.save_format in ['npz', 'both']:
-            npz_path = base_path + '.npz'
-            if os.path.exists(npz_path):
-                logging.info(f"Removing existing file: {npz_path}")
-                os.remove(npz_path)
-            logging.info(f"Saving data to {npz_path}")
-            np.savez_compressed(npz_path, **self.contents)
-            logging.info(f"Successfully saved parsed data to {npz_path}")
-        if self.save_format in ['npy', 'both']:
-            npy_folder = base_path + '_npy'
-            if os.path.exists(npy_folder):
-                logging.info(f"Removing existing folder: {npy_folder}")
-                import shutil
-                shutil.rmtree(npy_folder)
-            os.makedirs(npy_folder)
-            logging.info(f"Created folder for .npy files: {npy_folder}")
-            for key, value in self.contents.items():
-                npy_path = os.path.join(npy_folder, f"{key}.npy")
-                logging.info(f"Saving {key} to {npy_path}")
-                np.save(npy_path, value)
-            logging.info(f"Successfully saved all arrays to {npy_folder}")
-
-    ###################################################################################
-
-    def find_signature(self, filepath: Path) -> list:
-        """Find and validate the file signature.
-        
-        Reads the first 8 bytes of the file to determine if it's a valid
-        Philips RF data file. The signature should match either the Voyager
-        or Fusion format header pattern.
-        
-        Args:
-            filepath (Path): Path to the RF data file
-            
-        Returns:
-            list: First 8 bytes of the file as a list of integers
-            
-        Raises:
-            Exception: If file cannot be read
-        """
-        logging.info(f"Attempting to open file: {filepath}")
-        try:
-            with open(filepath, 'rb') as file:
-                sig = list(file.read(8))
-                logging.info(f"Signature read: {sig}")
-                return sig
-        except Exception as e:
-            logging.error(f"Failed to read signature from {filepath}: {e}")
-            raise
-
-    ###################################################################################
-
-    def prune_data(self, lineData, lineHeader, ML_Capture):
-        """Remove false gate data and align samples.
-        
-        This method:
-        1. Finds the first valid data gate
-        2. Aligns data to multiline capture boundaries
-        3. Removes invalid data at the end
-        
-        Args:
-            lineData (np.ndarray): RF line data
-            lineHeader (np.ndarray): Header information for each line
-            ML_Capture (float): Multiline capture factor
-            
-        Returns:
-            np.ndarray: Pruned and aligned data
-        """
-        logging.info("Starting pruneData function.")
-        
-        # Get dimensions
-        numSamples = lineData.shape[0]
-        referenceLine = int(np.ceil(lineData.shape[1] * 0.2)) - 1
-        startPoint = int(np.ceil(numSamples * 0.015)) - 1
-
-        # Find first valid gate
-        indicesFound = np.where(lineHeader[startPoint:numSamples + 1, referenceLine] == 3)
-        if not len(indicesFound[0]):
-            iFirstSample = 1
-            logging.warning("No valid gate found, starting from sample 1.")
-        else:
-            iFirstSample = indicesFound[0][0] + startPoint
-
-        # Align to multiline capture boundaries
-        alignment = np.arange(0, numSamples, np.double(ML_Capture))
-        diff = alignment - iFirstSample
-        iFirstSample = int(alignment[np.where(diff >= 0)[0][0]])
-
-        # Extract valid data
-        prunedData = lineData[iFirstSample:numSamples + 1, :]
-        lineHeader = lineHeader[iFirstSample:numSamples + 1, :]
-
-        # Find last valid sample
-        numSamples = prunedData.shape[0]
-        startPoint = int(np.floor(numSamples * 0.99)) - 1
-
-        indicesFound = np.where(lineHeader[startPoint:numSamples + 1, referenceLine] == 0)
-        if not len(indicesFound[0]):
-            iLastSample = numSamples
-            logging.warning("No zero data found near the end, keeping full length.")
-        else:
-            iLastSample = indicesFound[0][0] + startPoint
-            alignment = np.arange(0, numSamples, np.double(ML_Capture))
-            diff = alignment - iLastSample
-            iLastSample = int(alignment[np.where(diff >= 0)[0][0]]) - 1
-
-        # Return pruned data
-        prunedData = prunedData[:iLastSample + 1, :]
-        return prunedData
-
-    ###################################################################################
-
+    
     def sort_rf(self, RFinput, Stride, ML, CRE=1, isVoyager=True):
         """Sort RF data based on configuration."""
         logging.info(f"Starting SortRF with Stride={Stride}, ML={ML}, CRE={CRE}")
+        # Ensure integer types for all relevant variables
+        Stride = int(Stride)
+        ML = int(ML)
+        xmitEvents = int(RFinput.shape[1])
         N = RFinput.shape[0]
-        xmitEvents = RFinput.shape[1]
         depth = int(np.floor(N / Stride))
         MLs = np.arange(0, ML)
 
         # Preallocate output arrays
-        out0 = np.zeros((depth, ML, xmitEvents))
-        out1 = np.zeros((depth, ML, xmitEvents)) if CRE >= 2 else None
-        out2 = np.zeros((depth, ML, xmitEvents)) if CRE >= 3 else None
-        out3 = np.zeros((depth, ML, xmitEvents)) if CRE == 4 else None
+        out0 = np.zeros((int(depth), int(ML), int(xmitEvents)))
+        out1 = np.zeros((int(depth), int(ML), int(xmitEvents))) if CRE >= 2 else None
+        out2 = np.zeros((int(depth), int(ML), int(xmitEvents))) if CRE >= 3 else None
+        out3 = np.zeros((int(depth), int(ML), int(xmitEvents))) if CRE == 4 else None
 
         # Determine ML_SortList based on Stride and CRE
         ML_SortList = self._get_ml_sort_list(Stride, CRE)
@@ -1177,9 +1034,9 @@ class PhilipsRFParser:
                 out3[:depth, k, :] = RFinput[np.arange(iML[3], (depth * Stride), Stride), :]
 
         return out0, out1, out2, out3
-
+    
     ###################################################################################
-
+    
     def _get_ml_sort_list(self, Stride, CRE):
         """Get the ML sort list based on stride and CRE."""
         if Stride == 128:
@@ -1225,71 +1082,199 @@ class PhilipsRFParser:
         logging.error("No sort list for this stride value.")
         return None
 
+    ################################################################################### 
+       
+    def prune_data(self, lineData, lineHeader, ML_Capture):
+        """Remove false gate data and align samples.
+        
+        This method:
+        1. Finds the first valid data gate
+        2. Aligns data to multiline capture boundaries
+        3. Removes invalid data at the end
+        
+        Args:
+            lineData (np.ndarray): RF line data
+            lineHeader (np.ndarray): Header information for each line
+            ML_Capture (float): Multiline capture factor
+            
+        Returns:
+            np.ndarray: Pruned and aligned data
+        """
+        logging.info("Starting pruneData function.")
+        
+        # Get dimensions
+        numSamples = lineData.shape[0]
+        referenceLine = int(np.ceil(lineData.shape[1] * 0.2)) - 1
+        startPoint = int(np.ceil(numSamples * 0.015)) - 1
+
+        # Find first valid gate
+        indicesFound = np.where(lineHeader[startPoint:numSamples + 1, referenceLine] == 3)
+        if not len(indicesFound[0]):
+            iFirstSample = 1
+            logging.warning("No valid gate found, starting from sample 1.")
+        else:
+            iFirstSample = indicesFound[0][0] + startPoint
+
+        # Align to multiline capture boundaries
+        alignment = np.arange(0, numSamples, np.double(ML_Capture))
+        diff = alignment - iFirstSample
+        iFirstSample = int(alignment[np.where(diff >= 0)[0][0]])
+
+        # Extract valid data
+        prunedData = lineData[iFirstSample:numSamples + 1, :]
+        lineHeader = lineHeader[iFirstSample:iFirstSample + prunedData.shape[0], :]
+
+        # Find last valid sample
+        numSamples = prunedData.shape[0]
+        startPoint = int(np.floor(numSamples * 0.99)) - 1
+
+        indicesFound = np.where(lineHeader[startPoint:numSamples + 1, referenceLine] == 0)
+        if not len(indicesFound[0]):
+            iLastSample = numSamples
+            logging.warning("No zero data found near the end, keeping full length.")
+        else:
+            iLastSample = indicesFound[0][0] + startPoint
+            alignment = np.arange(0, numSamples, np.double(ML_Capture))
+            diff = alignment - iLastSample
+            iLastSample = int(alignment[np.where(diff >= 0)[0][0]]) - 1
+
+        # Return pruned data
+        prunedData = prunedData[:iLastSample + 1, :]
+        return prunedData
+
     ###################################################################################
     
-    def _determine_capture_info(self, headerInfo, Tap_Point):
-        """Determine capture configuration."""
-        if Tap_Point == 7:
-            ML_Capture = 128
+    def _clean_duplicate_lines(self):
+        """Check for and remove duplicate lines in self.rf.lineData."""
+        logging.info("Checking for duplicate lines...")
+        if self.rfdata.headerInfo.Line_Index[249] == self.rfdata.headerInfo.Line_Index[250]:
+            self.rfdata.lineData = self.rfdata.lineData[:, np.arange(2, self.rfdata.lineData.shape[1], 2)]
+            logging.info("Detected even-indexed duplicate, skipping even lines")
         else:
-            ML_Capture = np.double(headerInfo.Multilines_Capture[0])
-
-        if ML_Capture == 0:
-            SAMPLE_RATE = np.double(headerInfo.RF_Sample_Rate[0])
-            ML_Capture = 16 if SAMPLE_RATE == 0 else 32
-
-        if Tap_Point == 7:
-            Tap_Point = 4
-
-        return ML_Capture, Tap_Point
+            self.rfdata.lineData = self.rfdata.lineData[:, np.arange(1, self.rfdata.lineData.shape[1], 2)]
+            logging.info("Detected odd-indexed duplicate, skipping odd lines")
 
     ###################################################################################
 
-    def _log_capture_info(self, Tap_Point, ML_Capture):
-        """Log capture configuration."""
-        namePoint = ['PostShepard', 'PostAGNOS', 'PostXBR', 'PostQBP', 'PostADC']
-        logging.info(f"Capture Tap Point: {namePoint[Tap_Point]}")
-        logging.info(f"ML Capture: {ML_Capture}x")
+    def _calculate_parameters(self):
+        """Calculate and set main parameters as instance variables."""
+        self.txBeamperFrame = np.array(self.rfdata.dbParams.num2DCols).flat[0]
+        self.NumSonoCTAngles = self.rfdata.dbParams.numOfSonoCTAngles2dActual[0]
+        logging.info(f"Beam parameters - txBeamperFrame: {self.txBeamperFrame}, NumSonoCTAngles: {self.NumSonoCTAngles}")
+        self.numFrame = int(np.floor(self.rfdata.lineData.shape[1] / (self.txBeamperFrame * self.NumSonoCTAngles)))
+        self.multilinefactor = self.ML_in
+        self.pt = int(np.floor((self.rfdata.lineData.shape[0] - self.used_os) / self.multilinefactor))
+        logging.info(f"Calculated parameters - numFrame: {self.numFrame}, multilinefactor: {self.multilinefactor}, points: {self.pt}")
 
     ###################################################################################
 
-    def _organize_rfdata(self, rfdata, ML_Capture, isVoyager):
-        """Organize RF data into different types."""
-        DataType_ECHO = np.arange(1, 15)
-        DataType_EchoMMode = 26
-        DataType_COLOR = [17, 21, 22, 23, 24]
-        DataType_ColorMMode = [27, 28]
-        DataType_CW = 16
-        DataType_PW = [18, 19]
-        DataType_Dummy = [20, 25, 29, 30, 31]
-        DataType_SWI = [90, 91]
-        DataType_Misc = [15, 88, 89]
-
-        def find_indices(dataTypes):
-            xmitEvents = len(rfdata.headerInfo.Data_Type)
-            mask = np.zeros(xmitEvents, dtype=bool)
-            for dt in dataTypes:
-                mask = np.bitwise_or(mask, rfdata.headerInfo.Data_Type == dt)
-            return mask
-
-        # Process each data type
-        for data_type, name in [
-            (DataType_ECHO, 'echoData'),
-            ([DataType_EchoMMode], 'echoMModeData'),
-            (DataType_COLOR, 'colorData'),
-            (DataType_ColorMMode, 'colorMModeData'),
-            ([DataType_CW], 'cwData'),
-            (DataType_PW, 'pwData'),
-            (DataType_Dummy, 'dummyData'),
-            (DataType_SWI, 'swiData'),
-            (DataType_Misc, 'miscData')
-        ]:
-            mask = find_indices(data_type)
-            if np.sum(mask) > 0:
-                data = self.prune_data(rfdata.lineData[:, mask], rfdata.lineHeader[:, mask], ML_Capture)
-                setattr(rfdata, name, self.sort_rf(data, ML_Capture, ML_Capture, 1, isVoyager))
+    def _initialize_data_arrays(self):
+        """Initialize and set data arrays as instance variables."""
+        logging.info("Initializing data arrays...")
+        self.rftemp_all_harm = np.zeros((self.pt, self.ML_out * self.txBeamperFrame))
+        self.rftemp_all_fund = np.zeros((self.pt, self.ML_out * self.txBeamperFrame))
+        self.rf_data_all_harm = np.zeros((self.numFrame, self.NumSonoCTAngles, self.pt, self.ML_out * self.txBeamperFrame))
+        self.rf_data_all_fund = np.zeros((self.numFrame, self.NumSonoCTAngles, self.pt, self.ML_out * self.txBeamperFrame))
+        logging.info("Array initialization completed")
 
     ###################################################################################
+
+    def _fill_data_arrays(self):
+        """Fill the data arrays using instance variables."""
+        logging.info("Filling data arrays...")
+        for k0 in range(self.numFrame):
+            logging.info(f"Processing frame {k0+1}/{self.numFrame}")
+            for k1 in range(self.NumSonoCTAngles):
+                for k2 in range(self.txBeamperFrame):
+                    bi = k0 * self.txBeamperFrame * self.NumSonoCTAngles + k1 * self.txBeamperFrame + k2
+                    temp = np.transpose(
+                        np.reshape(self.rfdata.lineData[self.used_os + np.arange(self.pt * self.multilinefactor), bi],
+                                 (self.multilinefactor, self.pt), order='F')
+                    )
+                    self.rftemp_all_harm[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [0, 2]]
+                    self.rftemp_all_fund[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [9, 11]]
+                self.rf_data_all_harm[k0, k1] = self.rftemp_all_harm
+                self.rf_data_all_fund[k0, k1] = self.rftemp_all_fund
+        logging.info("Data array filling completed")
+
+    ###################################################################################
+
+    def _prepare_save_contents(self):
+        """Prepare the contents dictionary for saving, using instance variables."""
+        logging.info("Preparing data for saving...")
+        self.contents = {
+            'echoData': self.rfdata.echoData[0],
+            'lineData': self.rfdata.lineData,
+            'lineHeader': self.rfdata.lineHeader,
+            'headerInfo': self.rfdata.headerInfo,
+            'dbParams': self.rfdata.dbParams,
+            'rf_data_all_fund': self.rf_data_all_fund,
+            'rf_data_all_harm': self.rf_data_all_harm,
+            'NumFrame': self.numFrame,
+            'NumSonoCTAngles': self.NumSonoCTAngles,
+            'pt': self.pt,
+            'multilinefactor': self.multilinefactor,
+        }
+        # Save the main echoData
+        self.contents['echoData'] = self.rfdata.echoData[0]
+
+        # Save additional echoData only if they exist and are not None and non-empty
+        if isinstance(self.rfdata.echoData, tuple):
+            for i in range(1, 4):
+                if (
+                    len(self.rfdata.echoData) > i
+                    and self.rfdata.echoData[i] is not None
+                    and hasattr(self.rfdata.echoData[i], '__len__')
+                    and len(self.rfdata.echoData[i])
+                ):
+                    self.contents[f'echoData{i}'] = self.rfdata.echoData[i]
+                    logging.info(f"Added echoData{i} to contents")
+        if hasattr(self.rfdata, 'echoMModeData'):
+            self.contents['echoMModeData'] = self.rfdata.echoMModeData
+            logging.info("Added echoMModeData to contents")
+        if hasattr(self.rfdata, 'miscData'):
+            self.contents['miscData'] = self.rfdata.miscData
+            logging.info("Added miscData to contents")
+
+    ###################################################################################
+
+    def _save_contents(self):
+        """Save the contents dictionary to disk using instance variables."""
+        base_path = self.filepath.rsplit('.', 1)[0]
+        if self.save_format in ['mat', 'both']:
+            mat_path = base_path + '.mat'
+            if os.path.exists(mat_path):
+                logging.info(f"Removing existing file: {mat_path}")
+                os.remove(mat_path)
+            logging.info(f"Saving data to {mat_path}")
+            savemat(mat_path, self.contents)
+            logging.info(f"Successfully saved parsed data to {mat_path}")
+        if self.save_format in ['npz', 'both']:
+            npz_path = base_path + '.npz'
+            if os.path.exists(npz_path):
+                logging.info(f"Removing existing file: {npz_path}")
+                os.remove(npz_path)
+            logging.info(f"Saving data to {npz_path}")
+            np.savez_compressed(npz_path, **self.contents)
+            logging.info(f"Successfully saved parsed data to {npz_path}")
+        if self.save_format in ['npy', 'both']:
+            npy_folder = base_path + '_npy'
+            if os.path.exists(npy_folder):
+                logging.info(f"Removing existing folder: {npy_folder}")
+                import shutil
+                shutil.rmtree(npy_folder)
+            os.makedirs(npy_folder)
+            logging.info(f"Created folder for .npy files: {npy_folder}")
+            for key, value in self.contents.items():
+                npy_path = os.path.join(npy_folder, f"{key}.npy")
+                logging.info(f"Saving {key} to {npy_path}")
+                np.save(npy_path, value)
+            logging.info(f"Successfully saved all arrays to {npy_folder}")
+
+    ###################################################################################
+
+
+
 
 
 # Main
@@ -1309,37 +1294,3 @@ if __name__ == "__main__":
 ###################################################################################
 
 
-
-"""
-2025-05-12 14:06:08 - INFO - [__run] - Starting philipsRfParser for file: /home/omid/job/David/sample.rf
-2025-05-12 14:06:08 - INFO - [_parse_rf_file] - Parsing RF file...
-2025-05-12 14:06:08 - INFO - [_parse_rf] - Starting parseRF for file: /home/omid/job/David/sample.rf
-2025-05-12 14:06:08 - INFO - [_parse_rf] - Initialized Rfdata structure
-2025-05-12 14:06:08 - INFO - [_analyze_header] - Header information found.
-2025-05-12 14:06:08 - INFO - [_analyze_header] - Parsing Fusion RF capture file...
-2025-05-12 14:06:08 - INFO - [_analyze_header] - Parsing file header with endianness: little
-2025-05-12 14:06:08 - INFO - [_parse_file_header] - Starting parseFileHeader.
-2025-05-12 14:06:08 - INFO - [_parse_file_header] - File Version: 3
-2025-05-12 14:06:08 - INFO - [_parse_file_header] - Header Size: 892 bytes
-2025-05-12 14:06:08 - INFO - [_analyze_header] - Total header size: 920
-2025-05-12 14:06:08 - INFO - [_parse_rf] - File analysis results - isVoyager: False, hasFileHeader: True, totalHeaderSize: 920
-2025-05-12 14:06:08 - INFO - [_align_offsets] - Remaining size: 430964736
-2025-05-12 14:06:08 - INFO - [_parse_rf] - Aligned read parameters - offset: 0, size: 430964704
-2025-05-12 14:06:08 - INFO - [_parse_rf] - Loading raw data from file...
-2025-05-12 14:06:09 - INFO - [call_get_part_a] - Calling getPartA with numClumps=13467647, filename='/home/omid/job/David/sample.rf', offset=920
-2025-05-12 14:06:37 - INFO - [call_get_part_b] - Calling getPartB with numClumps=13467647, filename='/home/omid/job/David/sample.rf', offset=920
-2025-05-12 14:06:50 - INFO - [_parse_rf] - Loaded raw data of size: (13, 13467647)
-2025-05-12 14:06:50 - INFO - [_parse_rf] - Parsing metadata headers...
-2025-05-12 14:06:50 - INFO - [parse_header_f] - Starting parseHeaderF function.
-2025-05-12 14:06:50 - INFO - [parse_header_f] - Found 2342 headers using pattern
-2025-05-12 14:06:50 - INFO - [parse_header_f] - Processing 2342 headers
-2025-05-12 14:06:50 - INFO - [parse_header_f] - Successfully parsed 2342 headers
-2025-05-12 14:06:50 - INFO - [_parse_rf] - Header parsing completed
-2025-05-12 14:06:50 - INFO - [_parse_rf] - Parsing RF signal data...
-2025-05-12 14:06:50 - INFO - [_parse_rf_data] - Tap Point: 4
-2025-05-12 14:06:50 - INFO - [parse_data_f] - Starting parseDataF function.
-2025-05-12 14:06:50 - INFO - [parse_data_f] - Found 2342 data sections
-2025-05-12 14:06:50 - INFO - [parse_data_f] - Initialized arrays with shape: (11491, 2342)
-2025-05-12 14:06:51 - INFO - [parse_data_f] - Processed data shape: lineData (11491, 2342), lineHeader (11491, 2342)
-2025-05-12 14:06:51 - INFO - [_parse_rf] - Signal data parsed - lineData shape: (11491, 2342), lineHeader shape: (11491, 2342)
-"""
