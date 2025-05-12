@@ -3,7 +3,8 @@ import sys
 from PyQt6.QtWidgets import QStackedWidget, QApplication, QDialog
 
 from pyquantus.gui.image_loading.select_image import SelectImageGUI
-from pyquantus.gui.seg_loading.roi_selection import SegSelectionGUI
+from pyquantus.gui.seg_loading.roi_selection import SegSelectionGUI as RoiGUI
+from pyquantus.gui.seg_loading.voi_selection import SegSelectionGUI as VoiGUI
 
 app = QApplication(sys.argv)
 widget = QStackedWidget()
@@ -20,7 +21,12 @@ def run_start_window(old_widget: QDialog = None):
             app.quit()
             sys.exit(0)
             
-    seg_window = SegSelectionGUI(start_window.image_data)
+    if start_window.image_data.spatial_dims == 2:
+        seg_window = RoiGUI(start_window.image_data)
+    elif start_window.image_data.spatial_dims == 3:
+        seg_window = VoiGUI(start_window.image_data)
+    else:
+        raise ValueError("Invalid spatial dimensions. Only 2D and 3D images are supported.")
 
     if old_widget is not None:
         widget.removeWidget(old_widget)
@@ -31,7 +37,7 @@ def run_start_window(old_widget: QDialog = None):
     widget.show()
     run_seg_window(seg_window)
             
-def run_seg_window(seg_window: SegSelectionGUI):
+def run_seg_window(seg_window: RoiGUI | VoiGUI):
     while seg_window.isVisible():
         app.processEvents()
         if not seg_window.isVisible():
