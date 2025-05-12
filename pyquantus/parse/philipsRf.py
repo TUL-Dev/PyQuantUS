@@ -1297,7 +1297,7 @@ class PhilipsRFParser:
 
 if __name__ == "__main__":
     # Parse the sample file
-    parser = PhilipsRFParser(r"D:\Omid\0_samples\Philips\David\sample.rf",  save_format='npy')
+    parser = PhilipsRFParser("/home/omid/job/David/sample.rf",  save_format='npy')
     
 ###################################################################################
 
