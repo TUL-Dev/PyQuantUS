@@ -78,7 +78,6 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
             assert(bit_offset == 4);
             bit_offset = 8;
             ssize_t num_bytes_read = read(fd, bytes_read, 32);
-            printf("[get_partA] Reading new 32-byte block at j=%d, bytes_read=%zd\n", j, num_bytes_read);
             if (num_bytes_read == -1) {
                 perror("read");
                 free(bytes_read);
@@ -122,7 +121,6 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
             }
             full_num[0] = first; full_num[1] = second; full_num[2] = third;
             partA[x] = *((int*)full_num);
-            printf("[get_partA] Writing partA[%d]=%d\n", x, partA[x]);
             ++x;
             i += 2;
         }
@@ -177,7 +175,6 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
     mask = ~((uint32_t)(~0)<<4);
     while (j < num_clumps) {
         ssize_t num_bytes_read = read(fd, bytes_read, 32);
-        printf("[get_partB] Iteration j=%d, bytes_read=%zd\n", j, num_bytes_read);
         if (num_bytes_read == -1) {
             perror("read");
             free(bytes_read);
@@ -193,7 +190,6 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
         cur_num = bytes_read[0];
         cur_num &= mask;
         partB[x] = (int)cur_num;
-        printf("[get_partB] Writing partB[%d]=%d\n", x, partB[x]);
         ++x;
     }
 
