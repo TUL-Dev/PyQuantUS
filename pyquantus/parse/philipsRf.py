@@ -1284,10 +1284,11 @@ if __name__ == "__main__":
     # Parse the sample file
     path_linux = "/home/omid/job/David/sample.rf"
     path_windows = r"D:\Omid\0_samples\Philips\David\sample.rf"
+    path_windows_2 = r"D:\Omid\0_samples\Philips\UKDFIBEPIC003\UKDFIBEPIC003INTER3D_20250424_094008.rf"
     
     # get operating system
     if os.name == 'nt':
-        parser = PhilipsRFParser(path_windows,  save_format='npy')
+        parser = PhilipsRFParser(path_windows_2,  save_format='npy')
     else:
         parser = PhilipsRFParser(path_linux,  save_format='npy')
 
