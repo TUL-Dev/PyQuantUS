@@ -223,6 +223,7 @@ def SortRF(RFinput, Stride, ML, CRE=1, isVoyager=True):
      
 
 def parseDataF(rawrfdata, headerInfo):
+    print('[Diagnostics] Entering parseDataF')
     # Definitions
     minNeg = 2**18 # Used to convert integers to 2's complement
 
@@ -268,6 +269,7 @@ def parseDataF(rawrfdata, headerInfo):
         lineData[:lineData_s32.size,m] = lineData_s32.ravel(order='F')
         lineHeader[:lineHeader_u8.size,m] = lineHeader_u8.ravel(order='F')
 
+    print('[Diagnostics] Exiting parseDataF, lineData shape:', lineData.shape, 'lineHeader shape:', lineHeader.shape)
     return lineData, lineHeader
 
 
@@ -340,7 +342,7 @@ def getFillerZeros(num):
     return zeros
 
 def parseHeaderF(rawrfdata):
-
+    print('[Diagnostics] Entering parseHeaderF')
     # Find header clumps
     # iHeader pts to the index of the header clump
     # Note that each header is exactly 1 "Clump" long
@@ -425,7 +427,7 @@ def parseHeaderF(rawrfdata):
         HeaderInfo.Line_Type[m] = int(packedHeader[iBit:iBit+16], 2)
         iBit += 16
         HeaderInfo.Time_Stamp[m] = int(str(packedHeader[iBit:iBit+13]+packedHeader[iBit+15:iBit+34]), 2)
-    
+    print('[Diagnostics] Exiting parseHeaderF, numHeaders:', numHeaders, 'Data_Type shape:', HeaderInfo.Data_Type.shape)
     return HeaderInfo
 
 
@@ -734,18 +736,26 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
     print("Parsing RF data ...")
     # Extract RF datad
     Tap_Point = headerInfo.Tap_Point[0]
-    if isVoyager:
-        [lineData, lineHeader] = parseDataV(rawrfdata, headerInfo)
-    else: # isFusion
-        # if Tap_Point == 7: #Post-ADC capture
-            # [lineData, lineHeader] = parseDataAdcF(rawrfdata, headerInfo)
-        # else:
-        [lineData, lineHeader] = parseDataF(rawrfdata, headerInfo)
-        Tap_Point = headerInfo.Tap_Point[0]
-        if Tap_Point == 0: # Correct for MS 19 bits of 21 real data bits
-            lineData = lineData << 2
-    
-    print (str("Elapsed time is " + str(-1*(start_time - datetime.now())) + " seconds."))
+    try:
+        if isVoyager:
+            [lineData, lineHeader] = parseDataV(rawrfdata, headerInfo)
+        else: # isFusion
+            # if Tap_Point == 7: #Post-ADC capture
+                # [lineData, lineHeader] = parseDataAdcF(rawrfdata, headerInfo)
+            # else:
+            [lineData, lineHeader] = parseDataF(rawrfdata, headerInfo)
+            Tap_Point = headerInfo.Tap_Point[0]
+            if Tap_Point == 0: # Correct for MS 19 bits of 21 real data bits
+                lineData = lineData << 2
+        # --- Diagnostics ---
+        print("[Diagnostics] Unique Data_Type values:", np.unique(headerInfo.Data_Type) if hasattr(headerInfo, 'Data_Type') else 'N/A')
+        print("[Diagnostics] lineData shape:", lineData.shape if 'lineData' in locals() else 'N/A')
+        print("[Diagnostics] lineHeader shape:", lineHeader.shape if 'lineHeader' in locals() else 'N/A')
+        # --- End Diagnostics ---
+    except Exception as e:
+        print("[Diagnostics] Exception during lineData/lineHeader assignment:", str(e))
+        print("[Diagnostics] headerInfo.Data_Type:", headerInfo.Data_Type if hasattr(headerInfo, 'Data_Type') else 'N/A')
+        raise
 
     # Pack data
     rfdata.lineData = lineData
@@ -758,6 +768,14 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
     # Sort into Data Types
     # De-interleave rfdata
     print("Organizing based on data type ...")
+
+    # Print detailed data type information
+    if hasattr(rfdata.headerInfo, 'Data_Type'):
+        unique_types = np.unique(rfdata.headerInfo.Data_Type)
+        print(f"Found data types: {unique_types}")
+        for dtype in unique_types:
+            count = np.sum(rfdata.headerInfo.Data_Type == dtype)
+            print(f"Data type {dtype}: {count} occurrences")
 
     DataType_ECHO = np.arange(1,15)
     DataType_EchoMMode = 26
@@ -796,13 +814,19 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
 
     xmitEvents = len(rfdata.headerInfo.Data_Type)
 
-    # Find Echo Data
+    # Find Echo Data - Modified to handle type 1 as echo data
     echo_index = np.zeros(xmitEvents).astype(np.int32)
     for i in range(len(DataType_ECHO)):
         index = ((rfdata.headerInfo.Data_Type & 255) == DataType_ECHO[i]) # Find least significant byte
         echo_index = np.bitwise_or(np.array(echo_index), np.array(index).astype(np.int32))
 
+    # If no echo data found but we have type 1, treat it as echo data
+    if np.sum(echo_index) == 0 and np.any(rfdata.headerInfo.Data_Type == 1):
+        print("No standard echo data found, but type 1 data present. Treating as echo data.")
+        echo_index = (rfdata.headerInfo.Data_Type == 1).astype(np.int32)
+
     if np.sum(echo_index) > 0:
+        print(f"Found {np.sum(echo_index)} echo data events")
         # Remove false gate data at the beginning of the line
         columnsToDelete =  np.where(echo_index==0)
         pruningLineData = np.delete(rfdata.lineData, columnsToDelete, axis=1)
@@ -859,7 +883,7 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
         CRE = 1
         rfdata.colorData = SortRF(colorData, ML_Capture, ML_Actual, CRE, isVoyager)
 
-        pkt = rfdata.dbParams.linesPerEnsCd
+        pkt = rfdata.dbParams.linesPerEnsCf
         nlv = rfdata.dbParams.ensPerSeqCf
         grp = rfdata.dbParams.numCfCols/rfdata.dbParams.ensPerSeqCf
         depth = rfdata.colorData.shape[0]
@@ -953,9 +977,37 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
     return rfdata
 
 
-def philipsRfParser(filepath: str, ML_out=2, ML_in=32, used_os=2256) -> np.ndarray:
-    """Parse Philips RF data file, save as .mat file, and return shape of data."""
+def philipsRfParser(filepath: str, ML_out=2, ML_in=32, used_os=2256, save_numpy=False) -> np.ndarray:
+    """Parse Philips RF data file, save as .mat file, and return shape of data.
+    If save_numpy is True, only save the processed data as .npy files in a folder named 'numpy_output' in the sample path.
+    If save_numpy is False, only save as .mat file."""
     rf = parseRF(filepath, 0, 2000)
+
+    # Diagnostics for echoData
+    print("Type of rf.echoData:", type(rf.echoData) if hasattr(rf, 'echoData') else 'No echoData')
+    if hasattr(rf, 'echoData'):
+        if isinstance(rf.echoData, (list, tuple, np.ndarray)):
+            if hasattr(rf.echoData, 'shape'):
+                print("rf.echoData shape:", rf.echoData.shape)
+            elif isinstance(rf.echoData, (list, tuple)) and len(rf.echoData) > 0 and hasattr(rf.echoData[0], 'shape'):
+                print("rf.echoData[0] shape:", rf.echoData[0].shape)
+            else:
+                print("rf.echoData is empty or not an array")
+        else:
+            print("rf.echoData is not a list/tuple/ndarray")
+
+    # Use the first element if echoData is a tuple/list, else use as is
+    echo_data_to_save = None
+    if hasattr(rf, 'echoData'):
+        if isinstance(rf.echoData, (list, tuple)) and len(rf.echoData) > 0:
+            echo_data_to_save = rf.echoData[0]
+        else:
+            echo_data_to_save = rf.echoData
+
+    if echo_data_to_save is None or (hasattr(echo_data_to_save, 'size') and echo_data_to_save.size == 0):
+        raise RuntimeError("No echo data found in RF file. Data_Type values: {}. lineData shape: {}".format(
+            np.unique(rf.headerInfo.Data_Type) if hasattr(rf.headerInfo, 'Data_Type') else 'N/A',
+            rf.lineData.shape if hasattr(rf, 'lineData') else 'N/A'))
 
     if (rf.headerInfo.Line_Index[249] == rf.headerInfo.Line_Index[250]):
         rf.lineData = rf.lineData[:,np.arange(2, rf.lineData.shape[1], 2)]
@@ -987,35 +1039,48 @@ def philipsRfParser(filepath: str, ML_out=2, ML_in=32, used_os=2256) -> np.ndarr
             rf_data_all_fund[k0][k1] = rftemp_all_fund
 
     # Save data
-    destination = str(filepath[:-3] + '.mat')
-    contents = {}
-    contents['echoData'] = rf.echoData[0]
-    contents['lineData'] = rf.lineData
-    contents['lineHeader'] = rf.lineHeader
-    contents['headerInfo'] = rf.headerInfo
-    contents['dbParams'] = rf.dbParams
-    contents['rf_data_all_fund'] = rf_data_all_fund
-    contents['rf_data_all_harm'] = rf_data_all_harm
-    contents['NumFrame'] = numFrame
-    contents['NumSonoCTAngles'] = NumSonoCTAngles
-    contents['pt'] = pt
-    contents['multilinefactor'] = multilinefactor
-    if len(rf.echoData[1]):
-        contents['echoData1'] = rf.echoData[1]
-    if len(rf.echoData[2]):
-        contents['echoData2'] = rf.echoData[2]
-    if len(rf.echoData[3]):
-        contents['echoData3'] = rf.echoData[3]
-    if hasattr(rf, 'echoMModeData'):
-        contents['echoMModeData'] = rf.echoMModeData
-    if hasattr(rf, 'miscData'):
-        contents['miscData'] = rf.miscData
-    
-    if os.path.exists(destination):
-        os.remove(destination)
-    savemat(destination, contents)
+    if not save_numpy:
+        destination = str(filepath[:-3] + '.mat')
+        contents = {}
+        contents['echoData'] = echo_data_to_save
+        contents['lineData'] = rf.lineData
+        contents['lineHeader'] = rf.lineHeader
+        contents['headerInfo'] = rf.headerInfo
+        contents['dbParams'] = rf.dbParams
+        contents['rf_data_all_fund'] = rf_data_all_fund
+        contents['rf_data_all_harm'] = rf_data_all_harm
+        contents['NumFrame'] = numFrame
+        contents['NumSonoCTAngles'] = NumSonoCTAngles
+        contents['pt'] = pt
+        contents['multilinefactor'] = multilinefactor
+        if hasattr(rf, 'echoData') and len(rf.echoData) > 1:
+            contents['echoData1'] = rf.echoData[1]
+        if hasattr(rf, 'echoData') and len(rf.echoData) > 2:
+            contents['echoData2'] = rf.echoData[2]
+        if hasattr(rf, 'echoData') and len(rf.echoData) > 3:
+            contents['echoData3'] = rf.echoData[3]
+        if hasattr(rf, 'echoMModeData'):
+            contents['echoMModeData'] = rf.echoMModeData
+        if hasattr(rf, 'miscData'):
+            contents['miscData'] = rf.miscData
+        
+        if os.path.exists(destination):
+            os.remove(destination)
+        savemat(destination, contents)
+    else:
+        # Save as numpy files
+        numpy_folder = os.path.join(os.path.dirname(filepath), 'numpy_output')
+        if not os.path.exists(numpy_folder):
+            os.makedirs(numpy_folder)
+        np.save(os.path.join(numpy_folder, 'echoData.npy'), echo_data_to_save)
+        np.save(os.path.join(numpy_folder, 'lineData.npy'), rf.lineData)
+        np.save(os.path.join(numpy_folder, 'lineHeader.npy'), rf.lineHeader)
+        np.save(os.path.join(numpy_folder, 'rf_data_all_fund.npy'), rf_data_all_fund)
+        np.save(os.path.join(numpy_folder, 'rf_data_all_harm.npy'), rf_data_all_harm)
     
     return np.array(rf_data_all_fund).shape
 
 if __name__ == "__main__":
-    philipsRfParser("/Users/davidspector/Downloads/parserRF_pywrap-2-2/rfCapture_20220511_144204.rf")
+    # Hardcoded file path - no command line arguments needed
+    filepath = r"D:\Omid\0_samples\Philips\David\sample.rf"
+    philipsRfParser(filepath, save_numpy=True)

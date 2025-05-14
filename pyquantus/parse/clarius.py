@@ -614,8 +614,17 @@ class ClariusParser():
                                                         self.default_frame, self.rf_yml_obj.rf_sampling_rate,
                                                         self.full_depth_mm, self.delay_samples,
                                                         self.hilbert_transform_axis)
-        visualizer.image_envelope_2d("TGC", title="rf_raw")
-        visualizer.image_envelope_2d("No TGC", title="rf_no_tgc_raw")
+            
+        visualizer.image_envelope_2d("TGC",
+                                     title="rf_raw",
+                                     clip_fact=self.clarius_info_struct.clipFact,
+                                     dyn_range=self.clarius_info_struct.dynRange)
+        
+        visualizer.image_envelope_2d("No TGC",
+                                     title="rf_no_tgc_raw",
+                                     clip_fact=self.clarius_info_struct.clipFact,
+                                     dyn_range=self.clarius_info_struct.dynRange)
+        
         visualizer.plot_1d_signal_and_fft("TGC", title="rf_raw")
         visualizer.plot_1d_signal_and_fft("No TGC", title="rf_no_tgc_raw")
         
@@ -747,7 +756,7 @@ class ClariusParser():
         previous_data_dict = None
 
         # Ensure each timestamp has valid TGC data
-        if self.env_tgc_yml_path is not None:
+        if self.env_tgc_yml_path is not None and len(self.env_tgc_yml_obj.timestamps.items()):
             for timestamp, data_list in self.env_tgc_yml_obj.timestamps.items():
                 logging.debug(f"Processing {timestamp}: {data_list}")
 
@@ -1132,7 +1141,7 @@ class ClariusParser():
         
         ###################################################################################
           
-        def image_envelope_2d(self, envelope_type: str, title: str, clip_fact: float = 0.8, dyn_range: float = 60) -> None:
+        def image_envelope_2d(self, envelope_type: str, title: str, clip_fact: float, dyn_range: float) -> None:
             """
             Plots a 2D signal envelope in decibels.
 
@@ -1150,7 +1159,7 @@ class ClariusParser():
                 None
             """
             logging.info("Starting the plot function.")
-            
+                        
             if envelope_type == "TGC":
                 tgc_signal_2d = self.rf_raw_data_3d[:, :, self.default_frame]
                 envelope = get_signal_envelope_xd(tgc_signal_2d, hilbert_transform_axis=self.hilbert_transform_axis)
