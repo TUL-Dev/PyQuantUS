@@ -165,9 +165,12 @@ class PhilipsRfParser:
         If save_numpy is True, only save the processed data as .npy files in a folder named '{sample_name}_extracted' in the sample path.
         If save_numpy is False, only save as .mat file."""
         
+        logging.info(f"Starting parsing of file: {filepath}")
+        
         logger = self._setup_logging(filepath, save_numpy)
         
         try:
+            logging.info(f"Initiating RF data parsing")
             self.rfdata = self._parse_rf(filepath, 0, 2000)
             
             # Save header summary if saving as numpy
@@ -175,19 +178,25 @@ class PhilipsRfParser:
             numpy_folder = None
             if save_numpy:
                 numpy_folder = os.path.join(os.path.dirname(filepath), f'{sample_name}_extracted')
+                logging.info(f"Saving header summary to {numpy_folder}")
                 self._save_header_summary(numpy_folder)
             
             data_to_save, data_type_label = self._find_primary_data()
             
             # Process data
+            logging.info(f"Processing line data")
             self._preprocess_line_data()
+            logging.info(f"Calculating parameters")
             self._calculate_parameters()
+            logging.info(f"Filling data arrays")
             rf_data_all_fund, rf_data_all_harm = self._fill_data_arrays()
             
             # Save data in appropriate format
             if save_numpy:
+                logging.info(f"Saving data as NumPy arrays")
                 result_shape = self._save_numpy_data(numpy_folder, data_to_save, rf_data_all_fund, rf_data_all_harm)
             else:
+                logging.info(f"Saving data as MATLAB file")
                 result_shape = self._save_matlab_data(filepath, data_to_save, rf_data_all_fund, rf_data_all_harm)
             
             logging.info(f"Parsing complete. Final data shape: {result_shape}")
@@ -206,8 +215,8 @@ class PhilipsRfParser:
         original_handlers = list(logger.handlers)  # Save original handlers
         original_level = logger.level
         
-        # Create formatter for consistent output
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        # Create formatter for console with function name included
+        console_formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(funcName)s] - %(message)s')
         
         if save_numpy:
             # Create numpy folder with sample name + '_extracted'
@@ -221,12 +230,17 @@ class PhilipsRfParser:
             file_handler = logging.FileHandler(log_file, mode='w')
             file_handler.setLevel(logging.DEBUG)  # Capture all levels for file
             
-            # Use a detailed formatter that includes source location and module info
+            # Use a detailed formatter that includes source location and function name
             file_formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+                '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d:%(funcName)s] - %(message)s'
             )
             file_handler.setFormatter(file_formatter)
             logger.addHandler(file_handler)
+            
+            # Apply console formatter to existing handlers
+            for handler in original_handlers:
+                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                    handler.setFormatter(console_formatter)
             
             # Ensure logger level is at DEBUG to capture all messages
             logger.setLevel(logging.DEBUG)
@@ -239,7 +253,7 @@ class PhilipsRfParser:
                         handler._original_level = handler.level
                     handler.setLevel(logging.INFO)
             
-            logging.debug("Detailed debug logging enabled to file: {}".format(log_file))
+            logging.debug(f"Detailed debug logging enabled to file: {log_file}")
         
         logging.info(f"Starting Philips RF parsing for file: {filepath}")
         logging.info(f"Save format: {'NumPy arrays' if save_numpy else 'MATLAB file'}")
@@ -281,6 +295,8 @@ class PhilipsRfParser:
     ###################################################################################
     def _find_primary_data(self):
         """Find the primary data type to save."""
+        logging.info(f"Finding primary data type to save")
+        
         # Try to find the first available data type to save
         data_priority = [
             ('echoData', 'echoData'),
@@ -302,12 +318,13 @@ class PhilipsRfParser:
                 data_type_label = label
                 if isinstance(data_to_save, (list, tuple)) and len(data_to_save) > 0:
                     data_to_save = data_to_save[0]
+                logging.debug(f"Found data type: {label}")
                 break
         
         has_valid_data = data_to_save is not None and (not hasattr(data_to_save, 'size') or data_to_save.size > 0)
         if not has_valid_data:
             error_msg = f"No supported data found in RF file. Data_Type values: {np.unique(self.rfdata.headerInfo.Data_Type) if hasattr(self.rfdata.headerInfo, 'Data_Type') else 'N/A'}. lineData shape: {self.rfdata.lineData.shape if hasattr(self.rfdata, 'lineData') else 'N/A'}"
-            logging.error(error_msg)
+            logging.error(f"{error_msg}")
             raise RuntimeError(error_msg)
         
         logging.info(f"Saving data type: {data_type_label} as 'echoData'")
@@ -318,33 +335,57 @@ class PhilipsRfParser:
     ###################################################################################
     def _preprocess_line_data(self):
         """Preprocess the line data."""
+        logging.info(f"Preprocessing line data")
+        
+        # Log original shape
+        logging.debug(f"Original lineData shape: {self.rfdata.lineData.shape}")
+        
         # Data preprocessing
         if (self.rfdata.headerInfo.Line_Index[249] == self.rfdata.headerInfo.Line_Index[250]):
+            logging.debug(f"Line indices 249 and 250 are equal, selecting even columns")
             self.rfdata.lineData = self.rfdata.lineData[:, np.arange(2, self.rfdata.lineData.shape[1], 2)]
         else:
+            logging.debug(f"Line indices 249 and 250 differ, selecting odd columns")
             self.rfdata.lineData = self.rfdata.lineData[:, np.arange(1, self.rfdata.lineData.shape[1], 2)]
+        
+        # Log new shape
+        logging.debug(f"Preprocessed lineData shape: {self.rfdata.lineData.shape}")
     
     ###################################################################################
     # NumPy Data Saving
-    ###################################################################################
+    ####################################################################################
     def _save_numpy_data(self, numpy_folder, data_to_save, rf_data_all_fund, rf_data_all_harm):
         """Save data as NumPy files."""
         logging.info(f"Saving as NumPy files in: {numpy_folder}")
+        
+        # Save individual arrays
+        logging.debug(f"Saving echoData.npy, shape: {data_to_save.shape}")
         np.save(os.path.join(numpy_folder, 'echoData.npy'), data_to_save)
+        
+        logging.debug(f"Saving lineData.npy, shape: {self.rfdata.lineData.shape}")
         np.save(os.path.join(numpy_folder, 'lineData.npy'), self.rfdata.lineData)
+        
+        logging.debug(f"Saving lineHeader.npy, shape: {self.rfdata.lineHeader.shape}")
         np.save(os.path.join(numpy_folder, 'lineHeader.npy'), self.rfdata.lineHeader)
+        
+        logging.debug(f"Saving rf_data_all_fund.npy, shape: {np.array(rf_data_all_fund).shape}")
         np.save(os.path.join(numpy_folder, 'rf_data_all_fund.npy'), rf_data_all_fund)
+        
+        logging.debug(f"Saving rf_data_all_harm.npy, shape: {np.array(rf_data_all_harm).shape}")
         np.save(os.path.join(numpy_folder, 'rf_data_all_harm.npy'), rf_data_all_harm)
-        logging.info("NumPy files saved successfully")
+        
+        logging.info(f"NumPy files saved successfully")
         return np.array(rf_data_all_fund).shape
-    
+
     ###################################################################################
     # MATLAB Data Saving
-    ###################################################################################
+    ####################################################################################
     def _save_matlab_data(self, filepath, data_to_save, rf_data_all_fund, rf_data_all_harm):
         """Save data as MATLAB file."""
         destination = str(filepath[:-3] + '.mat')
         logging.info(f"Saving as MATLAB file: {destination}")
+        
+        # Prepare contents dictionary
         contents = {
             'echoData': data_to_save,
             'lineData': self.rfdata.lineData,
@@ -359,6 +400,8 @@ class PhilipsRfParser:
             'multilinefactor': self.multilinefactor,
         }
         
+        # Add optional data if available
+        logging.debug(f"Adding optional data fields to MATLAB file")
         if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 1:
             contents['echoData1'] = self.rfdata.echoData[1]
         if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 2:
@@ -370,8 +413,12 @@ class PhilipsRfParser:
         if hasattr(self.rfdata, 'miscData'):
             contents['miscData'] = self.rfdata.miscData
         
+        # Remove existing file if necessary
         if os.path.exists(destination):
+            logging.debug(f"Removing existing file: {destination}")
             os.remove(destination)
+        
+        # Save the file
         savemat(destination, contents)
         logging.info(f"MATLAB file saved successfully: {destination}")
         return np.array(rf_data_all_fund).shape
@@ -398,6 +445,7 @@ class PhilipsRfParser:
         rfdata.headerInfo = header_info
         del rawrfdata
         rfdata = self._organize_data_types(rfdata, header_info, tap_point)
+        logging.debug(f"RF parsing complete")
         return rfdata
 
     ###################################################################################
@@ -574,16 +622,22 @@ class PhilipsRfParser:
 
     ###################################################################################
     # Parameter Calculation
-    ###################################################################################
+    ####################################################################################
     def _calculate_parameters(self) -> None:
         """Calculate and set main parameters as instance variables."""
-        logging.info("Calculating parsing parameters...")
+        logging.info(f"Calculating parsing parameters...")
+        
+        # Calculate beam parameters
         self.txBeamperFrame = int(np.array(self.rfdata.dbParams.num2DCols).flat[0])
         self.NumSonoCTAngles = int(self.rfdata.dbParams.numOfSonoCTAngles2dActual[0])
         logging.info(f"Beam parameters - txBeamperFrame: {self.txBeamperFrame}, NumSonoCTAngles: {self.NumSonoCTAngles}")
+        
+        # Calculate frame count
         self.numFrame = int(np.floor(self.rfdata.lineData.shape[1] / (self.txBeamperFrame * self.NumSonoCTAngles)))
         self.multilinefactor = self.ML_in
         logging.info(f"Calculated numFrame: {self.numFrame}, multilinefactor: {self.multilinefactor}")
+        
+        # Determine OS and PT parameters
         col = 0
         if np.any(self.rfdata.lineData[:, col] != 0):
             # Auto-detect based on data
@@ -600,39 +654,60 @@ class PhilipsRfParser:
       
     ###################################################################################
     # Data Array Filling
-    ###################################################################################
+    ####################################################################################
     def _fill_data_arrays(self) -> Tuple[np.ndarray, np.ndarray]:
         """Fill RF data arrays for fundamental and harmonic signals."""
-        logging.info("Filling RF data arrays for fundamental and harmonic signals...")
+        logging.info(f"Filling RF data arrays for fundamental and harmonic signals...")
+        
+        # Preallocate arrays
         rftemp_all_harm = np.zeros((self.pt, self.ML_out * self.txBeamperFrame))
         rftemp_all_fund = np.zeros((self.pt, self.ML_out * self.txBeamperFrame))
         rf_data_all_harm = np.zeros((self.numFrame, self.NumSonoCTAngles, self.pt, self.ML_out * self.txBeamperFrame))
         rf_data_all_fund = np.zeros((self.numFrame, self.NumSonoCTAngles, self.pt, self.ML_out * self.txBeamperFrame))
         logging.debug(f"Preallocated arrays shapes - fund: {rf_data_all_fund.shape}, harm: {rf_data_all_harm.shape}")
+        
+        # Process each frame
         for k0 in range(self.numFrame):
             if k0 % max(1, self.numFrame // 10) == 0:
                 logging.info(f"Processing frame {k0+1}/{self.numFrame}")
+            
+            # Process angles within frame
             for k1 in range(self.NumSonoCTAngles):
+                # Process beams within angle
                 for k2 in range(self.txBeamperFrame):
                     bi = k0 * self.txBeamperFrame * self.NumSonoCTAngles + k1 * self.txBeamperFrame + k2
+                    
+                    # Skip if beam index exceeds available data
                     if bi >= self.rfdata.lineData.shape[1]:
                         logging.warning(f"Skipping bi={bi} as it exceeds lineData columns {self.rfdata.lineData.shape[1]}")
                         continue
+                    
+                    # Extract data for this beam
                     idx0 = self.used_os + np.arange(self.pt * self.multilinefactor)
                     idx1 = bi
+                    
+                    # Log first extraction for debugging
                     if k0 == 0 and k1 == 0 and k2 == 0:
                         logging.debug(f"First extraction - lineData[{idx0[0]}:{idx0[-1]+1}, {idx1}]")
                         logging.debug(f"lineData values sample: {self.rfdata.lineData[idx0, idx1][:10]}")
+                    
+                    # Reshape data for multiline
                     temp = np.transpose(
                         np.reshape(self.rfdata.lineData[idx0, idx1],
                                  (self.multilinefactor, self.pt), order='F')
                     )
+                    
+                    # Log first reshape for debugging
                     if k0 == 0 and k1 == 0 and k2 == 0:
                         logging.debug(f"temp shape: {temp.shape}, temp sample: {temp.ravel()[:10]}")
+                    
+                    # Harmonic extraction
                     if temp.shape[1] > 2:
                         rftemp_all_harm[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [0, 2]]
                     else:
                         logging.warning(f"temp has only {temp.shape[1]} columns, skipping harmonic assignment")
+                    
+                    # Fundamental extraction
                     if temp.shape[1] >= 12:
                         rftemp_all_fund[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [9, 11]]
                     elif temp.shape[1] >= 2:
@@ -641,17 +716,20 @@ class PhilipsRfParser:
                         rftemp_all_fund[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [-2, -1]]
                     else:
                         logging.warning(f"temp has only {temp.shape[1]} columns, skipping fundamental assignment")
+                
+                # Store arrays for this angle
                 rf_data_all_harm[k0][k1] = rftemp_all_harm
                 rf_data_all_fund[k0][k1] = rftemp_all_fund
-        logging.info("RF data array filling complete")
+        
+        logging.info(f"RF data array filling complete")
         return rf_data_all_fund, rf_data_all_harm
-   
+
     ###################################################################################
     # File Type Detection and File Header
-    ###################################################################################
+    ####################################################################################
     def _detect_file_type(self, file_obj) -> Tuple[bool, bool, int, List[int]]:
         """Detects file type and returns is_voyager, has_file_header, file_header_size, file_header."""
-        logging.info("Starting file type detection")
+        logging.info(f"Starting file type detection")
         
         file_header_size = len(self.VHeader)
         
@@ -663,14 +741,14 @@ class PhilipsRfParser:
         has_file_header = False
         
         if file_header == self.VHeader:
-            logging.info("Header information found - Parsing Voyager RF capture file")
+            logging.info(f"Header information found - Parsing Voyager RF capture file")
             is_voyager = True
             has_file_header = True
         elif file_header == self.FHeader:
-            logging.info("Header information found - Parsing Fusion RF capture file")
+            logging.info(f"Header information found - Parsing Fusion RF capture file")
             has_file_header = True
         else:
-            logging.info("No header found - Parsing legacy Voyager RF capture file")
+            logging.info(f"No header found - Parsing legacy Voyager RF capture file")
             is_voyager = True
             
         logging.debug(f"File type detection complete: is_voyager={is_voyager}, has_file_header={has_file_header}")
@@ -678,10 +756,10 @@ class PhilipsRfParser:
 
     ###################################################################################
     # File Header Parsing
-    ###################################################################################
+    ####################################################################################
     def _parse_file_header_and_offset(self, file_obj, is_voyager: bool, has_file_header: bool, file_header_size: int, filepath: str) -> Tuple['PhilipsRfParser.DbParams', int, str]:
         """Parse file header and calculate total_header_size, endianness, and db_params."""
-        logging.info("Parsing file header and calculating offset")
+        logging.info(f"Parsing file header and calculating offset")
         logging.debug(f"Input parameters: is_voyager={is_voyager}, has_file_header={has_file_header}, file_header_size={file_header_size}")
         
         endianness = 'little'
@@ -691,28 +769,29 @@ class PhilipsRfParser:
         if has_file_header:
             if is_voyager:
                 endianness = 'big'
-                logging.debug("Using big-endian for Voyager file")
+                logging.debug(f"Using big-endian for Voyager file")
             else:
-                logging.debug("Using little-endian for Fusion file")
+                logging.debug(f"Using little-endian for Fusion file")
                 
-            logging.info("Parsing file header parameters")
+            logging.info(f"Parsing file header parameters")
             db_params, num_file_header_bytes = self._parse_file_header(file_obj, endianness)
             total_header_size = file_header_size + 8 + num_file_header_bytes
             
             logging.debug(f"Total header size: {total_header_size} bytes (file_header={file_header_size} + 8 + params={num_file_header_bytes})")
         else:
             total_header_size = 0
-            logging.debug("No file header to parse")
+            logging.debug(f"No file header to parse")
             
         logging.info(f"File header parsing complete: endianness={endianness}, total_header_size={total_header_size}")
         return db_params, total_header_size, endianness
 
     ###################################################################################
     # File Header Parsing
-    ###################################################################################
+    ####################################################################################
     def _parse_file_header(self, file_obj, endianness: str) -> Tuple['PhilipsRfParser.DbParams', int]:
         """Parse file header information."""
-        logging.info("Parsing file header information")
+        logging.info(f"Parsing file header information")
+        
         fileVersion = int.from_bytes(file_obj.read(4), endianness, signed=False)
         numFileHeaderBytes = int.from_bytes(file_obj.read(4), endianness, signed=False)
         logging.info(f"File Version: {fileVersion}, Header Size: {numFileHeaderBytes} bytes")
@@ -743,15 +822,25 @@ class PhilipsRfParser:
     ###################################################################################
     def _read_int_array(self, file_obj, endianness: str, count: int) -> List[int]:
         """Helper method to read an array of integers."""
-        return [int.from_bytes(file_obj.read(4), endianness, signed=False) for _ in range(count)]
+        logging.debug(f"Reading {count} integers with endianness '{endianness}'")
+        
+        result = [int.from_bytes(file_obj.read(4), endianness, signed=False) for _ in range(count)]
+        
+        logging.debug(f"Read {len(result)} integers, first few: {result[:min(5, len(result))]}")
+        return result
     
     ###################################################################################
     # Helper Methods
     ###################################################################################
     def _read_2d_cols(self, file_obj, endianness: str) -> np.ndarray:
         """Helper method to read and reshape 2D columns data."""
+        logging.debug(f"Reading 2D columns data with endianness '{endianness}'")
+        
         flat_data = self._read_int_array(file_obj, endianness, 14*11)
-        return np.reshape(flat_data, (14, 11), order='F')
+        result = np.reshape(flat_data, (14, 11), order='F')
+        
+        logging.debug(f"Reshaped data to shape: {result.shape}")
+        return result
     
     ###################################################################################
     # File Header Parsing
@@ -1133,10 +1222,10 @@ class PhilipsRfParser:
         logging.info(f"Dispatching header parsing: is_voyager={is_voyager}")
         
         if is_voyager:
-            logging.debug("Using Voyager header parser")
+            logging.debug(f"Using Voyager header parser")
             return self._parse_header_v(rawrfdata)
         else:
-            logging.debug("Using Fusion header parser")
+            logging.debug(f"Using Fusion header parser")
             return self._parse_header_f(rawrfdata)
 
     ###################################################################################
@@ -1562,24 +1651,42 @@ class PhilipsRfParser:
         return lineData, lineHeader
 
     ###################################################################################
-    # Data Type Organization (Placeholder)
-    ###################################################################################
+    # Data Type Organization
+    ####################################################################################
     def _organize_data_types(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Organize data types (echo, color, etc.) and assign them to rfdata."""
         logging.info(f"Organizing data types, tap_point={tap_point}")
         logging.debug(f"Available data types in headers: {np.unique(header_info.Data_Type) if hasattr(header_info, 'Data_Type') else 'N/A'}")
         
+        # Extract different data types
+        logging.debug(f"Extracting echo data")
         rfdata = self._extract_echo_data(rfdata, header_info, tap_point)
+        
+        logging.debug(f"Extracting CW data")
         rfdata = self._extract_cw_data(rfdata, header_info, tap_point)
+        
+        logging.debug(f"Extracting PW data")
         rfdata = self._extract_pw_data(rfdata, header_info, tap_point)
+        
+        logging.debug(f"Extracting color data")
         rfdata = self._extract_color_data(rfdata, header_info, tap_point)
+        
+        logging.debug(f"Extracting echo M-mode data")
         rfdata = self._extract_echo_mmode_data(rfdata, header_info, tap_point)
+        
+        logging.debug(f"Extracting color M-mode data")
         rfdata = self._extract_color_mmode_data(rfdata, header_info, tap_point)
+        
+        logging.debug(f"Extracting dummy data")
         rfdata = self._extract_dummy_data(rfdata, header_info, tap_point)
+        
+        logging.debug(f"Extracting SWI data")
         rfdata = self._extract_swi_data(rfdata, header_info, tap_point)
+        
+        logging.debug(f"Extracting miscellaneous data")
         rfdata = self._extract_misc_data(rfdata, header_info, tap_point)
         
-        logging.info("Data type organization complete")
+        logging.info(f"Data type organization complete")
         return rfdata
 
     ###################################################################################
@@ -2072,11 +2179,17 @@ class PhilipsRfParser:
     ###################################################################################
     def _initialize_rf_sort_dimensions(self, RFinput, Stride, ML):
         """Initialize dimensions for RF sorting."""
+        logging.debug(f"Initializing dimensions - input shape: {RFinput.shape}, Stride: {Stride}, ML: {ML}")
+        
+        # Calculate dimensions
         N = RFinput.shape[0]
         xmitEvents = RFinput.shape[1]
         depth = int(np.floor(N/Stride))
-        MLs = np.arange(0, ML)  # Create array of multiline indices
-        logging.debug(f"Sort dimensions - depth: {depth}, MLs: {len(MLs)}")
+        
+        # Create array of multiline indices
+        MLs = np.arange(0, ML)
+        
+        logging.debug(f"Calculated dimensions - N: {N}, xmitEvents: {xmitEvents}, depth: {depth}, MLs range: 0-{ML-1}")
         return N, xmitEvents, depth, MLs
 
     ###################################################################################
@@ -2084,30 +2197,40 @@ class PhilipsRfParser:
     ###################################################################################
     def _initialize_rf_sort_outputs(self, depth, ML, xmitEvents, CRE):
         """Initialize output arrays based on CRE value."""
-        logging.debug(f"Initializing output arrays for CRE={CRE}")
+        logging.debug(f"Initializing output arrays - depth: {depth}, ML: {ML}, xmitEvents: {xmitEvents}, CRE: {CRE}")
         
         # Initialize arrays with empty values
         out0 = out1 = out2 = out3 = np.array([])
         
+        # Initialize array shape for logging
+        array_shape = (depth, ML, xmitEvents)
+        array_size_mb = (depth * ML * xmitEvents * 4) / (1024 * 1024)  # Assuming 4 bytes per element
+        
         # Create arrays based on CRE
         if CRE == 4:
-            out3 = np.zeros((depth, ML, xmitEvents))
-            out2 = np.zeros((depth, ML, xmitEvents))
-            out1 = np.zeros((depth, ML, xmitEvents))
-            out0 = np.zeros((depth, ML, xmitEvents))
+            logging.debug(f"Creating 4 output arrays of shape {array_shape} (~{array_size_mb:.2f}MB each)")
+            out3 = np.zeros(array_shape)
+            out2 = np.zeros(array_shape)
+            out1 = np.zeros(array_shape)
+            out0 = np.zeros(array_shape)
         elif CRE == 3:
-            out2 = np.zeros((depth, ML, xmitEvents))
-            out1 = np.zeros((depth, ML, xmitEvents))
-            out0 = np.zeros((depth, ML, xmitEvents))
+            logging.debug(f"Creating 3 output arrays of shape {array_shape} (~{array_size_mb:.2f}MB each)")
+            out2 = np.zeros(array_shape)
+            out1 = np.zeros(array_shape)
+            out0 = np.zeros(array_shape)
         elif CRE == 2:
-            out1 = np.zeros((depth, ML, xmitEvents))
-            out0 = np.zeros((depth, ML, xmitEvents))
+            logging.debug(f"Creating 2 output arrays of shape {array_shape} (~{array_size_mb:.2f}MB each)")
+            out1 = np.zeros(array_shape)
+            out0 = np.zeros(array_shape)
         elif CRE == 1:
-            out0 = np.zeros((depth, ML, xmitEvents))
+            logging.debug(f"Creating 1 output array of shape {array_shape} (~{array_size_mb:.2f}MB)")
+            out0 = np.zeros(array_shape)
         else:
             logging.warning(f"Unsupported CRE value: {CRE}, using CRE=1")
-            out0 = np.zeros((depth, ML, xmitEvents))
+            logging.debug(f"Creating 1 output array of shape {array_shape} (~{array_size_mb:.2f}MB)")
+            out0 = np.zeros(array_shape)
         
+        logging.debug(f"Output arrays initialized successfully")
         return out0, out1, out2, out3
 
     ###################################################################################
@@ -2166,7 +2289,7 @@ class PhilipsRfParser:
         else:
             logging.warning(f"No sort list for Stride={Stride}")
         
-        logging.debug(f"Using ML_SortList: {ML_SortList}")
+        logging.debug(f"Using ML_SortList with {len(ML_SortList)} elements")
         return ML_SortList
 
     ###################################################################################
@@ -2174,42 +2297,71 @@ class PhilipsRfParser:
     ###################################################################################
     def _check_ml_sort_validity(self, ML, ML_SortList, CRE, Stride):
         """Check if the ML sort list is valid for the requested parameters."""
+        logging.debug(f"Checking ML sort list validity - ML: {ML}, CRE: {CRE}, Stride: {Stride}")
+        
+        # Check if sort list is empty
         if not ML_SortList:
             logging.warning(f"Empty ML_SortList for Stride={Stride}, CRE={CRE}")
             return
         
-        # Check for potential issues
+        # Log sort list properties
+        logging.debug(f"ML_SortList - length: {len(ML_SortList)}, min: {min(ML_SortList)}, max: {max(ML_SortList)}")
+        
+        # Check if ML value exceeds what's available in the sort list
         if ((ML-1) > max(ML_SortList)):
             logging.warning(f"ML ({ML}) exceeds max value in ML_SortList ({max(ML_SortList)})")
         
-        if (CRE == 4 and Stride < 16) or (CRE == 2 and Stride < 4):
-            logging.warning("Captured ML is insufficient, some ML were not captured")
+        # Check for special configuration issues
+        if (CRE == 4 and Stride < 16):
+            logging.warning(f"Insufficient ML capture for CRE=4 with Stride={Stride} (should be >= 16)")
+            
+        if (CRE == 2 and Stride < 4):
+            logging.warning(f"Insufficient ML capture for CRE=2 with Stride={Stride} (should be >= 4)")
+        
+        logging.debug(f"ML sort list validity check complete")
 
     ###################################################################################
     # RF Sorting Utility
     ###################################################################################
     def _fill_rf_sort_outputs(self, RFinput, out0, out1, out2, out3, MLs, ML_SortList, depth, Stride, ML, CRE):
         """Fill output arrays based on the sort list."""
+        logging.info(f"Filling output arrays - ML: {ML}, CRE: {CRE}, depth: {depth}")
+        
         # Skip if sort list is empty
         if not ML_SortList:
-            logging.warning("Empty ML_SortList, unable to fill output arrays")
+            logging.warning(f"Empty ML_SortList, unable to fill output arrays")
             return out0, out1, out2, out3
+        
+        # Log the first few items in the sort list
+        preview_length = min(10, len(ML_SortList))
+        logging.debug(f"Using ML_SortList (first {preview_length}): {ML_SortList[:preview_length]}")
+        
+        # Store matches for logging
+        matches_found = 0
+        ml_not_found = []
         
         # Process each multiline index
         for k in range(ML):
+            logging.debug(f"Processing ML index {k} of {ML}")
+            
             # Get indices in sort list that match current multiline index
             iML = np.where(np.array(ML_SortList) == MLs[k])[0]
             
             # Skip if no matching indices found
             if len(iML) == 0:
                 logging.warning(f"No matching indices for ML={MLs[k]} in sort list")
+                ml_not_found.append(MLs[k])
                 continue
+            
+            matches_found += 1
+            logging.debug(f"Found {len(iML)} matches for ML={MLs[k]} at indices {iML}")
             
             # Fill primary output array
             self._fill_output_array(out0, RFinput, depth, k, iML[0], Stride)
             
             # Fill additional output arrays based on CRE
             if CRE >= 2 and len(iML) > 1:
+                logging.debug(f"Filling CRE={CRE} outputs for ML={MLs[k]}")
                 self._fill_output_array(out1, RFinput, depth, k, iML[1], Stride)
                 
                 # These are duplicated for backward compatibility
@@ -2220,8 +2372,14 @@ class PhilipsRfParser:
             
             # Fill tertiary and quaternary output arrays for CRE=4
             if CRE == 4 and len(iML) > 3:
+                logging.debug(f"Filling CRE=4 tertiary and quaternary outputs for ML={MLs[k]}")
                 self._fill_output_array(out2, RFinput, depth, k, iML[2], Stride)
                 self._fill_output_array(out3, RFinput, depth, k, iML[3], Stride)
+        
+        # Log summary statistics
+        logging.info(f"Output array filling complete - {matches_found}/{ML} multilines processed")
+        if ml_not_found:
+            logging.warning(f"Missing multilines: {ml_not_found}")
         
         return out0, out1, out2, out3
 
@@ -2230,9 +2388,22 @@ class PhilipsRfParser:
     ###################################################################################
     def _fill_output_array(self, output_array, input_array, depth, k, iML_index, Stride):
         """Fill a specific output array with data from the input array."""
-        if output_array.size > 0:
-            indices = np.arange(iML_index, (depth*Stride), Stride)
-            output_array[:depth, k, :] = input_array[indices]
+                
+        # Check if output array is valid
+        if output_array.size == 0:
+            logging.debug(f"Skipping fill operation - output_array is empty")
+            return
+        
+        # Create indices for strided access
+        indices = np.arange(iML_index, (depth*Stride), Stride)
+        
+        # Log diagnostics about the fill operation
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.debug(f"Filling output array[:, {k}, :] from input_array[{indices[0]}:{indices[-1]}:{Stride}]")
+            logging.debug(f"Number of indices: {len(indices)}, expected depth: {depth}")
+        
+        # Perform the fill operation
+        output_array[:depth, k, :] = input_array[indices]
 
     ###################################################################################
     # Utility Functions
@@ -2242,7 +2413,9 @@ class PhilipsRfParser:
         """Get string of zeros for padding."""
         logging.debug(f"Creating filler zeros, num={num}")
         
-        result = '0' * max(0, num - 1)
+        # Ensure we don't create negative length strings
+        count = max(0, num - 1)
+        result = '0' * count
         
         logging.debug(f"Generated {len(result)} filler zeros")
         return result
@@ -2257,9 +2430,9 @@ if __name__ == "__main__":
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)  # Capture all levels
     
-    # Create a detailed formatter that includes module names for better tracking
+    # Create a detailed formatter that includes function names
     detailed_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+        '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d:%(funcName)s] - %(message)s'
     )
     
     # Console handler with full debug output
@@ -2285,5 +2458,5 @@ if __name__ == "__main__":
     parser = PhilipsRfParser()
     parser.philipsRfParser(filepath, save_numpy=True)
     logging.info("Main execution complete")
-    
-###################################################################################
+      
+    ###################################################################################
