@@ -1,116 +1,159 @@
+import logging
 import os
 import platform
-from pathlib import Path
-from datetime import datetime
-import warnings
-import ctypes as ct
-import logging
-from typing import Optional, Tuple, List, Any
+from typing import Any, List, Tuple
 
 import numpy as np
 from scipy.io import savemat
 from philipsRfParser import getPartA, getPartB
 
 ###################################################################################
-# HeaderInfoStruct Class
-###################################################################################
-class HeaderInfoStruct:
-    """Philips-specific structure containing information from the headers."""
-    def __init__(self):
-        logging.debug("Initializing HeaderInfoStruct")
-        
-        self.RF_CaptureVersion: Optional[np.ndarray] = None
-        self.Tap_Point: Optional[np.ndarray] = None
-        self.Data_Gate: Optional[np.ndarray] = None
-        self.Multilines_Capture: Optional[np.ndarray] = None
-        self.Steer: Optional[np.ndarray] = None
-        self.elevationPlaneOffset: Optional[np.ndarray] = None
-        self.PM_Index: Optional[np.ndarray] = None
-        self.Pulse_Index: Optional[np.ndarray] = None
-        self.Data_Format: Optional[np.ndarray] = None
-        self.Data_Type: Optional[np.ndarray] = None
-        self.Header_Tag: Optional[np.ndarray] = None
-        self.Threed_Pos: Optional[np.ndarray] = None
-        self.Mode_Info: Optional[np.ndarray] = None
-        self.Frame_ID: Optional[np.ndarray] = None
-        self.CSID: Optional[np.ndarray] = None
-        self.Line_Index: Optional[np.ndarray] = None
-        self.Line_Type: Optional[np.ndarray] = None
-        self.Time_Stamp: Optional[np.ndarray] = None
-        self.RF_Sample_Rate: Optional[np.ndarray] = None
-        
-        logging.debug("HeaderInfoStruct initialization complete")
-
-###################################################################################
-# DbParams Class
-###################################################################################
-class DbParams:
-    """Philips-specific structure containing signal properties of the scan."""
-    def __init__(self):
-        logging.debug("Initializing DbParams")
-        
-        self.acqNumActiveScChannels2d: Optional[List[int]] = None
-        self.azimuthMultilineFactorXbrOut: Optional[List[int]] = None
-        self.azimuthMultilineFactorXbrIn: Optional[List[int]] = None
-        self.numOfSonoCTAngles2dActual: Optional[List[int]] = None
-        self.elevationMultilineFactor: Optional[List[int]] = None
-        self.numPiPulses: Optional[List[int]] = None
-        self.num2DCols: Optional[np.ndarray] = None
-        self.fastPiEnabled: Optional[List[int]] = None
-        self.numZones2d: Optional[List[int]] = None
-        self.numSubVols: Optional[Any] = None
-        self.numPlanes: Optional[Any] = None
-        self.zigZagEnabled: Optional[Any] = None
-        self.azimuthMultilineFactorXbrOutCf: Optional[List[int]] = None
-        self.azimuthMultilineFactorXbrInCf: Optional[List[int]] = None
-        self.multiLineFactorCf: Optional[List[int]] = None
-        self.linesPerEnsCf: Optional[List[int]] = None
-        self.ensPerSeqCf: Optional[List[int]] = None
-        self.numCfCols: Optional[List[int]] = None
-        self.numCfEntries: Optional[List[int]] = None
-        self.numCfDummies: Optional[List[int]] = None
-        self.elevationMultilineFactorCf: Optional[List[int]] = None
-        self.Planes: Optional[List[int]] = None
-        self.tapPoint: Optional[List[int]] = None
-        
-        logging.debug("DbParams initialization complete")
-
-###################################################################################
-# Rfdata Class
-###################################################################################
-class Rfdata:
-    """Philips-specific structure containing constructed RF data."""
-    def __init__(self):
-        logging.debug("Initializing Rfdata")
-        
-        self.lineData: Optional[np.ndarray] = None
-        self.lineHeader: Optional[np.ndarray] = None
-        self.headerInfo: Optional[HeaderInfoStruct] = None
-        self.echoData: Optional[Any] = None
-        self.dbParams: Optional[DbParams] = None
-        self.echoMModeData: Optional[Any] = None
-        self.miscData: Optional[Any] = None
-        
-        logging.debug("Rfdata initialization complete")
-
-###################################################################################
 # Main Parser Class
 ###################################################################################
 class PhilipsRfParser:
     """Main class for parsing Philips RF data files."""
-    def __init__(self, ML_out: int = 2, ML_in: int = 32, used_os: Optional[int] = None):
+    
+    ###################################################################################
+    # HeaderInfoStruct Class
+    ###################################################################################
+    class HeaderInfoStruct:
+        """Philips-specific structure containing information from the headers."""
+        def __init__(self):
+            logging.debug("Initializing HeaderInfoStruct")
+            
+            self.RF_CaptureVersion: np.ndarray = None
+            self.Tap_Point: np.ndarray = None
+            self.Data_Gate: np.ndarray = None
+            self.Multilines_Capture: np.ndarray = None
+            self.Steer: np.ndarray = None
+            self.elevationPlaneOffset: np.ndarray = None
+            self.PM_Index: np.ndarray = None
+            self.Pulse_Index: np.ndarray = None
+            self.Data_Format: np.ndarray = None
+            self.Data_Type: np.ndarray = None
+            self.Header_Tag: np.ndarray = None
+            self.Threed_Pos: np.ndarray = None
+            self.Mode_Info: np.ndarray = None
+            self.Frame_ID: np.ndarray = None
+            self.CSID: np.ndarray = None
+            self.Line_Index: np.ndarray = None
+            self.Line_Type: np.ndarray = None
+            self.Time_Stamp: np.ndarray = None
+            self.RF_Sample_Rate: np.ndarray = None
+            
+            logging.debug("HeaderInfoStruct initialization complete")
+
+    ###################################################################################
+    # DbParams Class
+    ###################################################################################
+    class DbParams:
+        """Philips-specific structure containing signal properties of the scan."""
+        def __init__(self):
+            logging.debug("Initializing DbParams")
+            
+            self.acqNumActiveScChannels2d: List[int] = None
+            self.azimuthMultilineFactorXbrOut: List[int] = None
+            self.azimuthMultilineFactorXbrIn: List[int] = None
+            self.numOfSonoCTAngles2dActual: List[int] = None
+            self.elevationMultilineFactor: List[int] = None
+            self.numPiPulses: List[int] = None
+            self.num2DCols: np.ndarray = None
+            self.fastPiEnabled: List[int] = None
+            self.numZones2d: List[int] = None
+            self.numSubVols: Any = None
+            self.numPlanes: Any = None
+            self.zigZagEnabled: Any = None
+            self.azimuthMultilineFactorXbrOutCf: List[int] = None
+            self.azimuthMultilineFactorXbrInCf: List[int] = None
+            self.multiLineFactorCf: List[int] = None
+            self.linesPerEnsCf: List[int] = None
+            self.ensPerSeqCf: List[int] = None
+            self.numCfCols: List[int] = None
+            self.numCfEntries: List[int] = None
+            self.numCfDummies: List[int] = None
+            self.elevationMultilineFactorCf: List[int] = None
+            self.Planes: List[int] = None
+            self.tapPoint: List[int] = None
+            
+            logging.debug("DbParams initialization complete")
+
+    ###################################################################################
+    # Rfdata Class
+    ###################################################################################
+    class Rfdata:
+        """Philips-specific structure containing constructed RF data."""
+        def __init__(self):
+            logging.debug("Initializing Rfdata")
+            
+            self.lineData: np.ndarray = None
+            self.lineHeader: np.ndarray = None
+            self.headerInfo: 'PhilipsRfParser.HeaderInfoStruct' = None
+            self.echoData: Any = None
+            self.dbParams: 'PhilipsRfParser.DbParams' = None
+            self.echoMModeData: Any = None
+            self.miscData: Any = None
+            self.cwData: Any = None
+            self.pwData: Any = None
+            self.colorData: Any = None
+            self.colorMModeData: Any = None
+            self.dummyData: Any = None
+            self.swiData: Any = None
+            
+            logging.debug("Rfdata initialization complete")
+    
+    ###################################################################################
+    # Initialize the parser with default parameters
+    ###################################################################################
+    def __init__(self, ML_out: int = 2, ML_in: int = 32, used_os: int = 2256):
         """Initialize the parser with default parameters."""
         logging.info(f"Initializing PhilipsRfParser with ML_out={ML_out}, ML_in={ML_in}, used_os={used_os}")
         
         self.ML_out: int = ML_out
         self.ML_in: int = ML_in
-        self.used_os: Optional[int] = used_os
-        self.rfdata: Optional[Rfdata] = None
-        self.txBeamperFrame: Optional[int] = None
-        self.NumSonoCTAngles: Optional[int] = None
-        self.numFrame: Optional[int] = None
-        self.multilinefactor: Optional[int] = None
-        self.pt: Optional[int] = None
+        self.used_os: int = used_os
+        self.rfdata: 'PhilipsRfParser.Rfdata' = None
+        self.txBeamperFrame: int = None
+        self.NumSonoCTAngles: int = None
+        self.numFrame: int = None
+        self.multilinefactor: int = None
+        self.pt: int = None
+        
+        # Define constant parameters for headers
+        self.VHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 160, 160]
+        self.FHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 11, 11]
+        
+        # Define data type constants
+        self.DataType_ECHO = np.arange(1, 15)
+        self.DataType_CW = 16
+        self.DataType_PW = [18, 19]
+        self.DataType_COLOR = [17, 21, 22, 23, 24]
+        self.DataType_EchoMMode = 26
+        self.DataType_ColorMMode = [27, 28]
+        self.DataType_Dummy = [20, 25, 29, 30, 31]
+        self.DataType_SWI = [90, 91]
+        self.DataType_Misc = [15, 88, 89]
+        
+        # Define ML sort lists
+        self.ML_SortList_128 = list(range(128))
+        self.ML_SortList_32_CRE4 = [4, 4, 5, 5, 6, 6, 7, 7, 4, 4, 5, 5, 6, 6, 7, 7, 
+                                    0, 0, 1, 1, 2, 2, 3, 3, 0, 0, 1, 1, 2, 2, 3, 3]
+        self.ML_SortList_32 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 
+                               0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        self.ML_SortList_16_CRE1 = [0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15]
+        self.ML_SortList_16_CRE2 = [0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7]
+        self.ML_SortList_16_CRE4 = [0, 0, 1, 1, 2, 2, 3, 3, 0, 0, 1, 1, 2, 2, 3, 3]
+        self.ML_SortList_12_CRE1 = [0, 2, 4, 6, 8, 10, 1, 3, 5, 7, 9, 11]
+        self.ML_SortList_12_CRE2 = [0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5]
+        self.ML_SortList_12_CRE4 = [0, 0, 1, 1, 2, 2, 0, 0, 1, 1, 2, 2]
+        self.ML_SortList_8_CRE1 = [0, 2, 4, 6, 1, 3, 5, 7]
+        self.ML_SortList_8_CRE2 = [0, 1, 2, 3, 0, 1, 2, 3]
+        self.ML_SortList_8_CRE4 = [0, 0, 1, 1, 0, 0, 1, 1]
+        self.ML_SortList_4_CRE1 = [0, 2, 1, 3]
+        self.ML_SortList_4_CRE2 = [0, 1, 0, 1]
+        self.ML_SortList_4_CRE4 = [0, 0, 0, 0]
+        self.ML_SortList_2_CRE1 = [0, 1]
+        self.ML_SortList_2_CRE2 = [0, 0]
+        self.ML_SortList_2_CRE4 = [0, 0]
         
         logging.debug("PhilipsRfParser initialization complete")
         
@@ -134,9 +177,7 @@ class PhilipsRfParser:
         """Detects file type and returns is_voyager, has_file_header, file_header_size, file_header."""
         logging.info("Starting file type detection")
         
-        VHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 160, 160]
-        FHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 11, 11]
-        file_header_size = len(VHeader)
+        file_header_size = len(self.VHeader)
         
         logging.debug(f"Reading {file_header_size} bytes for header detection")
         file_header = list(file_obj.read(file_header_size))
@@ -145,11 +186,11 @@ class PhilipsRfParser:
         is_voyager = False
         has_file_header = False
         
-        if file_header == VHeader:
+        if file_header == self.VHeader:
             logging.info("Header information found - Parsing Voyager RF capture file")
             is_voyager = True
             has_file_header = True
-        elif file_header == FHeader:
+        elif file_header == self.FHeader:
             logging.info("Header information found - Parsing Fusion RF capture file")
             has_file_header = True
         else:
@@ -162,13 +203,13 @@ class PhilipsRfParser:
     ###################################################################################
     # File Header Parsing
     ###################################################################################
-    def _parse_file_header_and_offset(self, file_obj, is_voyager: bool, has_file_header: bool, file_header_size: int, filepath: str) -> Tuple[Optional[DbParams], int, str]:
+    def _parse_file_header_and_offset(self, file_obj, is_voyager: bool, has_file_header: bool, file_header_size: int, filepath: str) -> Tuple['PhilipsRfParser.DbParams', int, str]:
         """Parse file header and calculate total_header_size, endianness, and db_params."""
         logging.info("Parsing file header and calculating offset")
         logging.debug(f"Input parameters: is_voyager={is_voyager}, has_file_header={has_file_header}, file_header_size={file_header_size}")
         
         endianness = 'little'
-        db_params = None
+        db_params = PhilipsRfParser.DbParams()
         num_file_header_bytes = 0
         
         if has_file_header:
@@ -193,7 +234,7 @@ class PhilipsRfParser:
     ###################################################################################
     # Raw Data Loading
     ###################################################################################
-    def _load_raw_rf_data(self, filepath: str, is_voyager: bool, total_header_size: int, read_offset: int, read_size: int) -> Tuple[Any, Optional[int]]:
+    def _load_raw_rf_data(self, filepath: str, is_voyager: bool, total_header_size: int, read_offset: int, read_size: int) -> Tuple[Any, int]:
         """Load raw RF data from file, handling Voyager and Fusion formats."""
         logging.info(f"Loading raw RF data: is_voyager={is_voyager}, offset={read_offset}MB, size={read_size}MB")
         
@@ -221,7 +262,7 @@ class PhilipsRfParser:
                 rawrfdata = f.read(read_size)
                 
             logging.info(f"Loaded {len(rawrfdata)} bytes of Voyager data")
-            return rawrfdata, None
+            return rawrfdata, 0
         else:
             logging.info("Loading Fusion format data")
             
@@ -307,7 +348,7 @@ class PhilipsRfParser:
     ###################################################################################
     # Header and RF Data Parsing Dispatch
     ###################################################################################
-    def _parse_header_dispatch(self, rawrfdata: Any, is_voyager: bool) -> HeaderInfoStruct:
+    def _parse_header_dispatch(self, rawrfdata: Any, is_voyager: bool) -> 'PhilipsRfParser.HeaderInfoStruct':
         """Dispatch to the correct header parsing method."""
         logging.info(f"Dispatching header parsing: is_voyager={is_voyager}")
         
@@ -321,7 +362,7 @@ class PhilipsRfParser:
     ###################################################################################
     # RF Data Parsing Dispatch
     ###################################################################################
-    def _parse_rf_data_dispatch(self, rawrfdata: Any, header_info: HeaderInfoStruct, is_voyager: bool) -> Tuple[np.ndarray, np.ndarray, int]:
+    def _parse_rf_data_dispatch(self, rawrfdata: Any, header_info: 'PhilipsRfParser.HeaderInfoStruct', is_voyager: bool) -> Tuple[np.ndarray, np.ndarray, int]:
         """Dispatch to the correct RF data parsing method."""
         logging.info(f"Dispatching RF data parsing: is_voyager={is_voyager}")
         return self._parse_rf_data(rawrfdata, header_info, is_voyager)
@@ -329,7 +370,7 @@ class PhilipsRfParser:
     ###################################################################################
     # Data Type Organization (Placeholder)
     ###################################################################################
-    def _organize_data_types(self, rfdata: Rfdata, header_info: HeaderInfoStruct, tap_point: int) -> Rfdata:
+    def _organize_data_types(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Organize data types (echo, color, etc.) and assign them to rfdata."""
         logging.info(f"Organizing data types, tap_point={tap_point}")
         logging.debug(f"Available data types in headers: {np.unique(header_info.Data_Type) if hasattr(header_info, 'Data_Type') else 'N/A'}")
@@ -350,11 +391,10 @@ class PhilipsRfParser:
     ###################################################################################
     # Echo Data Extraction
     ###################################################################################
-    def _extract_echo_data(self, rfdata, header_info, tap_point):
+    def _extract_echo_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Extract echo data from RF data."""
         logging.info(f"Extracting echo data, tap_point={tap_point}")
-        
-        DataType_ECHO = np.arange(1, 15)
-        logging.debug(f"Echo data types: {DataType_ECHO}")
+        logging.debug(f"Echo data types: {self.DataType_ECHO}")
         
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
@@ -376,7 +416,7 @@ class PhilipsRfParser:
         logging.debug(f"Number of transmit events: {xmit_events}")
         
         echo_index = np.zeros(xmit_events).astype(np.int32)
-        for dt in DataType_ECHO:
+        for dt in self.DataType_ECHO:
             index = ((header_info.Data_Type & 255) == dt)
             echo_index = np.bitwise_or(echo_index, np.array(index).astype(np.int32))
             
@@ -428,11 +468,10 @@ class PhilipsRfParser:
     ###################################################################################
     # CW Data Extraction
     ###################################################################################
-    def _extract_cw_data(self, rfdata, header_info, tap_point):
+    def _extract_cw_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Extract CW data from RF data."""
         logging.info(f"Extracting CW data, tap_point={tap_point}")
-        
-        DataType_CW = 16
-        logging.debug(f"CW data type: {DataType_CW}")
+        logging.debug(f"CW data type: {self.DataType_CW}")
         
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
@@ -446,7 +485,7 @@ class PhilipsRfParser:
         
         logging.debug(f"ML_Capture={ML_Capture}")
         
-        cw_index = (header_info.Data_Type == DataType_CW)
+        cw_index = (header_info.Data_Type == self.DataType_CW)
         cw_count = np.sum(cw_index)
         logging.debug(f"Found {cw_count} CW data entries")
         
@@ -468,11 +507,10 @@ class PhilipsRfParser:
     ###################################################################################
     # PW Data Extraction
     ###################################################################################
-    def _extract_pw_data(self, rfdata, header_info, tap_point):
+    def _extract_pw_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Extract PW data from RF data."""
         logging.info(f"Extracting PW data, tap_point={tap_point}")
-        
-        DataType_PW = [18, 19]
-        logging.debug(f"PW data types: {DataType_PW}")
+        logging.debug(f"PW data types: {self.DataType_PW}")
         
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
@@ -485,7 +523,7 @@ class PhilipsRfParser:
         xmit_events = len(header_info.Data_Type)
         pw_index = np.zeros(xmit_events).astype(bool)
         
-        for dt in DataType_PW:
+        for dt in self.DataType_PW:
             index = (header_info.Data_Type == dt)
             pw_index = np.bitwise_or(pw_index, index)
             
@@ -510,11 +548,10 @@ class PhilipsRfParser:
     ###################################################################################
     # Color Data Extraction
     ###################################################################################
-    def _extract_color_data(self, rfdata, header_info, tap_point):
+    def _extract_color_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Extract color data from RF data."""
         logging.info(f"Extracting color data, tap_point={tap_point}")
-        
-        DataType_COLOR = [17, 21, 22, 23, 24]
-        logging.debug(f"Color data types: {DataType_COLOR}")
+        logging.debug(f"Color data types: {self.DataType_COLOR}")
         
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
@@ -527,7 +564,7 @@ class PhilipsRfParser:
         xmit_events = len(header_info.Data_Type)
         color_index = np.zeros(xmit_events).astype(bool)
         
-        for dt in DataType_COLOR:
+        for dt in self.DataType_COLOR:
             index = (header_info.Data_Type == dt)
             color_index = np.bitwise_or(color_index, index)
             
@@ -549,11 +586,10 @@ class PhilipsRfParser:
     ###################################################################################
     # Echo M-Mode Data Extraction
     ###################################################################################
-    def _extract_echo_mmode_data(self, rfdata, header_info, tap_point):
+    def _extract_echo_mmode_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Extract echo M-Mode data from RF data."""
         logging.info(f"Extracting echo M-Mode data, tap_point={tap_point}")
-        
-        DataType_EchoMMode = 26
-        logging.debug(f"Echo M-Mode data type: {DataType_EchoMMode}")
+        logging.debug(f"Echo M-Mode data type: {self.DataType_EchoMMode}")
         
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
@@ -563,7 +599,7 @@ class PhilipsRfParser:
             
         logging.debug(f"ML_Capture={ML_Capture}")
         
-        echo_mmode_index = (header_info.Data_Type == DataType_EchoMMode)
+        echo_mmode_index = (header_info.Data_Type == self.DataType_EchoMMode)
         echo_mmode_count = np.sum(echo_mmode_index)
         logging.debug(f"Found {echo_mmode_count} echo M-Mode data entries")
         
@@ -585,11 +621,10 @@ class PhilipsRfParser:
     ###################################################################################
     # Color M-Mode Data Extraction
     ###################################################################################
-    def _extract_color_mmode_data(self, rfdata, header_info, tap_point):
+    def _extract_color_mmode_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Extract color M-Mode data from RF data."""
         logging.info(f"Extracting color M-Mode data, tap_point={tap_point}")
-        
-        DataType_ColorMMode = [27, 28]
-        logging.debug(f"Color M-Mode data types: {DataType_ColorMMode}")
+        logging.debug(f"Color M-Mode data types: {self.DataType_ColorMMode}")
         
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
@@ -602,7 +637,7 @@ class PhilipsRfParser:
         xmit_events = len(header_info.Data_Type)
         color_mmode_index = np.zeros(xmit_events).astype(bool)
         
-        for dt in DataType_ColorMMode:
+        for dt in self.DataType_ColorMMode:
             index = (header_info.Data_Type == dt)
             color_mmode_index = np.bitwise_or(color_mmode_index, index)
             
@@ -627,11 +662,10 @@ class PhilipsRfParser:
     ###################################################################################
     # Dummy Data Extraction
     ###################################################################################
-    def _extract_dummy_data(self, rfdata, header_info, tap_point):
+    def _extract_dummy_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Extract dummy data from RF data."""
         logging.info(f"Extracting dummy data, tap_point={tap_point}")
-        
-        DataType_Dummy = [20, 25, 29, 30, 31]
-        logging.debug(f"Dummy data types: {DataType_Dummy}")
+        logging.debug(f"Dummy data types: {self.DataType_Dummy}")
         
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
@@ -644,7 +678,7 @@ class PhilipsRfParser:
         xmit_events = len(header_info.Data_Type)
         dummy_index = np.zeros(xmit_events).astype(bool)
         
-        for dt in DataType_Dummy:
+        for dt in self.DataType_Dummy:
             index = (header_info.Data_Type == dt)
             dummy_index = np.bitwise_or(dummy_index, index)
             
@@ -669,11 +703,10 @@ class PhilipsRfParser:
     ###################################################################################
     # SWI Data Extraction
     ###################################################################################
-    def _extract_swi_data(self, rfdata, header_info, tap_point):
+    def _extract_swi_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Extract SWI data from RF data."""
         logging.info(f"Extracting SWI data, tap_point={tap_point}")
-        
-        DataType_SWI = [90, 91]
-        logging.debug(f"SWI data types: {DataType_SWI}")
+        logging.debug(f"SWI data types: {self.DataType_SWI}")
         
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
@@ -681,7 +714,7 @@ class PhilipsRfParser:
             ML_Capture = 16 if SAMPLE_RATE == 0 else 32
         xmit_events = len(header_info.Data_Type)
         swi_index = np.zeros(xmit_events).astype(bool)
-        for dt in DataType_SWI:
+        for dt in self.DataType_SWI:
             index = (header_info.Data_Type == dt)
             swi_index = np.bitwise_or(swi_index, index)
         if np.sum(swi_index) > 0:
@@ -694,15 +727,16 @@ class PhilipsRfParser:
     ###################################################################################
     # Misc Data Extraction
     ###################################################################################
-    def _extract_misc_data(self, rfdata, header_info, tap_point):
-        DataType_Misc = [15, 88, 89]
+    def _extract_misc_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Extract miscellaneous data from RF data."""
+        logging.debug(f"Misc data types: {self.DataType_Misc}")
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
             SAMPLE_RATE = float(header_info.RF_Sample_Rate[0])
             ML_Capture = 16 if SAMPLE_RATE == 0 else 32
         xmit_events = len(header_info.Data_Type)
         misc_index = np.zeros(xmit_events).astype(bool)
-        for dt in DataType_Misc:
+        for dt in self.DataType_Misc:
             index = (header_info.Data_Type == dt)
             misc_index = np.bitwise_or(misc_index, index)
         if np.sum(misc_index) > 0:
@@ -784,50 +818,50 @@ class PhilipsRfParser:
         if ((CRE != 1) and (CRE != 2) and (CRE != 4)):
             logging.warning(f"No sort list for CRE={CRE}")
         if Stride == 128:
-            ML_SortList = list(range(128))
+            ML_SortList = self.ML_SortList_128
         elif Stride == 32:
             if CRE == 4:
-                ML_SortList = [4, 4, 5, 5, 6, 6, 7, 7, 4, 4, 5, 5, 6, 6, 7, 7, 0, 0, 1, 1, 2, 2, 3, 3, 0, 0, 1, 1, 2, 2, 3, 3]
+                ML_SortList = self.ML_SortList_32_CRE4
             else:
-                ML_SortList = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+                ML_SortList = self.ML_SortList_32
         elif Stride == 16:
             if CRE == 1:
-                ML_SortList = [0, 2, 4, 6, 8, 10, 12, 14, 1, 3, 5, 7, 9, 11, 13, 15]
+                ML_SortList = self.ML_SortList_16_CRE1
             elif CRE == 2:
-                ML_SortList = [0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7]
+                ML_SortList = self.ML_SortList_16_CRE2
             elif CRE == 4:
-                ML_SortList = [0, 0, 1, 1, 2, 2, 3, 3, 0, 0, 1, 1, 2, 2, 3, 3]
+                ML_SortList = self.ML_SortList_16_CRE4
         elif Stride == 12:
             if CRE ==1:
-                ML_SortList = [0, 2, 4, 6, 8, 10, 1, 3, 5, 7, 9, 11]
+                ML_SortList = self.ML_SortList_12_CRE1
             elif CRE == 2:
-                ML_SortList = [0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5]
+                ML_SortList = self.ML_SortList_12_CRE2
             elif CRE == 4:
-                ML_SortList = [0, 0, 1, 1, 2, 2, 0, 0, 1, 1, 2, 2]
+                ML_SortList = self.ML_SortList_12_CRE4
         elif Stride == 8:
             if CRE == 1:
-                ML_SortList = [0, 2, 4, 6, 1, 3, 5, 7]
+                ML_SortList = self.ML_SortList_8_CRE1
             elif CRE == 2:
-                ML_SortList = [0, 1, 2, 3, 0, 1, 2, 3]
+                ML_SortList = self.ML_SortList_8_CRE2
             elif CRE == 4:
-                ML_SortList = [0, 0, 1, 1, 0, 0, 1, 1]
+                ML_SortList = self.ML_SortList_8_CRE4
         elif Stride == 4:
             if CRE == 1:
-                ML_SortList = [0, 2, 1, 3]
+                ML_SortList = self.ML_SortList_4_CRE1
             elif CRE == 2:
-                ML_SortList = [0, 1, 0, 1]
+                ML_SortList = self.ML_SortList_4_CRE2
             elif CRE == 4:
-                ML_SortList = [0, 0, 0, 0]
+                ML_SortList = self.ML_SortList_4_CRE4
         elif Stride == 2:
             if CRE == 1:
-                ML_SortList = [0, 1]
+                ML_SortList = self.ML_SortList_2_CRE1
             elif CRE == 2:
-                ML_SortList = [0, 0]
+                ML_SortList = self.ML_SortList_2_CRE2
             elif CRE == 4:
-                ML_SortList = [0, 0]
+                ML_SortList = self.ML_SortList_2_CRE4
         else:
-            logging.warning(f"No sort list for Stride={Stride}")
             ML_SortList = []
+            logging.warning(f"No sort list for Stride={Stride}")
         logging.debug(f"Using ML_SortList: {ML_SortList}")
         if ((ML-1)>max(ML_SortList)) or (CRE == 4 and Stride < 16) or (CRE == 2 and Stride < 4):
             logging.warning("Captured ML is insufficient, some ML were not captured")
@@ -847,11 +881,11 @@ class PhilipsRfParser:
     ###################################################################################
     # Main RF Parsing Orchestrator
     ###################################################################################
-    def _parse_rf(self, filepath: str, read_offset: int, read_size: int) -> Rfdata:
+    def _parse_rf(self, filepath: str, read_offset: int, read_size: int) -> 'PhilipsRfParser.Rfdata':
         """Open and parse RF data file (refactored into smaller methods)."""
         logging.info(f"Opening RF file: {filepath}")
         logging.debug(f"Read parameters - offset: {read_offset}MB, size: {read_size}MB")
-        rfdata = Rfdata()
+        rfdata = PhilipsRfParser.Rfdata()
         with open(filepath, 'rb') as file_obj:
             is_voyager, has_file_header, file_header_size, file_header = self._detect_file_type(file_obj)
             db_params, total_header_size, endianness = self._parse_file_header_and_offset(file_obj, is_voyager, has_file_header, file_header_size, filepath)
@@ -882,16 +916,18 @@ class PhilipsRfParser:
         logging.info(f"Calculated numFrame: {self.numFrame}, multilinefactor: {self.multilinefactor}")
         col = 0
         if np.any(self.rfdata.lineData[:, col] != 0):
+            # Auto-detect based on data
             first_nonzero = np.where(self.rfdata.lineData[:, col] != 0)[0][0]
             last_nonzero = np.where(self.rfdata.lineData[:, col] != 0)[0][-1]
-            self.used_os = first_nonzero
+            self.used_os = first_nonzero  # Override default with detected value
             self.pt = int(np.floor((last_nonzero - first_nonzero + 1) / self.multilinefactor))
             logging.info(f"Auto-detected: used_os={self.used_os}, pt={self.pt}")
         else:
-            self.used_os = 2256 if self.used_os is None else self.used_os
+            # Use the value provided in the constructor (default is 2256)
+            logging.info(f"Using provided used_os={self.used_os}")
             self.pt = int(np.floor((self.rfdata.lineData.shape[0] - self.used_os) / self.multilinefactor))
-            logging.warning(f"Using fallback values: used_os={self.used_os}, pt={self.pt}")
-
+            logging.debug(f"Calculated pt={self.pt} based on shape {self.rfdata.lineData.shape[0]} and multilinefactor {self.multilinefactor}")
+            
     ###################################################################################
     # Data Array Filling
     ###################################################################################
@@ -946,7 +982,7 @@ class PhilipsRfParser:
     def _parse_header_v(self, rawrfdata):
         """Parse header for Voyager systems."""
         logging.info("Parsing Voyager header information")
-        temp_headerInfo = HeaderInfoStruct()
+        temp_headerInfo = PhilipsRfParser.HeaderInfoStruct()
 
         iHeader = np.where(np.uint8(rawrfdata[2,0,:])&224)
         numHeaders = len(iHeader)-1 # Ignore last header as it is part of a partial line
@@ -1047,7 +1083,7 @@ class PhilipsRfParser:
         numHeaders: int = iHeader.size - 1 # Ignore last header as it is a part of a partial line
         logging.info(f"Found {numHeaders} headers in Fusion data")
 
-        HeaderInfo = HeaderInfoStruct()
+        HeaderInfo = PhilipsRfParser.HeaderInfoStruct()
 
         # Initialize header arrays
         logging.debug("Initializing header arrays...")
@@ -1142,7 +1178,7 @@ class PhilipsRfParser:
     ###################################################################################
     # Voyager Data Parsing
     ###################################################################################
-    def _parse_data_v(self, rawrfdata, headerInfo):
+    def _parse_data_v(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray]:
         """Parse RF data for Voyager systems."""
         logging.info("Parsing Voyager RF data")
         minNeg = 16 * (2**16)  # Corrected exponentiation
@@ -1186,7 +1222,7 @@ class PhilipsRfParser:
     ###################################################################################
     # Fusion Data Parsing
     ###################################################################################
-    def _parse_data_f(self, rawrfdata, headerInfo):
+    def _parse_data_f(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray]:
         """Parse RF data for Fusion systems."""
         logging.info('Entering parseDataF - parsing Fusion RF data')
         # Definitions
@@ -1244,7 +1280,7 @@ class PhilipsRfParser:
     ###################################################################################
     # RF Data Parsing
     ###################################################################################
-    def _parse_rf_data(self, rawrfdata, headerInfo, isVoyager):
+    def _parse_rf_data(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct', isVoyager: bool) -> Tuple[np.ndarray, np.ndarray, int]:
         """Parse RF signal data."""
         logging.info("Parsing RF signal data...")
         Tap_Point = headerInfo.Tap_Point[0]
@@ -1278,7 +1314,7 @@ class PhilipsRfParser:
     ###################################################################################
     # File Header Parsing
     ###################################################################################
-    def _parse_file_header(self, file_obj, endianness):
+    def _parse_file_header(self, file_obj, endianness: str) -> Tuple['PhilipsRfParser.DbParams', int]:
         """Parse file header information."""
         logging.info("Parsing file header information")
         fileVersion = int.from_bytes(file_obj.read(4), endianness, signed=False)
@@ -1286,7 +1322,7 @@ class PhilipsRfParser:
         logging.info(f"File Version: {fileVersion}, Header Size: {numFileHeaderBytes} bytes")
 
         # Handle accordingly to fileVersion
-        temp_dbParams = DbParams()
+        temp_dbParams = PhilipsRfParser.DbParams()
         logging.debug(f"Reading file header for version {fileVersion}")
         
         if fileVersion == 2:
@@ -1496,7 +1532,8 @@ class PhilipsRfParser:
                     data_to_save = data_to_save[0]
                 break
         
-        if data_to_save is None or (hasattr(data_to_save, 'size') and data_to_save.size == 0):
+        has_valid_data = data_to_save is not None and (not hasattr(data_to_save, 'size') or data_to_save.size > 0)
+        if not has_valid_data:
             error_msg = f"No supported data found in RF file. Data_Type values: {np.unique(self.rfdata.headerInfo.Data_Type) if hasattr(self.rfdata.headerInfo, 'Data_Type') else 'N/A'}. lineData shape: {self.rfdata.lineData.shape if hasattr(self.rfdata, 'lineData') else 'N/A'}"
             logging.error(error_msg)
             raise RuntimeError(error_msg)
