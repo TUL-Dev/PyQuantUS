@@ -156,20 +156,496 @@ class PhilipsRfParser:
         self.ML_SortList_2_CRE4 = [0, 0]
         
         logging.debug("PhilipsRfParser initialization complete")
-        
+           
     ###################################################################################
-    # Utility Functions
+    # Main Parsing Function
     ###################################################################################
-    @staticmethod
-    def _get_filler_zeros(num: int) -> str:
-        """Get string of zeros for padding."""
-        logging.debug(f"Creating filler zeros, num={num}")
+    def philipsRfParser(self, filepath: str, save_numpy: bool = False) -> np.ndarray:
+        """Parse Philips RF data file, save as .mat file, and return shape of data.
+        If save_numpy is True, only save the processed data as .npy files in a folder named '{sample_name}_extracted' in the sample path.
+        If save_numpy is False, only save as .mat file."""
         
-        result = '0' * max(0, num - 1)
+        logger = self._setup_logging(filepath, save_numpy)
         
-        logging.debug(f"Generated {len(result)} filler zeros")
-        return result
+        try:
+            self.rfdata = self._parse_rf(filepath, 0, 2000)
+            
+            # Save header summary if saving as numpy
+            sample_name = os.path.splitext(os.path.basename(filepath))[0]
+            numpy_folder = None
+            if save_numpy:
+                numpy_folder = os.path.join(os.path.dirname(filepath), f'{sample_name}_extracted')
+                self._save_header_summary(numpy_folder)
+            
+            data_to_save, data_type_label = self._find_primary_data()
+            
+            # Process data
+            self._preprocess_line_data()
+            self._calculate_parameters()
+            rf_data_all_fund, rf_data_all_harm = self._fill_data_arrays()
+            
+            # Save data in appropriate format
+            if save_numpy:
+                result_shape = self._save_numpy_data(numpy_folder, data_to_save, rf_data_all_fund, rf_data_all_harm)
+            else:
+                result_shape = self._save_matlab_data(filepath, data_to_save, rf_data_all_fund, rf_data_all_harm)
+            
+            logging.info(f"Parsing complete. Final data shape: {result_shape}")
+            return result_shape
+            
+        finally:
+            self._restore_logging(logger, save_numpy)
+    
+    ###################################################################################
+    # Logging Setup
+    ###################################################################################
+    def _setup_logging(self, filepath: str, save_numpy: bool):
+        """Set up logging configuration for the parsing process."""
+        # Get the root logger - it may already be configured
+        logger = logging.getLogger()
+        original_handlers = list(logger.handlers)  # Save original handlers
+        original_level = logger.level
+        
+        # Create formatter for consistent output
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        
+        if save_numpy:
+            # Create numpy folder with sample name + '_extracted'
+            sample_name = os.path.splitext(os.path.basename(filepath))[0]
+            numpy_folder = os.path.join(os.path.dirname(filepath), f'{sample_name}_extracted')
+            if not os.path.exists(numpy_folder):
+                os.makedirs(numpy_folder)
+            
+            # Add file logging to the numpy folder with detailed output
+            log_file = os.path.join(numpy_folder, 'parsing_log.txt')
+            file_handler = logging.FileHandler(log_file, mode='w')
+            file_handler.setLevel(logging.DEBUG)  # Capture all levels for file
+            
+            # Use a detailed formatter that includes source location and module info
+            file_formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+            )
+            file_handler.setFormatter(file_formatter)
+            logger.addHandler(file_handler)
+            
+            # Ensure logger level is at DEBUG to capture all messages
+            logger.setLevel(logging.DEBUG)
+            
+            # Make console handler show only INFO and above if it existed before
+            for handler in original_handlers:
+                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                    # Save original level to restore later
+                    if not hasattr(handler, '_original_level'):
+                        handler._original_level = handler.level
+                    handler.setLevel(logging.INFO)
+            
+            logging.debug("Detailed debug logging enabled to file: {}".format(log_file))
+        
+        logging.info(f"Starting Philips RF parsing for file: {filepath}")
+        logging.info(f"Save format: {'NumPy arrays' if save_numpy else 'MATLAB file'}")
+        
+        return {'handlers': original_handlers, 'level': original_level}
+    
+    ###################################################################################
+    # Logging Restoration
+    ###################################################################################
+    def _restore_logging(self, logger_state, save_numpy: bool):
+        """Restore original logging configuration."""
+        if save_numpy:
+            # Get the root logger
+            logger = logging.getLogger()
+            
+            # Remove any added handlers
+            current_handlers = list(logger.handlers)
+            for handler in current_handlers:
+                if handler not in logger_state['handlers']:
+                    handler.close()
+                    logger.removeHandler(handler)
+            
+            # Restore original handler levels
+            for handler in logger_state['handlers']:
+                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                    # Restore saved original level if available
+                    if hasattr(handler, '_original_level'):
+                        handler.setLevel(handler._original_level)
+                        delattr(handler, '_original_level')
+                    else:
+                        handler.setLevel(logger_state['level'])
+            
+            # Restore original logger level
+            logger.setLevel(logger_state['level'])
+            logging.debug("Logging configuration restored to original state")
+    
+    ###################################################################################
+    # Primary Data Detection
+    ###################################################################################
+    def _find_primary_data(self):
+        """Find the primary data type to save."""
+        # Try to find the first available data type to save
+        data_priority = [
+            ('echoData', 'echoData'),
+            ('cwData', 'cwData'),
+            ('pwData', 'pwData'),
+            ('colorData', 'colorData'),
+            ('echoMModeData', 'echoMModeData'),
+            ('colorMModeData', 'colorMModeData'),
+            ('dummyData', 'dummyData'),
+            ('swiData', 'swiData'),
+            ('miscData', 'miscData'),
+        ]
+        
+        data_to_save = None
+        data_type_label = None
+        for attr, label in data_priority:
+            if hasattr(self.rfdata, attr) and getattr(self.rfdata, attr) is not None:
+                data_to_save = getattr(self.rfdata, attr)
+                data_type_label = label
+                if isinstance(data_to_save, (list, tuple)) and len(data_to_save) > 0:
+                    data_to_save = data_to_save[0]
+                break
+        
+        has_valid_data = data_to_save is not None and (not hasattr(data_to_save, 'size') or data_to_save.size > 0)
+        if not has_valid_data:
+            error_msg = f"No supported data found in RF file. Data_Type values: {np.unique(self.rfdata.headerInfo.Data_Type) if hasattr(self.rfdata.headerInfo, 'Data_Type') else 'N/A'}. lineData shape: {self.rfdata.lineData.shape if hasattr(self.rfdata, 'lineData') else 'N/A'}"
+            logging.error(error_msg)
+            raise RuntimeError(error_msg)
+        
+        logging.info(f"Saving data type: {data_type_label} as 'echoData'")
+        return data_to_save, data_type_label
+    
+    ###################################################################################
+    # Line Data Preprocessing
+    ###################################################################################
+    def _preprocess_line_data(self):
+        """Preprocess the line data."""
+        # Data preprocessing
+        if (self.rfdata.headerInfo.Line_Index[249] == self.rfdata.headerInfo.Line_Index[250]):
+            self.rfdata.lineData = self.rfdata.lineData[:, np.arange(2, self.rfdata.lineData.shape[1], 2)]
+        else:
+            self.rfdata.lineData = self.rfdata.lineData[:, np.arange(1, self.rfdata.lineData.shape[1], 2)]
+    
+    ###################################################################################
+    # NumPy Data Saving
+    ###################################################################################
+    def _save_numpy_data(self, numpy_folder, data_to_save, rf_data_all_fund, rf_data_all_harm):
+        """Save data as NumPy files."""
+        logging.info(f"Saving as NumPy files in: {numpy_folder}")
+        np.save(os.path.join(numpy_folder, 'echoData.npy'), data_to_save)
+        np.save(os.path.join(numpy_folder, 'lineData.npy'), self.rfdata.lineData)
+        np.save(os.path.join(numpy_folder, 'lineHeader.npy'), self.rfdata.lineHeader)
+        np.save(os.path.join(numpy_folder, 'rf_data_all_fund.npy'), rf_data_all_fund)
+        np.save(os.path.join(numpy_folder, 'rf_data_all_harm.npy'), rf_data_all_harm)
+        logging.info("NumPy files saved successfully")
+        return np.array(rf_data_all_fund).shape
+    
+    ###################################################################################
+    # MATLAB Data Saving
+    ###################################################################################
+    def _save_matlab_data(self, filepath, data_to_save, rf_data_all_fund, rf_data_all_harm):
+        """Save data as MATLAB file."""
+        destination = str(filepath[:-3] + '.mat')
+        logging.info(f"Saving as MATLAB file: {destination}")
+        contents = {
+            'echoData': data_to_save,
+            'lineData': self.rfdata.lineData,
+            'lineHeader': self.rfdata.lineHeader,
+            'headerInfo': self.rfdata.headerInfo,
+            'dbParams': self.rfdata.dbParams,
+            'rf_data_all_fund': rf_data_all_fund,
+            'rf_data_all_harm': rf_data_all_harm,
+            'NumFrame': self.numFrame,
+            'NumSonoCTAngles': self.NumSonoCTAngles,
+            'pt': self.pt,
+            'multilinefactor': self.multilinefactor,
+        }
+        
+        if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 1:
+            contents['echoData1'] = self.rfdata.echoData[1]
+        if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 2:
+            contents['echoData2'] = self.rfdata.echoData[2]
+        if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 3:
+            contents['echoData3'] = self.rfdata.echoData[3]
+        if hasattr(self.rfdata, 'echoMModeData'):
+            contents['echoMModeData'] = self.rfdata.echoMModeData
+        if hasattr(self.rfdata, 'miscData'):
+            contents['miscData'] = self.rfdata.miscData
+        
+        if os.path.exists(destination):
+            os.remove(destination)
+        savemat(destination, contents)
+        logging.info(f"MATLAB file saved successfully: {destination}")
+        return np.array(rf_data_all_fund).shape
 
+    ###################################################################################
+    # Main RF Parsing Orchestrator
+    ###################################################################################
+    def _parse_rf(self, filepath: str, read_offset: int, read_size: int) -> 'PhilipsRfParser.Rfdata':
+        """Open and parse RF data file (refactored into smaller methods)."""
+        logging.info(f"Opening RF file: {filepath}")
+        logging.debug(f"Read parameters - offset: {read_offset}MB, size: {read_size}MB")
+        rfdata = PhilipsRfParser.Rfdata()
+        with open(filepath, 'rb') as file_obj:
+            is_voyager, has_file_header, file_header_size, file_header = self._detect_file_type(file_obj)
+            db_params, total_header_size, endianness = self._parse_file_header_and_offset(file_obj, is_voyager, has_file_header, file_header_size, filepath)
+        rfdata.dbParams = db_params
+        rawrfdata, num_clumps = self._load_raw_rf_data(filepath, is_voyager, total_header_size, read_offset, read_size)
+        if is_voyager:
+            rawrfdata = self._reshape_voyager_raw_data(rawrfdata)
+        header_info = self._parse_header_dispatch(rawrfdata, is_voyager)
+        line_data, line_header, tap_point = self._parse_rf_data_dispatch(rawrfdata, header_info, is_voyager)
+        rfdata.lineData = line_data
+        rfdata.lineHeader = line_header
+        rfdata.headerInfo = header_info
+        del rawrfdata
+        rfdata = self._organize_data_types(rfdata, header_info, tap_point)
+        return rfdata
+
+    ###################################################################################
+    # Save Header Summary
+    ###################################################################################
+    def _save_header_summary(self, numpy_folder: str):
+        """Save a summary of header information to a text file."""
+        summary_file = os.path.join(numpy_folder, 'header_summary.txt')
+        
+        with open(summary_file, 'w') as f:
+            f.write("=== PHILIPS RF FILE HEADER SUMMARY ===\n\n")
+            
+            # Write each section of the summary
+            self._write_header_info_section(f)
+            self._write_db_params_section(f)
+            self._write_calculated_params_section(f)
+            self._write_data_shapes_section(f)
+            self._write_available_data_section(f)
+        
+        logging.info(f"Header summary saved to: {summary_file}")
+
+    ###################################################################################
+    # Header Information Section Writing
+    ###################################################################################
+    def _write_header_info_section(self, file_handle):
+        """Write header information section to the summary file."""
+        if not hasattr(self.rfdata, 'headerInfo') or not self.rfdata.headerInfo:
+            return
+            
+        h = self.rfdata.headerInfo
+        
+        # Number of headers/lines
+        if hasattr(h, 'Data_Type') and h.Data_Type is not None:
+            file_handle.write(f"Number of headers/lines: {len(h.Data_Type)}\n")
+        
+        # First header information
+        file_handle.write("\n--- First Header Information ---\n")
+        self._write_first_header_info(file_handle, h)
+        
+        # Data types present
+        self._write_data_types_info(file_handle, h)
+        
+        # Frame and line information
+        self._write_frame_info(file_handle, h)
+        
+        # Time information
+        self._write_time_info(file_handle, h)
+
+    ###################################################################################
+    # First Header Information Section Writing
+    ###################################################################################
+    def _write_first_header_info(self, file_handle, h):
+        """Write information from the first header."""
+        header_fields = [
+            ('RF_CaptureVersion', 'RF Capture Version'),
+            ('Tap_Point', 'Tap Point'),
+            ('RF_Sample_Rate', 'RF Sample Rate'),
+            ('Multilines_Capture', 'Multilines Capture'),
+            ('Data_Gate', 'Data Gate')
+        ]
+        
+        for attr, label in header_fields:
+            if hasattr(h, attr) and getattr(h, attr) is not None:
+                file_handle.write(f"{label}: {getattr(h, attr)[0]}\n")
+
+    ###################################################################################
+    # Data Types Information Section Writing
+    ###################################################################################
+    def _write_data_types_info(self, file_handle, h):
+        """Write information about data types."""
+        file_handle.write("\n--- Data Types Present ---\n")
+        if hasattr(h, 'Data_Type') and h.Data_Type is not None:
+            unique_types = np.unique(h.Data_Type)
+            file_handle.write(f"Unique Data Types: {unique_types}\n")
+            
+            # Count of each data type
+            for dtype in unique_types:
+                count = np.sum(h.Data_Type == dtype)
+                file_handle.write(f"  Type {dtype}: {count} occurrences\n")
+
+    ###################################################################################
+    # Frame Information Section Writing
+    ###################################################################################
+    def _write_frame_info(self, file_handle, h):
+        """Write information about frames and lines."""
+        file_handle.write("\n--- Frame Information ---\n")
+        if hasattr(h, 'Frame_ID') and h.Frame_ID is not None:
+            unique_frames = np.unique(h.Frame_ID)
+            file_handle.write(f"Number of unique frames: {len(unique_frames)}\n")
+            file_handle.write(f"Frame ID range: {unique_frames.min()} to {unique_frames.max()}\n")
+        
+        if hasattr(h, 'Line_Index') and h.Line_Index is not None:
+            file_handle.write(f"Line index range: {h.Line_Index.min()} to {h.Line_Index.max()}\n")
+
+    ###################################################################################
+    # Time Information Section Writing
+    ###################################################################################
+    def _write_time_info(self, file_handle, h):
+        """Write time-related information."""
+        file_handle.write("\n--- Time Information ---\n")
+        if hasattr(h, 'Time_Stamp') and h.Time_Stamp is not None:
+            file_handle.write(f"First timestamp: {h.Time_Stamp[0]}\n")
+            file_handle.write(f"Last timestamp: {h.Time_Stamp[-1]}\n")
+
+    ###################################################################################
+    # Database Parameters Section Writing
+    ###################################################################################
+    def _write_db_params_section(self, file_handle):
+        """Write database parameters section to the summary file."""
+        if not hasattr(self.rfdata, 'dbParams') or not self.rfdata.dbParams:
+            return
+            
+        file_handle.write("\n--- Database Parameters ---\n")
+        db = self.rfdata.dbParams
+        
+        if hasattr(db, 'acqNumActiveScChannels2d') and db.acqNumActiveScChannels2d:
+            file_handle.write(f"Active scan channels: {db.acqNumActiveScChannels2d}\n")
+        if hasattr(db, 'numOfSonoCTAngles2dActual') and db.numOfSonoCTAngles2dActual:
+            file_handle.write(f"SonoCT angles: {db.numOfSonoCTAngles2dActual}\n")
+        if hasattr(db, 'num2DCols') and db.num2DCols is not None:
+            file_handle.write(f"2D columns shape: {db.num2DCols.shape}\n")
+            file_handle.write(f"2D columns first row: {db.num2DCols[0, :] if db.num2DCols.size > 0 else 'N/A'}\n")
+
+    ###################################################################################
+    # Calculated Parameters Section Writing
+    ###################################################################################
+    def _write_calculated_params_section(self, file_handle):
+        """Write calculated parameters section to the summary file."""
+        if not hasattr(self, 'numFrame'):
+            return
+            
+        file_handle.write("\n--- Calculated Parameters ---\n")
+        file_handle.write(f"Number of frames: {self.numFrame}\n")
+        file_handle.write(f"TX beams per frame: {self.txBeamperFrame}\n")
+        file_handle.write(f"Number of SonoCT angles: {self.NumSonoCTAngles}\n")
+        file_handle.write(f"Multiline factor: {self.multilinefactor}\n")
+        file_handle.write(f"Used OS: {self.used_os}\n")
+        file_handle.write(f"PT: {self.pt}\n")
+
+    ###################################################################################
+    # Data Shapes Section Writing
+    ###################################################################################
+    def _write_data_shapes_section(self, file_handle):
+        """Write data shapes section to the summary file."""
+        file_handle.write("\n--- Data Array Shapes ---\n")
+        if hasattr(self.rfdata, 'lineData') and self.rfdata.lineData is not None:
+            file_handle.write(f"Line data shape: {self.rfdata.lineData.shape}\n")
+        if hasattr(self.rfdata, 'lineHeader') and self.rfdata.lineHeader is not None:
+            file_handle.write(f"Line header shape: {self.rfdata.lineHeader.shape}\n")
+
+    ###################################################################################
+    # Available Data Types Section Writing
+    ###################################################################################
+    def _write_available_data_section(self, file_handle):
+        """Write available data types section to the summary file."""
+        file_handle.write("\n--- Available Data Arrays ---\n")
+        data_attrs = ['echoData', 'cwData', 'pwData', 'colorData', 
+                     'echoMModeData', 'colorMModeData', 'dummyData', 
+                     'swiData', 'miscData']
+        
+        for attr in data_attrs:
+            if hasattr(self.rfdata, attr):
+                data = getattr(self.rfdata, attr)
+                if data is not None:
+                    if isinstance(data, (list, tuple)):
+                        file_handle.write(f"{attr}: {len(data)} elements\n")
+                        for i, elem in enumerate(data):
+                            if hasattr(elem, 'shape'):
+                                file_handle.write(f"  [{i}]: {elem.shape}\n")
+                    elif hasattr(data, 'shape'):
+                        file_handle.write(f"{attr}: {data.shape}\n")
+                    else:
+                        file_handle.write(f"{attr}: Available (unknown shape)\n")
+
+    ###################################################################################
+    # Parameter Calculation
+    ###################################################################################
+    def _calculate_parameters(self) -> None:
+        """Calculate and set main parameters as instance variables."""
+        logging.info("Calculating parsing parameters...")
+        self.txBeamperFrame = int(np.array(self.rfdata.dbParams.num2DCols).flat[0])
+        self.NumSonoCTAngles = int(self.rfdata.dbParams.numOfSonoCTAngles2dActual[0])
+        logging.info(f"Beam parameters - txBeamperFrame: {self.txBeamperFrame}, NumSonoCTAngles: {self.NumSonoCTAngles}")
+        self.numFrame = int(np.floor(self.rfdata.lineData.shape[1] / (self.txBeamperFrame * self.NumSonoCTAngles)))
+        self.multilinefactor = self.ML_in
+        logging.info(f"Calculated numFrame: {self.numFrame}, multilinefactor: {self.multilinefactor}")
+        col = 0
+        if np.any(self.rfdata.lineData[:, col] != 0):
+            # Auto-detect based on data
+            first_nonzero = np.where(self.rfdata.lineData[:, col] != 0)[0][0]
+            last_nonzero = np.where(self.rfdata.lineData[:, col] != 0)[0][-1]
+            self.used_os = first_nonzero  # Override default with detected value
+            self.pt = int(np.floor((last_nonzero - first_nonzero + 1) / self.multilinefactor))
+            logging.info(f"Auto-detected: used_os={self.used_os}, pt={self.pt}")
+        else:
+            # Use the value provided in the constructor (default is 2256)
+            logging.info(f"Using provided used_os={self.used_os}")
+            self.pt = int(np.floor((self.rfdata.lineData.shape[0] - self.used_os) / self.multilinefactor))
+            logging.debug(f"Calculated pt={self.pt} based on shape {self.rfdata.lineData.shape[0]} and multilinefactor {self.multilinefactor}")
+      
+    ###################################################################################
+    # Data Array Filling
+    ###################################################################################
+    def _fill_data_arrays(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Fill RF data arrays for fundamental and harmonic signals."""
+        logging.info("Filling RF data arrays for fundamental and harmonic signals...")
+        rftemp_all_harm = np.zeros((self.pt, self.ML_out * self.txBeamperFrame))
+        rftemp_all_fund = np.zeros((self.pt, self.ML_out * self.txBeamperFrame))
+        rf_data_all_harm = np.zeros((self.numFrame, self.NumSonoCTAngles, self.pt, self.ML_out * self.txBeamperFrame))
+        rf_data_all_fund = np.zeros((self.numFrame, self.NumSonoCTAngles, self.pt, self.ML_out * self.txBeamperFrame))
+        logging.debug(f"Preallocated arrays shapes - fund: {rf_data_all_fund.shape}, harm: {rf_data_all_harm.shape}")
+        for k0 in range(self.numFrame):
+            if k0 % max(1, self.numFrame // 10) == 0:
+                logging.info(f"Processing frame {k0+1}/{self.numFrame}")
+            for k1 in range(self.NumSonoCTAngles):
+                for k2 in range(self.txBeamperFrame):
+                    bi = k0 * self.txBeamperFrame * self.NumSonoCTAngles + k1 * self.txBeamperFrame + k2
+                    if bi >= self.rfdata.lineData.shape[1]:
+                        logging.warning(f"Skipping bi={bi} as it exceeds lineData columns {self.rfdata.lineData.shape[1]}")
+                        continue
+                    idx0 = self.used_os + np.arange(self.pt * self.multilinefactor)
+                    idx1 = bi
+                    if k0 == 0 and k1 == 0 and k2 == 0:
+                        logging.debug(f"First extraction - lineData[{idx0[0]}:{idx0[-1]+1}, {idx1}]")
+                        logging.debug(f"lineData values sample: {self.rfdata.lineData[idx0, idx1][:10]}")
+                    temp = np.transpose(
+                        np.reshape(self.rfdata.lineData[idx0, idx1],
+                                 (self.multilinefactor, self.pt), order='F')
+                    )
+                    if k0 == 0 and k1 == 0 and k2 == 0:
+                        logging.debug(f"temp shape: {temp.shape}, temp sample: {temp.ravel()[:10]}")
+                    if temp.shape[1] > 2:
+                        rftemp_all_harm[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [0, 2]]
+                    else:
+                        logging.warning(f"temp has only {temp.shape[1]} columns, skipping harmonic assignment")
+                    if temp.shape[1] >= 12:
+                        rftemp_all_fund[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [9, 11]]
+                    elif temp.shape[1] >= 2:
+                        if k0 == 0 and k1 == 0 and k2 == 0:
+                            logging.warning(f"temp has only {temp.shape[1]} columns, using last 2 columns for fundamental")
+                        rftemp_all_fund[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [-2, -1]]
+                    else:
+                        logging.warning(f"temp has only {temp.shape[1]} columns, skipping fundamental assignment")
+                rf_data_all_harm[k0][k1] = rftemp_all_harm
+                rf_data_all_fund[k0][k1] = rftemp_all_fund
+        logging.info("RF data array filling complete")
+        return rf_data_all_fund, rf_data_all_harm
+   
     ###################################################################################
     # File Type Detection and File Header
     ###################################################################################
@@ -232,73 +708,377 @@ class PhilipsRfParser:
         return db_params, total_header_size, endianness
 
     ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _parse_file_header(self, file_obj, endianness: str) -> Tuple['PhilipsRfParser.DbParams', int]:
+        """Parse file header information."""
+        logging.info("Parsing file header information")
+        fileVersion = int.from_bytes(file_obj.read(4), endianness, signed=False)
+        numFileHeaderBytes = int.from_bytes(file_obj.read(4), endianness, signed=False)
+        logging.info(f"File Version: {fileVersion}, Header Size: {numFileHeaderBytes} bytes")
+
+        # Handle accordingly to fileVersion
+        temp_dbParams = PhilipsRfParser.DbParams()
+        logging.debug(f"Reading file header for version {fileVersion}")
+        
+        if fileVersion == 2:
+            self._parse_file_header_v2(file_obj, endianness, temp_dbParams)
+        elif fileVersion == 3:
+            self._parse_file_header_v3(file_obj, endianness, temp_dbParams)
+        elif fileVersion == 4:
+            self._parse_file_header_v4(file_obj, endianness, temp_dbParams)
+        elif fileVersion == 5:
+            self._parse_file_header_v5(file_obj, endianness, temp_dbParams)
+        elif fileVersion == 6:
+            self._parse_file_header_v6(file_obj, endianness, temp_dbParams)
+        else:
+            numFileHeaderBytes = 0
+            logging.warning(f"Unknown file version: {fileVersion}")
+
+        logging.info(f"File header parsing complete for version {fileVersion}")
+        return temp_dbParams, numFileHeaderBytes
+    
+    ###################################################################################
+    # Helper Methods
+    ###################################################################################
+    def _read_int_array(self, file_obj, endianness: str, count: int) -> List[int]:
+        """Helper method to read an array of integers."""
+        return [int.from_bytes(file_obj.read(4), endianness, signed=False) for _ in range(count)]
+    
+    ###################################################################################
+    # Helper Methods
+    ###################################################################################
+    def _read_2d_cols(self, file_obj, endianness: str) -> np.ndarray:
+        """Helper method to read and reshape 2D columns data."""
+        flat_data = self._read_int_array(file_obj, endianness, 14*11)
+        return np.reshape(flat_data, (14, 11), order='F')
+    
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _parse_file_header_v2(self, file_obj, endianness: str, temp_dbParams: 'PhilipsRfParser.DbParams') -> None:
+        """Parse file header version 2."""
+        logging.debug("Reading file header version 2")
+        
+        # Basic parameters (arrays of 4)
+        temp_dbParams.acqNumActiveScChannels2d = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.azimuthMultilineFactorXbrOut = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.azimuthMultilineFactorXbrIn = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.numOfSonoCTAngles2dActual = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.elevationMultilineFactor = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.numPiPulses = self._read_int_array(file_obj, endianness, 4)
+        
+        # 2D columns
+        temp_dbParams.num2DCols = self._read_2d_cols(file_obj, endianness)
+        
+        # Additional parameters
+        temp_dbParams.fastPiEnabled = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.numZones2d = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.numPlanes = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)
+    
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _parse_file_header_v3(self, file_obj, endianness: str, temp_dbParams: 'PhilipsRfParser.DbParams') -> None:
+        """Parse file header version 3."""
+        logging.debug("Reading file header version 3")
+        
+        # Basic parameters (arrays of 4)
+        temp_dbParams.acqNumActiveScChannels2d = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.azimuthMultilineFactorXbrOut = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.azimuthMultilineFactorXbrIn = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.numOfSonoCTAngles2dActual = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.elevationMultilineFactor = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.numPiPulses = self._read_int_array(file_obj, endianness, 4)
+        
+        # 2D columns
+        temp_dbParams.num2DCols = self._read_2d_cols(file_obj, endianness)
+        
+        # Additional parameters
+        temp_dbParams.fastPiEnabled = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.numZones2d = self._read_int_array(file_obj, endianness, 4)
+        
+        # Single values
+        temp_dbParams.numSubVols = int.from_bytes(file_obj.read(4), endianness, signed=False)
+        temp_dbParams.numPlanes = int.from_bytes(file_obj.read(4), endianness, signed=False)
+        temp_dbParams.zigZagEnabled = int.from_bytes(file_obj.read(4), endianness, signed=False)
+        
+        # Color flow parameters
+        temp_dbParams.multiLineFactorCf = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.linesPerEnsCf = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.ensPerSeqCf = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.numCfCols = self._read_int_array(file_obj, endianness, 14)
+        temp_dbParams.numCfEntries = self._read_int_array(file_obj, endianness, 4)
+        temp_dbParams.numCfDummies = self._read_int_array(file_obj, endianness, 4)
+    
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _parse_file_header_v4(self, file_obj, endianness: str, temp_dbParams: 'PhilipsRfParser.DbParams') -> None:
+        """Parse file header version 4."""
+        logging.debug("Reading file header version 4")
+        
+        # Basic parameters (arrays of 3)
+        temp_dbParams.acqNumActiveScChannels2d = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.azimuthMultilineFactorXbrOut = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.azimuthMultilineFactorXbrIn = self._read_int_array(file_obj, endianness, 3)
+
+        # Color flow azimuth parameters
+        temp_dbParams.azimuthMultilineFactorXbrOutCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.azimuthMultilineFactorXbrInCf = self._read_int_array(file_obj, endianness, 3)
+
+        # Additional basic parameters
+        temp_dbParams.numOfSonoCTAngles2dActual = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.elevationMultilineFactor = self._read_int_array(file_obj, endianness, 3)
+
+        # Color flow elevation parameters
+        temp_dbParams.elevationMultilineFactorCf = self._read_int_array(file_obj, endianness, 3)
+
+        # More basic parameters
+        temp_dbParams.numPiPulses = self._read_int_array(file_obj, endianness, 3)
+        
+        # 2D columns
+        temp_dbParams.num2DCols = self._read_2d_cols(file_obj, endianness)
+        
+        # Additional parameters
+        temp_dbParams.fastPiEnabled = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numZones2d = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)
+
+        # Planes instead of numPlanes
+        temp_dbParams.Planes = self._read_int_array(file_obj, endianness, 1)
+
+        # More parameters
+        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)
+
+        # Color flow parameters
+        temp_dbParams.linesPerEnsCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.ensPerSeqCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numCfCols = self._read_int_array(file_obj, endianness, 14)
+        temp_dbParams.numCfEntries = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numCfDummies = self._read_int_array(file_obj, endianness, 3)
+    
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _parse_file_header_v5(self, file_obj, endianness: str, temp_dbParams: 'PhilipsRfParser.DbParams') -> None:
+        """Parse file header version 5."""
+        logging.debug("Reading file header version 5")
+        
+        # Basic parameters (arrays of 3)
+        temp_dbParams.acqNumActiveScChannels2d = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.azimuthMultilineFactorXbrOut = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.azimuthMultilineFactorXbrIn = self._read_int_array(file_obj, endianness, 3)
+
+        # Color flow azimuth parameters
+        temp_dbParams.azimuthMultilineFactorXbrOutCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.azimuthMultilineFactorXbrInCf = self._read_int_array(file_obj, endianness, 3)
+
+        # Additional basic parameters
+        temp_dbParams.numOfSonoCTAngles2dActual = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.elevationMultilineFactor = self._read_int_array(file_obj, endianness, 3)
+
+        # Color flow elevation and multiline parameters
+        temp_dbParams.elevationMultilineFactorCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.multiLineFactorCf = self._read_int_array(file_obj, endianness, 3)
+
+        # More basic parameters
+        temp_dbParams.numPiPulses = self._read_int_array(file_obj, endianness, 3)
+        
+        # 2D columns
+        temp_dbParams.num2DCols = self._read_2d_cols(file_obj, endianness)
+        
+        # Additional parameters
+        temp_dbParams.fastPiEnabled = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numZones2d = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)
+
+        temp_dbParams.numPlanes = self._read_int_array(file_obj, endianness, 1)
+
+        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)
+
+        # Color flow parameters
+        temp_dbParams.linesPerEnsCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.ensPerSeqCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numCfCols = self._read_int_array(file_obj, endianness, 14)
+        temp_dbParams.numCfEntries = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numCfDummies = self._read_int_array(file_obj, endianness, 3)
+    
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _parse_file_header_v6(self, file_obj, endianness: str, temp_dbParams: 'PhilipsRfParser.DbParams') -> None:
+        """Parse file header version 6."""
+        logging.debug("Reading file header version 6")
+        
+        # Tap point parameter
+        temp_dbParams.tapPoint = self._read_int_array(file_obj, endianness, 1)
+        
+        # Basic parameters (arrays of 3)
+        temp_dbParams.acqNumActiveScChannels2d = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.azimuthMultilineFactorXbrOut = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.azimuthMultilineFactorXbrIn = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.azimuthMultilineFactorXbrOutCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.azimuthMultilineFactorXbrInCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numOfSonoCTAngles2dActual = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.elevationMultilineFactor = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.elevationMultilineFactorCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.multiLineFactorCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numPiPulses = self._read_int_array(file_obj, endianness, 3)
+        
+        # 2D columns
+        temp_dbParams.num2DCols = self._read_2d_cols(file_obj, endianness)
+        
+        # Additional parameters
+        temp_dbParams.fastPiEnabled = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numZones2d = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.numPlanes = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)
+        
+        # Color flow parameters
+        temp_dbParams.linesPerEnsCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.ensPerSeqCf = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numCfCols = self._read_int_array(file_obj, endianness, 14)
+        temp_dbParams.numCfEntries = self._read_int_array(file_obj, endianness, 3)
+        temp_dbParams.numCfDummies = self._read_int_array(file_obj, endianness, 3)
+
+    ###################################################################################
     # Raw Data Loading
     ###################################################################################
     def _load_raw_rf_data(self, filepath: str, is_voyager: bool, total_header_size: int, read_offset: int, read_size: int) -> Tuple[Any, int]:
         """Load raw RF data from file, handling Voyager and Fusion formats."""
         logging.info(f"Loading raw RF data: is_voyager={is_voyager}, offset={read_offset}MB, size={read_size}MB")
         
+        # Calculate file sizes and convert units
+        file_size, remaining_size, read_offset_bytes, read_size_bytes = self._calculate_read_parameters(
+            filepath, total_header_size, read_offset, read_size
+        )
+        
+        # Load data based on format
+        if is_voyager:
+            return self._load_voyager_data(filepath, remaining_size, read_offset_bytes, read_size_bytes)
+        else:
+            return self._load_fusion_data(filepath, total_header_size, remaining_size, read_offset_bytes, read_size_bytes)
+
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _calculate_read_parameters(self, filepath: str, total_header_size: int, read_offset: int, read_size: int) -> Tuple[int, int, int, int]:
+        """Calculate file sizes and convert MB to bytes for read parameters."""
         file_size = os.stat(filepath).st_size
         remaining_size = file_size - total_header_size
         logging.debug(f"File size: {file_size} bytes, header size: {total_header_size} bytes, remaining: {remaining_size} bytes")
         
-        read_offset *= 2 ** 20
-        read_size *= 2 ** 20
-        logging.debug(f"Read parameters in bytes: offset={read_offset}, size={read_size}")
+        # Convert from MB to bytes
+        read_offset_bytes = read_offset * (2 ** 20)
+        read_size_bytes = read_size * (2 ** 20)
+        logging.debug(f"Read parameters in bytes: offset={read_offset_bytes}, size={read_size_bytes}")
         
-        if is_voyager:
-            logging.info("Loading Voyager format data")
-            
-            alignment = np.arange(0, remaining_size + 1, 36)
-            offset_diff = alignment - read_offset
-            read_diff = alignment - read_size
-            read_offset = alignment[np.where(offset_diff >= 0)[0][0]].__int__()
-            read_size = alignment[np.where(read_diff >= 0)[0][0]].__int__()
-            
-            logging.debug(f"Aligned Voyager read - offset: {read_offset}, size: {read_size}")
-            
-            with open(filepath, 'rb') as f:
-                f.seek(read_offset)
-                rawrfdata = f.read(read_size)
-                
-            logging.info(f"Loaded {len(rawrfdata)} bytes of Voyager data")
-            return rawrfdata, 0
+        return file_size, remaining_size, read_offset_bytes, read_size_bytes
+
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _load_voyager_data(self, filepath: str, remaining_size: int, read_offset: int, read_size: int) -> Tuple[Any, int]:
+        """Load data in Voyager format."""
+        logging.info("Loading Voyager format data")
+        
+        # Align read parameters to Voyager data format
+        read_offset, read_size = self._align_voyager_parameters(remaining_size, read_offset, read_size)
+        
+        # Read the raw data
+        with open(filepath, 'rb') as f:
+            f.seek(read_offset)
+            rawrfdata = f.read(read_size)
+        
+        logging.info(f"Loaded {len(rawrfdata)} bytes of Voyager data")
+        return rawrfdata, 0
+
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _align_voyager_parameters(self, remaining_size: int, read_offset: int, read_size: int) -> Tuple[int, int]:
+        """Align read parameters to Voyager format boundaries (36 bytes)."""
+        alignment = np.arange(0, remaining_size + 1, 36)
+        offset_diff = alignment - read_offset
+        read_diff = alignment - read_size
+        
+        aligned_offset = alignment[np.where(offset_diff >= 0)[0][0]].__int__()
+        aligned_size = alignment[np.where(read_diff >= 0)[0][0]].__int__()
+        
+        logging.debug(f"Aligned Voyager read - offset: {aligned_offset}, size: {aligned_size}")
+        return aligned_offset, aligned_size
+
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _load_fusion_data(self, filepath: str, total_header_size: int, remaining_size: int, read_offset: int, read_size: int) -> Tuple[Any, int]:
+        """Load data in Fusion format."""
+        logging.info("Loading Fusion format data")
+        
+        # Align read parameters to Fusion data format
+        read_offset, read_size = self._align_fusion_parameters(remaining_size, read_offset, read_size)
+        
+        # Calculate number of clumps and final offset
+        num_clumps = int(np.floor(read_size / 32))
+        offset = total_header_size + read_offset
+        logging.info(f"Reading Fusion data: {num_clumps} clumps from offset {offset}")
+        
+        # Read and process the data
+        rawrfdata = self._read_and_process_fusion_data(filepath, offset, num_clumps)
+        
+        logging.info(f"Loaded Fusion data with shape {rawrfdata.shape}")
+        return rawrfdata, num_clumps
+
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _align_fusion_parameters(self, remaining_size: int, read_offset: int, read_size: int) -> Tuple[int, int]:
+        """Align read parameters to Fusion format boundaries (32 bytes)."""
+        alignment = np.arange(0, remaining_size + 1, 32)
+        offset_diff = alignment - read_offset
+        read_diff = alignment - read_size
+        
+        # Find matching offset
+        matching_indices = np.where(offset_diff >= 0)[0]
+        if len(matching_indices) > 0:
+            aligned_offset = alignment[matching_indices[0]].__int__()
         else:
-            logging.info("Loading Fusion format data")
-            
-            alignment = np.arange(0, remaining_size + 1, 32)
-            offset_diff = alignment - read_offset
-            read_diff = alignment - read_size
-            matching_indices = np.where(offset_diff >= 0)[0]
-            
-            if len(matching_indices) > 0:
-                read_offset = alignment[matching_indices[0]].__int__()
-            else:
-                read_offset = 0
-                logging.warning("No matching offset found, using 0")
-                
-            matching_indices = np.where(read_diff >= 0)[0]
-            if len(matching_indices) > 0:
-                read_size = alignment[matching_indices[0]].__int__()
-            else:
-                read_size = remaining_size
-                logging.warning(f"No matching size found, using remaining size: {read_size}")
-                
-            num_clumps = int(np.floor(read_size / 32))
-            logging.debug(f"Aligned Fusion read - offset: {read_offset}, size: {read_size}, clumps: {num_clumps}")
-            
-            offset = total_header_size + read_offset
-            logging.info(f"Reading Fusion data: {num_clumps} clumps from offset {offset}")
-            
-            partA = getPartA(num_clumps, filepath, offset)
-            partB = getPartB(num_clumps, filepath, offset)
-            logging.debug(f"Retrieved partA: {len(partA)} elements, partB: {len(partB)} elements")
-            
-            rawrfdata = np.concatenate((np.array(partA, dtype=int).reshape((12, num_clumps), order='F'), np.array([partB], dtype=int)))
-            logging.debug(f"Raw RF data shape: {rawrfdata.shape}")
-            
-            logging.info(f"Loaded Fusion data with shape {rawrfdata.shape}")
-            return rawrfdata, num_clumps
+            aligned_offset = 0
+            logging.warning("No matching offset found, using 0")
+        
+        # Find matching size
+        matching_indices = np.where(read_diff >= 0)[0]
+        if len(matching_indices) > 0:
+            aligned_size = alignment[matching_indices[0]].__int__()
+        else:
+            aligned_size = remaining_size
+            logging.warning(f"No matching size found, using remaining size: {aligned_size}")
+        
+        logging.debug(f"Aligned Fusion read - offset: {aligned_offset}, size: {aligned_size}")
+        return aligned_offset, aligned_size
+
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _read_and_process_fusion_data(self, filepath: str, offset: int, num_clumps: int) -> np.ndarray:
+        """Read and process Fusion format data using external functions."""
+        # External functions from philipsRfParser module
+        partA = getPartA(num_clumps, filepath, offset)
+        partB = getPartB(num_clumps, filepath, offset)
+        logging.debug(f"Retrieved partA: {len(partA)} elements, partB: {len(partB)} elements")
+        
+        # Process and reshape the data
+        rawrfdata = np.concatenate((
+            np.array(partA, dtype=int).reshape((12, num_clumps), order='F'), 
+            np.array([partB], dtype=int)
+        ))
+        logging.debug(f"Raw RF data shape: {rawrfdata.shape}")
+        
+        return rawrfdata
 
     ###################################################################################
     # Data Reshaping
@@ -360,12 +1140,426 @@ class PhilipsRfParser:
             return self._parse_header_f(rawrfdata)
 
     ###################################################################################
+    # Voyager Header Parsing
+    ###################################################################################
+    def _parse_header_v(self, rawrfdata):
+        """Parse header for Voyager systems."""
+        logging.info("Parsing Voyager header information")
+        
+        # Find headers and initialize structure
+        temp_headerInfo = PhilipsRfParser.HeaderInfoStruct()
+        iHeader, numHeaders = self._find_voyager_headers(rawrfdata)
+        
+        # Initialize header arrays
+        temp_headerInfo = self._initialize_header_arrays(temp_headerInfo, numHeaders)
+        
+        # Process each header
+        self._process_voyager_headers(rawrfdata, iHeader, numHeaders, temp_headerInfo)
+        
+        logging.info(f"Voyager header parsing complete - processed {numHeaders} headers")
+        return temp_headerInfo
+    
+    ###################################################################################
+    # Voyager Header Parsing
+    ###################################################################################
+    def _find_voyager_headers(self, rawrfdata):
+        """Find headers in Voyager data."""
+        iHeader = np.where(np.uint8(rawrfdata[2,0,:])&224)
+        numHeaders = len(iHeader)-1  # Ignore last header as it is part of a partial line
+        logging.debug(f"Found {numHeaders} headers in Voyager data")
+        return iHeader, numHeaders
+
+    ###################################################################################
+    # Voyager Header Parsing
+    ###################################################################################
+    def _initialize_header_arrays(self, header_info, numHeaders):
+        """Initialize header arrays with appropriate sizes and types."""
+        # Initialize 8-bit fields
+        header_info.RF_CaptureVersion = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.Tap_Point = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.Data_Gate = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.Multilines_Capture = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.RF_Sample_Rate = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.Steer = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.elevationPlaneOffset = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.PM_Index = np.zeros(numHeaders, dtype=np.uint8)
+        
+        # Initialize 16-bit fields
+        header_info.Line_Index = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Pulse_Index = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Data_Format = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Data_Type = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Header_Tag = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Threed_Pos = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Mode_Info = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.CSID = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Line_Type = np.zeros(numHeaders, dtype=np.uint16)
+        
+        # Initialize 32-bit fields
+        header_info.Frame_ID = np.zeros(numHeaders, dtype=np.uint32)
+        header_info.Time_Stamp = np.zeros(numHeaders, dtype=np.uint32)
+        
+        return header_info
+
+    ###################################################################################
+    # Voyager Header Parsing
+    ###################################################################################
+    def _process_voyager_headers(self, rawrfdata, iHeader, numHeaders, temp_headerInfo):
+        """Process each header in Voyager data."""
+        for m in range(numHeaders):
+            if m % 1000 == 0:
+                logging.debug(f"Processing Voyager header {m}/{numHeaders}")
+            
+            # Build packed header string from raw data
+            packedHeader = self._build_voyager_packed_header(rawrfdata, iHeader, m)
+            
+            # Parse the header values
+            self._parse_voyager_header_values(packedHeader, m, temp_headerInfo)
+
+    ###################################################################################
+    # Voyager Header Parsing
+    ###################################################################################
+    def _build_voyager_packed_header(self, rawrfdata, iHeader, m):
+        """Build packed header string from raw data."""
+        packedHeader = ''
+        for k in np.arange(11, 0, -1):
+            temp = ''
+            for i in np.arange(2, 0, -1):
+                temp += bin(np.uint8(rawrfdata[i, k, iHeader[m]]))
+            # Discard first 3 bits, redundant info
+            packedHeader += temp[3:24]
+        return packedHeader
+
+    ###################################################################################
+    # Voyager Header Parsing
+    ###################################################################################
+    def _parse_voyager_header_values(self, packedHeader, m, header_info):
+        """Parse values from packed header string."""
+        iBit = 0
+        
+        # Parse 8-bit fields
+        header_info.RF_CaptureVersion[m] = int(packedHeader[iBit:iBit+4], 2)
+        iBit += 4
+        header_info.Tap_Point[m] = int(packedHeader[iBit:iBit+3], 2)
+        iBit += 3
+        header_info.Data_Gate[m] = int(packedHeader[iBit], 2)
+        iBit += 1
+        header_info.Multilines_Capture[m] = int(packedHeader[iBit:iBit+4], 2)
+        iBit += 4
+        header_info.RF_Sample_Rate[m] = int(packedHeader[iBit], 2)
+        iBit += 1
+        
+        # Log sample rate for first header
+        if m == 0:
+            logging.info(f"Sample rate from first Voyager header: {header_info.RF_Sample_Rate[m]}")
+        
+        header_info.Steer[m] = int(packedHeader[iBit:iBit+6], 2)
+        iBit += 6
+        header_info.elevationPlaneOffset[m] = int(packedHeader[iBit:iBit+8], 2)
+        iBit += 8
+        header_info.PM_Index[m] = int(packedHeader[iBit:iBit+2], 2)
+        iBit += 2
+        
+        # Parse 16-bit fields
+        header_info.Line_Index[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Pulse_Index[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Data_Format[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Data_Type[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Header_Tag[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Threed_Pos[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Mode_Info[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        
+        # Parse 32-bit fields
+        header_info.Frame_ID[m] = int(packedHeader[iBit:iBit+32], 2)
+        iBit += 32
+        header_info.CSID[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Line_Type[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Time_Stamp[m] = int(packedHeader[iBit:iBit+32], 2)
+
+    ###################################################################################
+    # Fusion Header Parsing
+    ###################################################################################
+    def _parse_header_f(self, rawrfdata):
+        """Parse header for Fusion systems."""
+        logging.info('Entering parseHeaderF - parsing Fusion headers')
+        
+        # Find headers and initialize structure
+        iHeader, numHeaders = self._find_fusion_headers(rawrfdata)
+        HeaderInfo = PhilipsRfParser.HeaderInfoStruct()
+        
+        # Initialize arrays
+        HeaderInfo = self._initialize_header_arrays(HeaderInfo, numHeaders)
+        
+        # Process each header
+        self._process_fusion_headers(rawrfdata, iHeader, numHeaders, HeaderInfo)
+        
+        logging.info(f'Exiting parseHeaderF - numHeaders: {numHeaders}, Data_Type shape: {HeaderInfo.Data_Type.shape}')
+        return HeaderInfo
+
+    ###################################################################################
+    # Fusion Header Parsing
+    ###################################################################################
+    def _find_fusion_headers(self, rawrfdata):
+        """Find headers in Fusion data."""
+        # Find header clumps
+        # iHeader pts to the index of the header clump
+        # Note that each header is exactly 1 "Clump" long
+        iHeader = np.array(np.where(rawrfdata[0,:]&1572864 == 524288))[0]
+        numHeaders = iHeader.size - 1  # Ignore last header as it is a part of a partial line
+        logging.info(f"Found {numHeaders} headers in Fusion data")
+        return iHeader, numHeaders
+
+    ###################################################################################
+    # Fusion Header Parsing
+    ###################################################################################
+    def _process_fusion_headers(self, rawrfdata, iHeader, numHeaders, HeaderInfo):
+        """Process each header in Fusion data."""
+        logging.info("Extracting header information...")
+        for m in range(numHeaders):
+            if m % 1000 == 0:
+                logging.debug(f"Processing Fusion header {m}/{numHeaders}")
+            
+            # Build packed header string from raw data
+            packedHeader = self._build_fusion_packed_header(rawrfdata, iHeader, m)
+            
+            # Parse the header values
+            self._parse_fusion_header_values(packedHeader, m, HeaderInfo)
+
+    ###################################################################################
+    # Fusion Header Parsing
+    ###################################################################################
+    def _build_fusion_packed_header(self, rawrfdata, iHeader, m):
+        """Build packed header string from raw data for Fusion systems."""
+        # Get the data from the 13th element (index 12)
+        packedHeader = bin(rawrfdata[12, iHeader[m]])[2:]
+        
+        # Add leading zeros if needed
+        remainingZeros = 4 - len(packedHeader)
+        if remainingZeros > 0:
+            zeros = self._get_filler_zeros(remainingZeros)
+            packedHeader = str(zeros + packedHeader)
+        
+        # Add data from remaining elements in reverse order
+        for i in np.arange(11, -1, -1):
+            curBin = bin(int(rawrfdata[i, iHeader[m]]))[2:]
+            remainingZeros = 21 - len(curBin)
+            if remainingZeros > 0:
+                zeros = self._get_filler_zeros(remainingZeros)
+                curBin = str(zeros + curBin)
+            packedHeader += curBin
+        
+        return packedHeader
+
+    ###################################################################################
+    # Fusion Header Parsing
+    ###################################################################################
+    def _parse_fusion_header_values(self, packedHeader, m, HeaderInfo):
+        """Parse values from packed header string for Fusion systems."""
+        iBit = 2  # Start at bit 2
+        
+        # Parse 8-bit fields
+        HeaderInfo.RF_CaptureVersion[m] = int(packedHeader[iBit:iBit+4], 2)
+        iBit += 4
+        HeaderInfo.Tap_Point[m] = int(packedHeader[iBit:iBit+3], 2)
+        iBit += 3
+        HeaderInfo.Data_Gate[m] = int(packedHeader[iBit], 2)
+        iBit += 1
+        HeaderInfo.Multilines_Capture[m] = int(packedHeader[iBit:iBit+4], 2)
+        iBit += 4
+        iBit += 15  # Skip 15 unused bits
+        HeaderInfo.RF_Sample_Rate[m] = int(packedHeader[iBit], 2)
+        iBit += 1
+        
+        # Log sample rate for first header
+        if m == 0:
+            logging.info(f"Sample rate from first header: {HeaderInfo.RF_Sample_Rate[m]}")
+        
+        HeaderInfo.Steer[m] = int(packedHeader[iBit:iBit+6], 2)
+        iBit += 6
+        HeaderInfo.elevationPlaneOffset[m] = int(packedHeader[iBit:iBit+8], 2)
+        iBit += 8
+        HeaderInfo.PM_Index[m] = int(packedHeader[iBit:iBit+2], 2)
+        iBit += 2
+        
+        # Parse 16-bit fields
+        HeaderInfo.Line_Index[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Pulse_Index[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Data_Format[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Data_Type[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Header_Tag[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Threed_Pos[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Mode_Info[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        
+        # Parse 32-bit fields
+        HeaderInfo.Frame_ID[m] = int(packedHeader[iBit:iBit+32], 2)
+        iBit += 32
+        HeaderInfo.CSID[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Line_Type[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        
+        # Special handling for Time_Stamp - concatenate specific bit ranges
+        HeaderInfo.Time_Stamp[m] = int(str(packedHeader[iBit:iBit+13]+packedHeader[iBit+15:iBit+34]), 2)
+
+    ###################################################################################
     # RF Data Parsing Dispatch
     ###################################################################################
     def _parse_rf_data_dispatch(self, rawrfdata: Any, header_info: 'PhilipsRfParser.HeaderInfoStruct', is_voyager: bool) -> Tuple[np.ndarray, np.ndarray, int]:
         """Dispatch to the correct RF data parsing method."""
         logging.info(f"Dispatching RF data parsing: is_voyager={is_voyager}")
         return self._parse_rf_data(rawrfdata, header_info, is_voyager)
+
+    ###################################################################################
+    # RF Data Parsing
+    ###################################################################################
+    def _parse_rf_data(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct', isVoyager: bool) -> Tuple[np.ndarray, np.ndarray, int]:
+        """Parse RF signal data."""
+        logging.info("Parsing RF signal data...")
+        Tap_Point = headerInfo.Tap_Point[0]
+        logging.debug(f"Tap Point: {Tap_Point}, isVoyager: {isVoyager}")
+        
+        if isVoyager:
+            lineData, lineHeader = self._parse_data_v(rawrfdata, headerInfo)
+        else: # isFusion
+            lineData, lineHeader = self._parse_data_f(rawrfdata, headerInfo)
+            Tap_Point = headerInfo.Tap_Point[0]
+            if Tap_Point == 0: # Correct for MS 19 bits of 21 real data bits
+                logging.debug("Applying bit shift correction for Tap Point 0")
+                lineData = lineData << 2
+        
+        # After parsing lineData, log a sample of the first and last 20 rows for a nonzero column
+        nonzero_col = None
+        for col in range(lineData.shape[1]):
+            if np.any(lineData[:, col] != 0):
+                nonzero_col = col
+                break
+        if nonzero_col is not None:
+            logging.info(f"First 20 values of lineData[:, {nonzero_col}]: {lineData[:20, nonzero_col]}")
+            logging.info(f"Last 20 values of lineData[:, {nonzero_col}]: {lineData[-20:, nonzero_col]}")
+            logging.info(f"Min: {lineData[:, nonzero_col].min()}, Max: {lineData[:, nonzero_col].max()}")
+        else:
+            logging.warning("No nonzero columns found in lineData!")
+        
+        logging.info(f"RF data parsing complete - lineData: {lineData.shape}, lineHeader: {lineHeader.shape}")
+        return lineData, lineHeader, Tap_Point
+
+    ###################################################################################
+    # Voyager Data Parsing
+    ###################################################################################
+    def _parse_data_v(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray]:
+        """Parse RF data for Voyager systems."""
+        logging.info("Parsing Voyager RF data")
+        minNeg = 16 * (2**16)  # Corrected exponentiation
+
+        iHeader = np.where(rawrfdata[2,0,:]&224==64)
+        numHeaders = len(iHeader)-1
+        numSamples = (iHeader[1]-iHeader[0]-1)*12
+        logging.debug(f"Voyager data: {numHeaders} headers, {numSamples} samples per line")
+
+        lineData = np.zeros((numSamples, numHeaders), dtype=np.int32)
+        lineHeader = np.zeros((numSamples, numHeaders), dtype=np.uint8)
+
+        logging.info("Extracting Voyager line data...")
+        for m in range(numHeaders):  # Corrected loop
+            if m % 1000 == 0:
+                logging.debug(f"Processing Voyager line {m}/{numHeaders}")
+
+            iStartData = iHeader[m]+1
+            iStopData = iHeader[m+1]-1
+
+            if headerInfo.Data_Type[m] == float(0x5a):
+                iStopData = iStartData+10000
+                logging.debug(f"Line {m} is push pulse, limiting data size")
+
+            lineData_u8 = rawrfdata[:,:,iStartData:iStopData]
+            lineData_s32 = (
+                np.int32(lineData_u8[0,:,:]) +
+                np.int32(lineData_u8[1,:,:]) * (2**8) +
+                np.int32(lineData_u8[2,:,:] & np.uint8(31)) * (2**16)
+            )
+            iNeg = np.where(lineData_s32 >= minNeg)
+            lineData_s32[iNeg] = lineData_s32[iNeg] - 2*minNeg
+            lineHeader_u8 = (lineData_u8[2,:,:] & 224) >> 6
+
+            lineData[:lineData_s32.size, m] = lineData_s32.ravel(order='F')
+            lineHeader[:lineHeader_u8.size, m] = lineHeader_u8.ravel(order='F')
+
+        logging.info(f"Voyager data parsing complete - lineData: {lineData.shape}, lineHeader: {lineHeader.shape}")
+        return lineData, lineHeader
+
+    ###################################################################################
+    # Fusion Data Parsing
+    ###################################################################################
+    def _parse_data_f(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray]:
+        """Parse RF data for Fusion systems."""
+        logging.info('Entering parseDataF - parsing Fusion RF data')
+        # Definitions
+        minNeg = 2**18 # Used to convert integers to 2's complement
+
+        # Find header clumps
+        # iHeader pts to the index of the header clump
+        # Note that each Header is exactly 1 "Clump" long
+        iHeader = np.array(np.where((rawrfdata[0,:] & 1572864)==524288))[0]
+        numHeaders = len(iHeader) - 1 # Ignore last header as it is a part of a partial line
+        logging.info(f"Found {numHeaders} headers in Fusion data")
+
+        # Get maximum number of samples between consecutive headers
+        maxNumSamples = 0
+        for m in range(numHeaders):
+            tempMax = iHeader[m+1] - iHeader[m] - 1
+            if (tempMax > maxNumSamples):
+                maxNumSamples = tempMax
+        
+        numSamples = maxNumSamples*12
+        logging.debug(f"Maximum samples between headers: {maxNumSamples}, total samples: {numSamples}")
+
+        # Preallocate arrays
+        lineData = np.zeros((numSamples, numHeaders), dtype = np.int32)
+        lineHeader = np.zeros((numSamples, numHeaders), dtype = np.uint8)
+        logging.debug(f"Preallocated arrays - lineData: {lineData.shape}, lineHeader: {lineHeader.shape}")
+
+        # Extract data
+        logging.info("Extracting line data from headers...")
+        for m in range(numHeaders):
+            if m % 1000 == 0:
+                logging.debug(f"Processing header {m}/{numHeaders}")
+                
+            iStartData = iHeader[m]+2
+            iStopData = iHeader[m+1]-1
+
+            if headerInfo.Data_Type[m] == float(0x5a):
+                # set stop data to a reasonable value to keep file size form blowing up
+                iStopData = iStartData + 10000
+                logging.debug(f"Header {m} is push pulse (0x5a), limiting data size")
+            
+            # Get Data for current line and convert to 2's complement values
+            lineData_u32 = rawrfdata[:12,iStartData:iStopData+1]
+            lineData_s32 = np.int32(lineData_u32&524287)
+            iNeg = np.where(lineData_s32 >= minNeg)
+            lineData_s32[iNeg] -= (2*minNeg) # type: ignore
+            lineHeader_u8 = (lineData_u32 & 1572864) >> 19
+
+            lineData[:lineData_s32.size,m] = lineData_s32.ravel(order='F')
+            lineHeader[:lineHeader_u8.size,m] = lineHeader_u8.ravel(order='F')
+
+        logging.info(f'Exiting parseDataF - lineData shape: {lineData.shape}, lineHeader shape: {lineHeader.shape}')
+        return lineData, lineHeader
 
     ###################################################################################
     # Data Type Organization (Placeholder)
@@ -394,75 +1588,133 @@ class PhilipsRfParser:
     def _extract_echo_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Extract echo data from RF data."""
         logging.info(f"Extracting echo data, tap_point={tap_point}")
+        
+        # Get multiline capture settings and adjust tap point if needed
+        ML_Capture, tap_point = self._get_echo_capture_settings(header_info, tap_point)
+        
+        # Find echo data indices in the dataset
+        echo_index, echo_count = self._find_echo_data_indices(header_info)
+        
+        # Process echo data if any was found
+        if echo_count > 0:
+            rfdata = self._process_echo_data(rfdata, header_info, echo_index, ML_Capture, tap_point)
+            logging.info(f"Echo data extracted successfully, shape: {rfdata.echoData[0].shape if hasattr(rfdata.echoData, '__getitem__') else 'N/A'}")
+        else:
+            logging.warning("No echo data found")
+        
+        return rfdata
+
+    ###################################################################################
+    # Echo Data Extraction
+    ###################################################################################
+    def _get_echo_capture_settings(self, header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> Tuple[float, int]:
+        """Get multiline capture settings and adjust tap point if needed."""
         logging.debug(f"Echo data types: {self.DataType_ECHO}")
         
+        # Determine ML_Capture based on tap point and multilines capture setting
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
+        
+        # If ML_Capture is 0, determine it from sample rate
         if ML_Capture == 0:
             SAMPLE_RATE = float(header_info.RF_Sample_Rate[0])
-            
-            # Log the sample rate when it's used to determine ML_Capture
             logging.info(f"RF Sample Rate: {SAMPLE_RATE}")
-            
-            ML_Capture = 16 if SAMPLE_RATE == 0 else 32 # 20MHz Capture
+            ML_Capture = 16 if SAMPLE_RATE == 0 else 32  # 20MHz Capture
             logging.debug(f"ML_Capture was 0, set to {ML_Capture} based on sample rate {SAMPLE_RATE}")
         
         logging.debug(f"ML_Capture={ML_Capture}")
         
+        # Adjust tap point if needed
         if tap_point == 7:
             tap_point = 4
             logging.debug("Tap point 7 converted to 4")
-            
+        
+        return ML_Capture, tap_point
+
+    ###################################################################################
+    # Echo Data Extraction
+    ###################################################################################
+    def _find_echo_data_indices(self, header_info: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, int]:
+        """Find indices of echo data in the dataset."""
         xmit_events = len(header_info.Data_Type)
         logging.debug(f"Number of transmit events: {xmit_events}")
         
+        # Build index of echo data types
         echo_index = np.zeros(xmit_events).astype(np.int32)
         for dt in self.DataType_ECHO:
             index = ((header_info.Data_Type & 255) == dt)
             echo_index = np.bitwise_or(echo_index, np.array(index).astype(np.int32))
-            
+        
         echo_count = np.sum(echo_index)
         logging.debug(f"Found {echo_count} echo data entries")
         
+        # Fallback to Data_Type=1 if no echo data found
         if echo_count == 0 and np.any(header_info.Data_Type == 1):
             echo_index = (header_info.Data_Type == 1).astype(np.int32)
             echo_count = np.sum(echo_index)
             logging.debug(f"Fallback: Found {echo_count} entries with Data_Type=1")
-            
-        if echo_count > 0:
-            columns_to_keep = np.where(echo_index == 1)[0]
-            logging.debug(f"Processing {len(columns_to_keep)} echo columns")
-            
-            pruning_line_data = rfdata.lineData[:, columns_to_keep]
-            pruning_line_header = rfdata.lineHeader[:, columns_to_keep]
-            logging.debug(f"Pruning data shape: {pruning_line_data.shape}")
-            
-            if tap_point == 4:
-                echo_data = pruning_line_data
-                logging.debug("Using data directly (tap_point=4)")
-            else:
-                logging.debug("Pruning data before use")
-                echo_data = self._prune_data(pruning_line_data, pruning_line_header, ML_Capture)
-                
-            if tap_point in [0, 1]:
-                ML_Actual = rfdata.dbParams.azimuthMultilineFactorXbrIn[0] * rfdata.dbParams.elevationMultilineFactor[0]
-                CRE = 1
-                logging.debug(f"Tap point {tap_point}: ML_Actual={ML_Actual}, CRE={CRE}")
-                rfdata.echoData = self._sort_rf(echo_data, ML_Capture, ML_Actual, CRE, False)
-            elif tap_point == 2:
-                ML_Actual = rfdata.dbParams.azimuthMultilineFactorXbrOut[0] * rfdata.dbParams.elevationMultilineFactor[0]
-                CRE = rfdata.dbParams.acqNumActiveScChannels2d[0]
-                logging.debug(f"Tap point {tap_point}: ML_Actual={ML_Actual}, CRE={CRE}")
-                rfdata.echoData = self._sort_rf(echo_data, ML_Capture, ML_Actual, CRE, False)
-            elif tap_point == 4:
-                ML_Actual = 128
-                CRE = 1
-                logging.debug(f"Tap point {tap_point}: ML_Actual={ML_Actual}, CRE={CRE}")
-                rfdata.echoData = self._sort_rf(echo_data, ML_Actual, ML_Actual, CRE, False)
-                
-            logging.info(f"Echo data extracted successfully, shape: {rfdata.echoData[0].shape if hasattr(rfdata.echoData, '__getitem__') else 'N/A'}")
+        
+        return echo_index, echo_count
+
+    ###################################################################################
+    # Echo Data Extraction
+    ###################################################################################
+    def _process_echo_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', 
+                          echo_index: np.ndarray, ML_Capture: float, tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Process echo data and assign it to rfdata."""
+        # Get columns to keep based on echo index
+        columns_to_keep = np.where(echo_index == 1)[0]
+        logging.debug(f"Processing {len(columns_to_keep)} echo columns")
+        
+        # Extract line data for echo columns
+        pruning_line_data = rfdata.lineData[:, columns_to_keep]
+        pruning_line_header = rfdata.lineHeader[:, columns_to_keep]
+        logging.debug(f"Pruning data shape: {pruning_line_data.shape}")
+        
+        # Get echo data, either directly or pruned
+        echo_data = self._get_echo_data_for_tap_point(rfdata, pruning_line_data, pruning_line_header, ML_Capture, tap_point)
+        
+        # Apply RF sorting based on tap point
+        rfdata = self._sort_echo_data_by_tap_point(rfdata, echo_data, ML_Capture, tap_point)
+        
+        return rfdata
+
+    ###################################################################################
+    # Echo Data Extraction
+    ###################################################################################
+    def _get_echo_data_for_tap_point(self, rfdata: 'PhilipsRfParser.Rfdata', pruning_line_data: np.ndarray, 
+                                    pruning_line_header: np.ndarray, ML_Capture: float, tap_point: int) -> np.ndarray:
+        """Get echo data for the specified tap point."""
+        if tap_point == 4:
+            echo_data = pruning_line_data
+            logging.debug("Using data directly (tap_point=4)")
         else:
-            logging.warning("No echo data found")
-            
+            logging.debug("Pruning data before use")
+            echo_data = self._prune_data(pruning_line_data, pruning_line_header, ML_Capture)
+        
+        return echo_data
+
+    ###################################################################################
+    # Echo Data Extraction
+    ###################################################################################
+    def _sort_echo_data_by_tap_point(self, rfdata: 'PhilipsRfParser.Rfdata', echo_data: np.ndarray, 
+                                    ML_Capture: float, tap_point: int) -> 'PhilipsRfParser.Rfdata':
+        """Sort echo data based on tap point and assign to rfdata."""
+        if tap_point in [0, 1]:
+            ML_Actual = rfdata.dbParams.azimuthMultilineFactorXbrIn[0] * rfdata.dbParams.elevationMultilineFactor[0]
+            CRE = 1
+            logging.debug(f"Tap point {tap_point}: ML_Actual={ML_Actual}, CRE={CRE}")
+            rfdata.echoData = self._sort_rf(echo_data, ML_Capture, ML_Actual, CRE, False)
+        elif tap_point == 2:
+            ML_Actual = rfdata.dbParams.azimuthMultilineFactorXbrOut[0] * rfdata.dbParams.elevationMultilineFactor[0]
+            CRE = rfdata.dbParams.acqNumActiveScChannels2d[0]
+            logging.debug(f"Tap point {tap_point}: ML_Actual={ML_Actual}, CRE={CRE}")
+            rfdata.echoData = self._sort_rf(echo_data, ML_Capture, ML_Actual, CRE, False)
+        elif tap_point == 4:
+            ML_Actual = 128
+            CRE = 1
+            logging.debug(f"Tap point {tap_point}: ML_Actual={ML_Actual}, CRE={CRE}")
+            rfdata.echoData = self._sort_rf(echo_data, ML_Actual, ML_Actual, CRE, False)
+        
         return rfdata
 
     ###################################################################################
@@ -793,14 +2045,51 @@ class PhilipsRfParser:
     def _sort_rf(self, RFinput, Stride, ML, CRE=1, isVoyager=True):
         """Sort RF data based on multiline parameters."""
         logging.info(f"Sorting RF data - input shape: {RFinput.shape}, Stride={Stride}, ML={ML}, CRE={CRE}, isVoyager={isVoyager}")
+        
+        # Initialize dimensions and output arrays
+        N, xmitEvents, depth, MLs = self._initialize_rf_sort_dimensions(RFinput, Stride, ML)
+        
+        # Initialize output arrays based on CRE
+        out0, out1, out2, out3 = self._initialize_rf_sort_outputs(depth, ML, xmitEvents, CRE)
+        
+        # Get the ML sort list for specified Stride and CRE
+        ML_SortList = self._get_ml_sort_list(Stride, CRE)
+        
+        # Check for potential issues
+        self._check_ml_sort_validity(ML, ML_SortList, CRE, Stride)
+        
+        # Fill output arrays based on the sort list
+        out0, out1, out2, out3 = self._fill_rf_sort_outputs(
+            RFinput, out0, out1, out2, out3, 
+            MLs, ML_SortList, depth, Stride, ML, CRE
+        )
+        
+        logging.info(f"RF sorting complete - output shape: {out0.shape}")
+        return out0, out1, out2, out3
+
+    ###################################################################################
+    # RF Sorting Utility
+    ###################################################################################
+    def _initialize_rf_sort_dimensions(self, RFinput, Stride, ML):
+        """Initialize dimensions for RF sorting."""
         N = RFinput.shape[0]
         xmitEvents = RFinput.shape[1]
         depth = int(np.floor(N/Stride))
-        MLs = np.arange(0,ML)
-        MLs = MLs[:]
-        out1 = np.array([])
-        out2 = np.array([])
-        out3 = np.array([])
+        MLs = np.arange(0, ML)  # Create array of multiline indices
+        logging.debug(f"Sort dimensions - depth: {depth}, MLs: {len(MLs)}")
+        return N, xmitEvents, depth, MLs
+
+    ###################################################################################
+    # RF Sorting Utility
+    ###################################################################################
+    def _initialize_rf_sort_outputs(self, depth, ML, xmitEvents, CRE):
+        """Initialize output arrays based on CRE value."""
+        logging.debug(f"Initializing output arrays for CRE={CRE}")
+        
+        # Initialize arrays with empty values
+        out0 = out1 = out2 = out3 = np.array([])
+        
+        # Create arrays based on CRE
         if CRE == 4:
             out3 = np.zeros((depth, ML, xmitEvents))
             out2 = np.zeros((depth, ML, xmitEvents))
@@ -815,8 +2104,23 @@ class PhilipsRfParser:
             out0 = np.zeros((depth, ML, xmitEvents))
         elif CRE == 1:
             out0 = np.zeros((depth, ML, xmitEvents))
-        if ((CRE != 1) and (CRE != 2) and (CRE != 4)):
-            logging.warning(f"No sort list for CRE={CRE}")
+        else:
+            logging.warning(f"Unsupported CRE value: {CRE}, using CRE=1")
+            out0 = np.zeros((depth, ML, xmitEvents))
+        
+        return out0, out1, out2, out3
+
+    ###################################################################################
+    # RF Sorting Utility
+    ###################################################################################
+    def _get_ml_sort_list(self, Stride, CRE):
+        """Get the appropriate ML sort list based on Stride and CRE."""
+        logging.debug(f"Getting ML sort list for Stride={Stride}, CRE={CRE}")
+        
+        # Initialize empty list
+        ML_SortList = []
+        
+        # Select sort list based on Stride and CRE values
         if Stride == 128:
             ML_SortList = self.ML_SortList_128
         elif Stride == 32:
@@ -832,7 +2136,7 @@ class PhilipsRfParser:
             elif CRE == 4:
                 ML_SortList = self.ML_SortList_16_CRE4
         elif Stride == 12:
-            if CRE ==1:
+            if CRE == 1:
                 ML_SortList = self.ML_SortList_12_CRE1
             elif CRE == 2:
                 ML_SortList = self.ML_SortList_12_CRE2
@@ -860,880 +2164,90 @@ class PhilipsRfParser:
             elif CRE == 4:
                 ML_SortList = self.ML_SortList_2_CRE4
         else:
-            ML_SortList = []
             logging.warning(f"No sort list for Stride={Stride}")
+        
         logging.debug(f"Using ML_SortList: {ML_SortList}")
-        if ((ML-1)>max(ML_SortList)) or (CRE == 4 and Stride < 16) or (CRE == 2 and Stride < 4):
+        return ML_SortList
+
+    ###################################################################################
+    # RF Sorting Utility
+    ###################################################################################
+    def _check_ml_sort_validity(self, ML, ML_SortList, CRE, Stride):
+        """Check if the ML sort list is valid for the requested parameters."""
+        if not ML_SortList:
+            logging.warning(f"Empty ML_SortList for Stride={Stride}, CRE={CRE}")
+            return
+        
+        # Check for potential issues
+        if ((ML-1) > max(ML_SortList)):
+            logging.warning(f"ML ({ML}) exceeds max value in ML_SortList ({max(ML_SortList)})")
+        
+        if (CRE == 4 and Stride < 16) or (CRE == 2 and Stride < 4):
             logging.warning("Captured ML is insufficient, some ML were not captured")
+
+    ###################################################################################
+    # RF Sorting Utility
+    ###################################################################################
+    def _fill_rf_sort_outputs(self, RFinput, out0, out1, out2, out3, MLs, ML_SortList, depth, Stride, ML, CRE):
+        """Fill output arrays based on the sort list."""
+        # Skip if sort list is empty
+        if not ML_SortList:
+            logging.warning("Empty ML_SortList, unable to fill output arrays")
+            return out0, out1, out2, out3
+        
+        # Process each multiline index
         for k in range(ML):
+            # Get indices in sort list that match current multiline index
             iML = np.where(np.array(ML_SortList) == MLs[k])[0]
-            out0[:depth, k, :] = RFinput[np.arange(iML[0],(depth*Stride), Stride)]
-            if CRE == 2:
-                out1[:depth, k, :] = RFinput[np.arange(iML[1], (depth*Stride), Stride), :]
-                out2[:depth,k,:] = RFinput[np.arange(iML[1], (depth*Stride), Stride), :]
-                out3[:depth,k,:] = RFinput[np.arange(iML[1], (depth*Stride), Stride), :]
-            elif CRE == 4:
-                out2[:depth, k, :] = RFinput[np.arange(iML[2], (depth*Stride), Stride), :]
-                out3[:depth, k, :] = RFinput[np.arange(iML[3], (depth*Stride), Stride), :]
-        logging.info(f"RF sorting complete - output shape: {out0.shape}")
+            
+            # Skip if no matching indices found
+            if len(iML) == 0:
+                logging.warning(f"No matching indices for ML={MLs[k]} in sort list")
+                continue
+            
+            # Fill primary output array
+            self._fill_output_array(out0, RFinput, depth, k, iML[0], Stride)
+            
+            # Fill additional output arrays based on CRE
+            if CRE >= 2 and len(iML) > 1:
+                self._fill_output_array(out1, RFinput, depth, k, iML[1], Stride)
+                
+                # These are duplicated for backward compatibility
+                if out2.size > 0:
+                    self._fill_output_array(out2, RFinput, depth, k, iML[1], Stride)
+                if out3.size > 0:
+                    self._fill_output_array(out3, RFinput, depth, k, iML[1], Stride)
+            
+            # Fill tertiary and quaternary output arrays for CRE=4
+            if CRE == 4 and len(iML) > 3:
+                self._fill_output_array(out2, RFinput, depth, k, iML[2], Stride)
+                self._fill_output_array(out3, RFinput, depth, k, iML[3], Stride)
+        
         return out0, out1, out2, out3
 
     ###################################################################################
-    # Main RF Parsing Orchestrator
+    # RF Sorting Utility
     ###################################################################################
-    def _parse_rf(self, filepath: str, read_offset: int, read_size: int) -> 'PhilipsRfParser.Rfdata':
-        """Open and parse RF data file (refactored into smaller methods)."""
-        logging.info(f"Opening RF file: {filepath}")
-        logging.debug(f"Read parameters - offset: {read_offset}MB, size: {read_size}MB")
-        rfdata = PhilipsRfParser.Rfdata()
-        with open(filepath, 'rb') as file_obj:
-            is_voyager, has_file_header, file_header_size, file_header = self._detect_file_type(file_obj)
-            db_params, total_header_size, endianness = self._parse_file_header_and_offset(file_obj, is_voyager, has_file_header, file_header_size, filepath)
-        rfdata.dbParams = db_params
-        rawrfdata, num_clumps = self._load_raw_rf_data(filepath, is_voyager, total_header_size, read_offset, read_size)
-        if is_voyager:
-            rawrfdata = self._reshape_voyager_raw_data(rawrfdata)
-        header_info = self._parse_header_dispatch(rawrfdata, is_voyager)
-        line_data, line_header, tap_point = self._parse_rf_data_dispatch(rawrfdata, header_info, is_voyager)
-        rfdata.lineData = line_data
-        rfdata.lineHeader = line_header
-        rfdata.headerInfo = header_info
-        del rawrfdata
-        rfdata = self._organize_data_types(rfdata, header_info, tap_point)
-        return rfdata
+    def _fill_output_array(self, output_array, input_array, depth, k, iML_index, Stride):
+        """Fill a specific output array with data from the input array."""
+        if output_array.size > 0:
+            indices = np.arange(iML_index, (depth*Stride), Stride)
+            output_array[:depth, k, :] = input_array[indices]
 
     ###################################################################################
-    # Parameter Calculation
+    # Utility Functions
     ###################################################################################
-    def _calculate_parameters(self) -> None:
-        """Calculate and set main parameters as instance variables."""
-        logging.info("Calculating parsing parameters...")
-        self.txBeamperFrame = int(np.array(self.rfdata.dbParams.num2DCols).flat[0])
-        self.NumSonoCTAngles = int(self.rfdata.dbParams.numOfSonoCTAngles2dActual[0])
-        logging.info(f"Beam parameters - txBeamperFrame: {self.txBeamperFrame}, NumSonoCTAngles: {self.NumSonoCTAngles}")
-        self.numFrame = int(np.floor(self.rfdata.lineData.shape[1] / (self.txBeamperFrame * self.NumSonoCTAngles)))
-        self.multilinefactor = self.ML_in
-        logging.info(f"Calculated numFrame: {self.numFrame}, multilinefactor: {self.multilinefactor}")
-        col = 0
-        if np.any(self.rfdata.lineData[:, col] != 0):
-            # Auto-detect based on data
-            first_nonzero = np.where(self.rfdata.lineData[:, col] != 0)[0][0]
-            last_nonzero = np.where(self.rfdata.lineData[:, col] != 0)[0][-1]
-            self.used_os = first_nonzero  # Override default with detected value
-            self.pt = int(np.floor((last_nonzero - first_nonzero + 1) / self.multilinefactor))
-            logging.info(f"Auto-detected: used_os={self.used_os}, pt={self.pt}")
-        else:
-            # Use the value provided in the constructor (default is 2256)
-            logging.info(f"Using provided used_os={self.used_os}")
-            self.pt = int(np.floor((self.rfdata.lineData.shape[0] - self.used_os) / self.multilinefactor))
-            logging.debug(f"Calculated pt={self.pt} based on shape {self.rfdata.lineData.shape[0]} and multilinefactor {self.multilinefactor}")
-            
-    ###################################################################################
-    # Data Array Filling
-    ###################################################################################
-    def _fill_data_arrays(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Fill RF data arrays for fundamental and harmonic signals."""
-        logging.info("Filling RF data arrays for fundamental and harmonic signals...")
-        rftemp_all_harm = np.zeros((self.pt, self.ML_out * self.txBeamperFrame))
-        rftemp_all_fund = np.zeros((self.pt, self.ML_out * self.txBeamperFrame))
-        rf_data_all_harm = np.zeros((self.numFrame, self.NumSonoCTAngles, self.pt, self.ML_out * self.txBeamperFrame))
-        rf_data_all_fund = np.zeros((self.numFrame, self.NumSonoCTAngles, self.pt, self.ML_out * self.txBeamperFrame))
-        logging.debug(f"Preallocated arrays shapes - fund: {rf_data_all_fund.shape}, harm: {rf_data_all_harm.shape}")
-        for k0 in range(self.numFrame):
-            if k0 % max(1, self.numFrame // 10) == 0:
-                logging.info(f"Processing frame {k0+1}/{self.numFrame}")
-            for k1 in range(self.NumSonoCTAngles):
-                for k2 in range(self.txBeamperFrame):
-                    bi = k0 * self.txBeamperFrame * self.NumSonoCTAngles + k1 * self.txBeamperFrame + k2
-                    if bi >= self.rfdata.lineData.shape[1]:
-                        logging.warning(f"Skipping bi={bi} as it exceeds lineData columns {self.rfdata.lineData.shape[1]}")
-                        continue
-                    idx0 = self.used_os + np.arange(self.pt * self.multilinefactor)
-                    idx1 = bi
-                    if k0 == 0 and k1 == 0 and k2 == 0:
-                        logging.debug(f"First extraction - lineData[{idx0[0]}:{idx0[-1]+1}, {idx1}]")
-                        logging.debug(f"lineData values sample: {self.rfdata.lineData[idx0, idx1][:10]}")
-                    temp = np.transpose(
-                        np.reshape(self.rfdata.lineData[idx0, idx1],
-                                 (self.multilinefactor, self.pt), order='F')
-                    )
-                    if k0 == 0 and k1 == 0 and k2 == 0:
-                        logging.debug(f"temp shape: {temp.shape}, temp sample: {temp.ravel()[:10]}")
-                    if temp.shape[1] > 2:
-                        rftemp_all_harm[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [0, 2]]
-                    else:
-                        logging.warning(f"temp has only {temp.shape[1]} columns, skipping harmonic assignment")
-                    if temp.shape[1] >= 12:
-                        rftemp_all_fund[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [9, 11]]
-                    elif temp.shape[1] >= 2:
-                        if k0 == 0 and k1 == 0 and k2 == 0:
-                            logging.warning(f"temp has only {temp.shape[1]} columns, using last 2 columns for fundamental")
-                        rftemp_all_fund[:, np.arange(self.ML_out) + (k2 * self.ML_out)] = temp[:, [-2, -1]]
-                    else:
-                        logging.warning(f"temp has only {temp.shape[1]} columns, skipping fundamental assignment")
-                rf_data_all_harm[k0][k1] = rftemp_all_harm
-                rf_data_all_fund[k0][k1] = rftemp_all_fund
-        logging.info("RF data array filling complete")
-        return rf_data_all_fund, rf_data_all_harm
-
-    ###################################################################################
-    # Voyager Header Parsing
-    ###################################################################################
-    def _parse_header_v(self, rawrfdata):
-        """Parse header for Voyager systems."""
-        logging.info("Parsing Voyager header information")
-        temp_headerInfo = PhilipsRfParser.HeaderInfoStruct()
-
-        iHeader = np.where(np.uint8(rawrfdata[2,0,:])&224)
-        numHeaders = len(iHeader)-1 # Ignore last header as it is part of a partial line
-        logging.debug(f"Found {numHeaders} headers in Voyager data")
-
-        # Initialize header arrays 
-        temp_headerInfo.RF_CaptureVersion = np.zeros(numHeaders, dtype=np.uint8)
-        temp_headerInfo.Tap_Point = np.zeros(numHeaders, dtype=np.uint8)
-        temp_headerInfo.Data_Gate = np.zeros(numHeaders, dtype=np.uint8)
-        temp_headerInfo.Multilines_Capture = np.zeros(numHeaders, dtype=np.uint8)
-        temp_headerInfo.RF_Sample_Rate = np.zeros(numHeaders, dtype=np.uint8)
-        temp_headerInfo.Steer = np.zeros(numHeaders, dtype=np.uint8)
-        temp_headerInfo.elevationPlaneOffset = np.zeros(numHeaders, dtype=np.uint8)
-        temp_headerInfo.PM_Index = np.zeros(numHeaders, dtype=np.uint8)
-        temp_headerInfo.Line_Index = np.zeros(numHeaders, dtype=np.uint16)
-        temp_headerInfo.Pulse_Index = np.zeros(numHeaders, dtype=np.uint16)
-        temp_headerInfo.Data_Format = np.zeros(numHeaders, dtype=np.uint16)
-        temp_headerInfo.Data_Type = np.zeros(numHeaders, dtype=np.uint16)
-        temp_headerInfo.Header_Tag = np.zeros(numHeaders, dtype=np.uint16)
-        temp_headerInfo.Threed_Pos = np.zeros(numHeaders, dtype=np.uint16)
-        temp_headerInfo.Mode_Info = np.zeros(numHeaders, dtype=np.uint16)
-        temp_headerInfo.Frame_ID = np.zeros(numHeaders, dtype=np.uint32)
-        temp_headerInfo.CSID = np.zeros(numHeaders, dtype=np.uint16)
-        temp_headerInfo.Line_Type = np.zeros(numHeaders, dtype=np.uint16)
-        temp_headerInfo.Time_Stamp = np.zeros(numHeaders, dtype=np.uint32)
-
-        # Get infor for each header
-        for m in range(numHeaders):
-            if m % 1000 == 0:
-                logging.debug(f"Processing Voyager header {m}/{numHeaders}")
-                
-            packedHeader = ''
-            for k in np.arange(11,0,-1):
-                temp = ''
-                for i in np.arange(2,0,-1):
-                    temp += bin(np.uint8(rawrfdata[i,k,iHeader[m]]))
-
-                # Discard first 3 bits, redundant info
-                packedHeader += temp[3:24]
-
-            iBit = 0
-            temp_headerInfo.RF_CaptureVersion[m] = int(packedHeader[iBit:iBit+4],2)
-            iBit += 4
-            temp_headerInfo.Tap_Point[m] = int(packedHeader[iBit:iBit+3],2)
-            iBit += 3
-            temp_headerInfo.Data_Gate[m] = int(packedHeader[iBit],2)
-            iBit += 1
-            temp_headerInfo.Multilines_Capture[m] = int(packedHeader[iBit:iBit+4],2)
-            iBit += 4
-            temp_headerInfo.RF_Sample_Rate[m] = int(packedHeader[iBit],2)
-            iBit += 1
-            
-            # Log sample rate for first header
-            if m == 0:
-                logging.info(f"Sample rate from first Voyager header: {temp_headerInfo.RF_Sample_Rate[m]}")
-                
-            temp_headerInfo.Steer[m] = int(packedHeader[iBit:iBit+6],2)
-            iBit += 6
-            temp_headerInfo.elevationPlaneOffset[m] = int(packedHeader[iBit:iBit+8],2)
-            iBit += 8
-            temp_headerInfo.PM_Index[m] = int(packedHeader[iBit:iBit+2],2)
-            iBit += 2
-            temp_headerInfo.Line_Index[m] = int(packedHeader[iBit:iBit+16],2)
-            iBit += 16
-            temp_headerInfo.Pulse_Index[m] = int(packedHeader[iBit:iBit+16],2)
-            iBit += 16
-            temp_headerInfo.Data_Format[m] = int(packedHeader[iBit:iBit+16],2)
-            iBit += 16
-            temp_headerInfo.Data_Type[m] = int(packedHeader[iBit:iBit+16],2)
-            iBit += 16
-            temp_headerInfo.Header_Tag[m] = int(packedHeader[iBit:iBit+16],2)
-            iBit += 16
-            temp_headerInfo.Threed_Pos[m] = int(packedHeader[iBit:iBit+16],2)
-            iBit += 16
-            temp_headerInfo.Mode_Info[m] = int(packedHeader[iBit:iBit+16],2)
-            iBit += 16
-            temp_headerInfo.Frame_ID[m] = int(packedHeader[iBit:iBit+32],2)
-            iBit += 32
-            temp_headerInfo.CSID[m] = int(packedHeader[iBit:iBit+16],2)
-            iBit += 16
-            temp_headerInfo.Line_Type[m] = int(packedHeader[iBit:iBit+16],2)
-            iBit += 16
-            temp_headerInfo.Time_Stamp[m] = int(packedHeader[iBit:iBit+32],2)
-
-        logging.info(f"Voyager header parsing complete - processed {numHeaders} headers")
-        return temp_headerInfo
-
-    ###################################################################################
-    # Fusion Header Parsing
-    ###################################################################################
-    def _parse_header_f(self, rawrfdata):
-        """Parse header for Fusion systems."""
-        logging.info('Entering parseHeaderF - parsing Fusion headers')
-        # Find header clumps
-        # iHeader pts to the index of the header clump
-        # Note that each header is exactly 1 "Clump" long
-        iHeader = np.array(np.where(rawrfdata[0,:]&1572864 == 524288))[0]
-        numHeaders: int = iHeader.size - 1 # Ignore last header as it is a part of a partial line
-        logging.info(f"Found {numHeaders} headers in Fusion data")
-
-        HeaderInfo = PhilipsRfParser.HeaderInfoStruct()
-
-        # Initialize header arrays
-        logging.debug("Initializing header arrays...")
-        HeaderInfo.RF_CaptureVersion = np.zeros(numHeaders, dtype=np.uint8)
-        HeaderInfo.Tap_Point = np.zeros(numHeaders, np.uint8)
-        HeaderInfo.Data_Gate = np.zeros(numHeaders, np.uint8)
-        HeaderInfo.Multilines_Capture = np.zeros(numHeaders, np.uint8)
-        HeaderInfo.RF_Sample_Rate = np.zeros(numHeaders, np.uint8)
-        HeaderInfo.Steer = np.zeros(numHeaders, np.uint8)
-        HeaderInfo.elevationPlaneOffset = np.zeros(numHeaders, np.uint8)
-        HeaderInfo.PM_Index = np.zeros(numHeaders, np.uint8)
-        HeaderInfo.Line_Index = np.zeros(numHeaders, np.uint16)
-        HeaderInfo.Pulse_Index = np.zeros(numHeaders, np.uint16)
-        HeaderInfo.Data_Format = np.zeros(numHeaders, np.uint16)
-        HeaderInfo.Data_Type = np.zeros(numHeaders, np.uint16)
-        HeaderInfo.Header_Tag = np.zeros(numHeaders, np.uint16)
-        HeaderInfo.Threed_Pos = np.zeros(numHeaders, np.uint16)
-        HeaderInfo.Mode_Info = np.zeros(numHeaders, np.uint16)
-        HeaderInfo.Frame_ID = np.zeros(numHeaders, np.uint32)
-        HeaderInfo.CSID = np.zeros(numHeaders, np.uint16)
-        HeaderInfo.Line_Type = np.zeros(numHeaders, np.uint16)
-        HeaderInfo.Time_Stamp = np.zeros(numHeaders, np.uint32)
-
-        # Get info for Each Header
-        logging.info("Extracting header information...")
-        for m in range(numHeaders):
-            if m % 1000 == 0:
-                logging.debug(f"Processing Fusion header {m}/{numHeaders}")
-                
-            packedHeader = bin(rawrfdata[12, iHeader[m]])[2:]
-            remainingZeros = 4 - len(packedHeader)
-            if remainingZeros > 0:
-                zeros = self._get_filler_zeros(remainingZeros)
-                packedHeader = str(zeros + packedHeader)
-            for i in np.arange(11,-1,-1):
-                curBin = bin(int(rawrfdata[i,iHeader[m]]))[2:]
-                remainingZeros = 21 - len(curBin)
-                if remainingZeros > 0:
-                    zeros = self._get_filler_zeros(remainingZeros)
-                    curBin = str(zeros + curBin)
-                packedHeader += curBin
-
-            # Parse packed header bits
-            iBit = 2
-            HeaderInfo.RF_CaptureVersion[m] = int(packedHeader[iBit:iBit+4], 2)
-            iBit += 4
-            HeaderInfo.Tap_Point[m] = int(packedHeader[iBit:iBit+3], 2)
-            iBit += 3
-            HeaderInfo.Data_Gate[m] = int(packedHeader[iBit], 2)
-            iBit += 1
-            HeaderInfo.Multilines_Capture[m] = int(packedHeader[iBit:iBit+4], 2)
-            iBit += 4
-            iBit += 15 # Waste 15 bits (unused)
-            HeaderInfo.RF_Sample_Rate[m] = int(packedHeader[iBit], 2)
-            iBit += 1
-            
-            # Log sample rate for first header
-            if m == 0:
-                logging.info(f"Sample rate from first header: {HeaderInfo.RF_Sample_Rate[m]}")
-                
-            HeaderInfo.Steer[m] = int(packedHeader[iBit:iBit+6], 2)
-            iBit += 6
-            HeaderInfo.elevationPlaneOffset[m] = int(packedHeader[iBit:iBit+8], 2)
-            iBit += 8
-            HeaderInfo.PM_Index[m] = int(packedHeader[iBit:iBit+2], 2)
-            iBit += 2
-            HeaderInfo.Line_Index[m] = int(packedHeader[iBit:iBit+16], 2)
-            iBit += 16
-            HeaderInfo.Pulse_Index[m] = int(packedHeader[iBit:iBit+16], 2)
-            iBit += 16
-            HeaderInfo.Data_Format[m] = int(packedHeader[iBit:iBit+16], 2)
-            iBit += 16
-            HeaderInfo.Data_Type[m] = int(packedHeader[iBit: iBit+16], 2)
-            iBit += 16
-            HeaderInfo.Header_Tag[m] = int(packedHeader[iBit:iBit+16], 2)
-            iBit += 16
-            HeaderInfo.Threed_Pos[m] = int(packedHeader[iBit:iBit+16], 2)
-            iBit += 16
-            HeaderInfo.Mode_Info[m] = int(packedHeader[iBit:iBit+16], 2)
-            iBit += 16
-            HeaderInfo.Frame_ID[m] = int(packedHeader[iBit:iBit+32], 2)
-            iBit += 32
-            HeaderInfo.CSID[m] = int(packedHeader[iBit:iBit+16], 2)
-            iBit += 16
-            HeaderInfo.Line_Type[m] = int(packedHeader[iBit:iBit+16], 2)
-            iBit += 16
-            HeaderInfo.Time_Stamp[m] = int(str(packedHeader[iBit:iBit+13]+packedHeader[iBit+15:iBit+34]), 2)
-            
-        logging.info(f'Exiting parseHeaderF - numHeaders: {numHeaders}, Data_Type shape: {HeaderInfo.Data_Type.shape}')
-        return HeaderInfo
-
-    ###################################################################################
-    # Voyager Data Parsing
-    ###################################################################################
-    def _parse_data_v(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray]:
-        """Parse RF data for Voyager systems."""
-        logging.info("Parsing Voyager RF data")
-        minNeg = 16 * (2**16)  # Corrected exponentiation
-
-        iHeader = np.where(rawrfdata[2,0,:]&224==64)
-        numHeaders = len(iHeader)-1
-        numSamples = (iHeader[1]-iHeader[0]-1)*12
-        logging.debug(f"Voyager data: {numHeaders} headers, {numSamples} samples per line")
-
-        lineData = np.zeros((numSamples, numHeaders), dtype=np.int32)
-        lineHeader = np.zeros((numSamples, numHeaders), dtype=np.uint8)
-
-        logging.info("Extracting Voyager line data...")
-        for m in range(numHeaders):  # Corrected loop
-            if m % 1000 == 0:
-                logging.debug(f"Processing Voyager line {m}/{numHeaders}")
-
-            iStartData = iHeader[m]+1
-            iStopData = iHeader[m+1]-1
-
-            if headerInfo.Data_Type[m] == float(0x5a):
-                iStopData = iStartData+10000
-                logging.debug(f"Line {m} is push pulse, limiting data size")
-
-            lineData_u8 = rawrfdata[:,:,iStartData:iStopData]
-            lineData_s32 = (
-                np.int32(lineData_u8[0,:,:]) +
-                np.int32(lineData_u8[1,:,:]) * (2**8) +
-                np.int32(lineData_u8[2,:,:] & np.uint8(31)) * (2**16)
-            )
-            iNeg = np.where(lineData_s32 >= minNeg)
-            lineData_s32[iNeg] = lineData_s32[iNeg] - 2*minNeg
-            lineHeader_u8 = (lineData_u8[2,:,:] & 224) >> 6
-
-            lineData[:lineData_s32.size, m] = lineData_s32.ravel(order='F')
-            lineHeader[:lineHeader_u8.size, m] = lineHeader_u8.ravel(order='F')
-
-        logging.info(f"Voyager data parsing complete - lineData: {lineData.shape}, lineHeader: {lineHeader.shape}")
-        return lineData, lineHeader
-
-    ###################################################################################
-    # Fusion Data Parsing
-    ###################################################################################
-    def _parse_data_f(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray]:
-        """Parse RF data for Fusion systems."""
-        logging.info('Entering parseDataF - parsing Fusion RF data')
-        # Definitions
-        minNeg = 2**18 # Used to convert integers to 2's complement
-
-        # Find header clumps
-        # iHeader pts to the index of the header clump
-        # Note that each Header is exactly 1 "Clump" long
-        iHeader = np.array(np.where((rawrfdata[0,:] & 1572864)==524288))[0]
-        numHeaders = len(iHeader) - 1 # Ignore last header as it is a part of a partial line
-        logging.info(f"Found {numHeaders} headers in Fusion data")
-
-        # Get maximum number of samples between consecutive headers
-        maxNumSamples = 0
-        for m in range(numHeaders):
-            tempMax = iHeader[m+1] - iHeader[m] - 1
-            if (tempMax > maxNumSamples):
-                maxNumSamples = tempMax
+    @staticmethod
+    def _get_filler_zeros(num: int) -> str:
+        """Get string of zeros for padding."""
+        logging.debug(f"Creating filler zeros, num={num}")
         
-        numSamples = maxNumSamples*12
-        logging.debug(f"Maximum samples between headers: {maxNumSamples}, total samples: {numSamples}")
-
-        # Preallocate arrays
-        lineData = np.zeros((numSamples, numHeaders), dtype = np.int32)
-        lineHeader = np.zeros((numSamples, numHeaders), dtype = np.uint8)
-        logging.debug(f"Preallocated arrays - lineData: {lineData.shape}, lineHeader: {lineHeader.shape}")
-
-        # Extract data
-        logging.info("Extracting line data from headers...")
-        for m in range(numHeaders):
-            if m % 1000 == 0:
-                logging.debug(f"Processing header {m}/{numHeaders}")
-                
-            iStartData = iHeader[m]+2
-            iStopData = iHeader[m+1]-1
-
-            if headerInfo.Data_Type[m] == float(0x5a):
-                # set stop data to a reasonable value to keep file size form blowing up
-                iStopData = iStartData + 10000
-                logging.debug(f"Header {m} is push pulse (0x5a), limiting data size")
-            
-            # Get Data for current line and convert to 2's complement values
-            lineData_u32 = rawrfdata[:12,iStartData:iStopData+1]
-            lineData_s32 = np.int32(lineData_u32&524287)
-            iNeg = np.where(lineData_s32 >= minNeg)
-            lineData_s32[iNeg] -= (2*minNeg) # type: ignore
-            lineHeader_u8 = (lineData_u32 & 1572864) >> 19
-
-            lineData[:lineData_s32.size,m] = lineData_s32.ravel(order='F')
-            lineHeader[:lineHeader_u8.size,m] = lineHeader_u8.ravel(order='F')
-
-        logging.info(f'Exiting parseDataF - lineData shape: {lineData.shape}, lineHeader shape: {lineHeader.shape}')
-        return lineData, lineHeader
-
-    ###################################################################################
-    # RF Data Parsing
-    ###################################################################################
-    def _parse_rf_data(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct', isVoyager: bool) -> Tuple[np.ndarray, np.ndarray, int]:
-        """Parse RF signal data."""
-        logging.info("Parsing RF signal data...")
-        Tap_Point = headerInfo.Tap_Point[0]
-        logging.debug(f"Tap Point: {Tap_Point}, isVoyager: {isVoyager}")
+        result = '0' * max(0, num - 1)
         
-        if isVoyager:
-            lineData, lineHeader = self._parse_data_v(rawrfdata, headerInfo)
-        else: # isFusion
-            lineData, lineHeader = self._parse_data_f(rawrfdata, headerInfo)
-            Tap_Point = headerInfo.Tap_Point[0]
-            if Tap_Point == 0: # Correct for MS 19 bits of 21 real data bits
-                logging.debug("Applying bit shift correction for Tap Point 0")
-                lineData = lineData << 2
-        
-        # After parsing lineData, log a sample of the first and last 20 rows for a nonzero column
-        nonzero_col = None
-        for col in range(lineData.shape[1]):
-            if np.any(lineData[:, col] != 0):
-                nonzero_col = col
-                break
-        if nonzero_col is not None:
-            logging.info(f"First 20 values of lineData[:, {nonzero_col}]: {lineData[:20, nonzero_col]}")
-            logging.info(f"Last 20 values of lineData[:, {nonzero_col}]: {lineData[-20:, nonzero_col]}")
-            logging.info(f"Min: {lineData[:, nonzero_col].min()}, Max: {lineData[:, nonzero_col].max()}")
-        else:
-            logging.warning("No nonzero columns found in lineData!")
-        
-        logging.info(f"RF data parsing complete - lineData: {lineData.shape}, lineHeader: {lineHeader.shape}")
-        return lineData, lineHeader, Tap_Point
+        logging.debug(f"Generated {len(result)} filler zeros")
+        return result
 
-    ###################################################################################
-    # File Header Parsing
-    ###################################################################################
-    def _parse_file_header(self, file_obj, endianness: str) -> Tuple['PhilipsRfParser.DbParams', int]:
-        """Parse file header information."""
-        logging.info("Parsing file header information")
-        fileVersion = int.from_bytes(file_obj.read(4), endianness, signed=False)
-        numFileHeaderBytes = int.from_bytes(file_obj.read(4), endianness, signed=False)
-        logging.info(f"File Version: {fileVersion}, Header Size: {numFileHeaderBytes} bytes")
-
-        # Handle accordingly to fileVersion
-        temp_dbParams = PhilipsRfParser.DbParams()
-        logging.debug(f"Reading file header for version {fileVersion}")
-        
-        if fileVersion == 2:
-            logging.debug("Reading file header version 2")
-            temp_dbParams.acqNumActiveScChannels2d = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.azimuthMultilineFactorXbrOut = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.azimuthMultilineFactorXbrIn = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.numOfSonoCTAngles2dActual = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.elevationMultilineFactor = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.numPiPulses = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.num2DCols = np.reshape([int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(14*11)], (14, 11), order='F')
-            temp_dbParams.fastPiEnabled = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.numZones2d = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.numSubVols = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-            temp_dbParams.numPlanes = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-            temp_dbParams.zigZagEnabled = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-
-        elif fileVersion == 3:
-            logging.debug("Reading file header version 3")
-            temp_dbParams.acqNumActiveScChannels2d = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.azimuthMultilineFactorXbrOut = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.azimuthMultilineFactorXbrIn = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.numOfSonoCTAngles2dActual = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.elevationMultilineFactor = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.numPiPulses = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.num2DCols = np.reshape([int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(14*11)],(14,11), order='F')
-            temp_dbParams.fastPiEnabled = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.numZones2d = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.numSubVols = int.from_bytes(file_obj.read(4), endianness, signed=False)
-            temp_dbParams.numPlanes = int.from_bytes(file_obj.read(4), endianness, signed=False)
-            temp_dbParams.zigZagEnabled = int.from_bytes(file_obj.read(4), endianness, signed=False)
-
-            temp_dbParams.multiLineFactorCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.linesPerEnsCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.ensPerSeqCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.numCfCols = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(14)]
-            temp_dbParams.numCfEntries = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-            temp_dbParams.numCfDummies = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(4)]
-
-        elif fileVersion == 4:
-            logging.debug("Reading file header version 4")
-            temp_dbParams.acqNumActiveScChannels2d = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.azimuthMultilineFactorXbrOut = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.azimuthMultilineFactorXbrIn = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-            temp_dbParams.azimuthMultilineFactorXbrOutCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.azimuthMultilineFactorXbrInCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-            temp_dbParams.numOfSonoCTAngles2dActual = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.elevationMultilineFactor = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-            temp_dbParams.elevationMultilineFactorCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-            temp_dbParams.numPiPulses = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.num2DCols = np.reshape([int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(14*11)],(14,11), order='F')
-            temp_dbParams.fastPiEnabled = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numZones2d = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numSubVols = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-
-            temp_dbParams.Planes = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-
-            temp_dbParams.zigZagEnabled = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-
-            temp_dbParams.linesPerEnsCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.ensPerSeqCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numCfCols = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(14)]
-            temp_dbParams.numCfEntries = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numCfDummies = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-        elif fileVersion == 5:
-            logging.debug("Reading file header version 5")
-            temp_dbParams.acqNumActiveScChannels2d = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.azimuthMultilineFactorXbrOut = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.azimuthMultilineFactorXbrIn = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-            temp_dbParams.azimuthMultilineFactorXbrOutCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.azimuthMultilineFactorXbrInCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-            temp_dbParams.numOfSonoCTAngles2dActual = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.elevationMultilineFactor = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-            temp_dbParams.elevationMultilineFactorCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.multiLineFactorCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-            temp_dbParams.numPiPulses = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.num2DCols = np.reshape([int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(14*11)],(14,11), order='F')
-            temp_dbParams.fastPiEnabled = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numZones2d = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numSubVols = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-
-            temp_dbParams.numPlanes = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-
-            temp_dbParams.zigZagEnabled = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-
-            temp_dbParams.linesPerEnsCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.ensPerSeqCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numCfCols = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(14)]
-            temp_dbParams.numCfEntries = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numCfDummies = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-        elif fileVersion == 6:
-            logging.debug("Reading file header version 6")
-            temp_dbParams.tapPoint = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-            temp_dbParams.acqNumActiveScChannels2d = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.azimuthMultilineFactorXbrOut = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.azimuthMultilineFactorXbrIn = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.azimuthMultilineFactorXbrOutCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.azimuthMultilineFactorXbrInCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numOfSonoCTAngles2dActual = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.elevationMultilineFactor = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.elevationMultilineFactorCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.multiLineFactorCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numPiPulses = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.num2DCols = np.reshape([int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(14*11)],(14,11), order='F')
-            temp_dbParams.fastPiEnabled = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numZones2d = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numSubVols = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-            temp_dbParams.numPlanes = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-            temp_dbParams.zigZagEnabled = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(1)]
-            temp_dbParams.linesPerEnsCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.ensPerSeqCf = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numCfCols = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(14)]
-            temp_dbParams.numCfEntries = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-            temp_dbParams.numCfDummies = [int.from_bytes(file_obj.read(4), endianness, signed=False) for i in range(3)]
-
-        else:
-            numFileHeaderBytes = 0
-            logging.warning(f"Unknown file version: {fileVersion}")
-
-        logging.info(f"File header parsing complete for version {fileVersion}")
-        return temp_dbParams, numFileHeaderBytes
-
-    ###################################################################################
-    # Main Parsing Function
-    ###################################################################################
-    def philipsRfParser(self, filepath: str, save_numpy: bool = False) -> np.ndarray:
-        """Parse Philips RF data file, save as .mat file, and return shape of data.
-        If save_numpy is True, only save the processed data as .npy files in a folder named '{sample_name}_extracted' in the sample path.
-        If save_numpy is False, only save as .mat file."""
-        
-        # Get the root logger - it may already be configured
-        logger = logging.getLogger()
-        original_handlers = list(logger.handlers)  # Save original handlers
-        original_level = logger.level
-        
-        # Create formatter for consistent output
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        
-        if save_numpy:
-            # Create numpy folder with sample name + '_extracted'
-            sample_name = os.path.splitext(os.path.basename(filepath))[0]
-            numpy_folder = os.path.join(os.path.dirname(filepath), f'{sample_name}_extracted')
-            if not os.path.exists(numpy_folder):
-                os.makedirs(numpy_folder)
-            
-            # Add file logging to the numpy folder with detailed output
-            log_file = os.path.join(numpy_folder, 'parsing_log.txt')
-            file_handler = logging.FileHandler(log_file, mode='w')
-            file_handler.setLevel(logging.DEBUG)  # Capture all levels for file
-            
-            # Use a detailed formatter that includes source location and module info
-            file_formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
-            )
-            file_handler.setFormatter(file_formatter)
-            logger.addHandler(file_handler)
-            
-            # Ensure logger level is at DEBUG to capture all messages
-            logger.setLevel(logging.DEBUG)
-            
-            # Make console handler show only INFO and above if it existed before
-            for handler in original_handlers:
-                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
-                    # Save original level to restore later
-                    if not hasattr(handler, '_original_level'):
-                        handler._original_level = handler.level
-                    handler.setLevel(logging.INFO)
-            
-            logging.debug("Detailed debug logging enabled to file: {}".format(log_file))
-        
-        logging.info(f"Starting Philips RF parsing for file: {filepath}")
-        logging.info(f"Save format: {'NumPy arrays' if save_numpy else 'MATLAB file'}")
-        
-        try:
-            self.rfdata = self._parse_rf(filepath, 0, 2000)
-            
-            # Save header summary if saving as numpy
-            if save_numpy:
-                self._save_header_summary(numpy_folder)
-            
-            # Try to find the first available data type to save
-            data_priority = [
-                ('echoData', 'echoData'),
-                ('cwData', 'cwData'),
-                ('pwData', 'pwData'),
-                ('colorData', 'colorData'),
-                ('echoMModeData', 'echoMModeData'),
-                ('colorMModeData', 'colorMModeData'),
-                ('dummyData', 'dummyData'),
-                ('swiData', 'swiData'),
-                ('miscData', 'miscData'),
-            ]
-            
-            data_to_save = None
-            data_type_label = None
-            for attr, label in data_priority:
-                if hasattr(self.rfdata, attr) and getattr(self.rfdata, attr) is not None:
-                    data_to_save = getattr(self.rfdata, attr)
-                    data_type_label = label
-                    if isinstance(data_to_save, (list, tuple)) and len(data_to_save) > 0:
-                        data_to_save = data_to_save[0]
-                    break
-            
-            has_valid_data = data_to_save is not None and (not hasattr(data_to_save, 'size') or data_to_save.size > 0)
-            if not has_valid_data:
-                error_msg = f"No supported data found in RF file. Data_Type values: {np.unique(self.rfdata.headerInfo.Data_Type) if hasattr(self.rfdata.headerInfo, 'Data_Type') else 'N/A'}. lineData shape: {self.rfdata.lineData.shape if hasattr(self.rfdata, 'lineData') else 'N/A'}"
-                logging.error(error_msg)
-                raise RuntimeError(error_msg)
-            
-            logging.info(f"Saving data type: {data_type_label} as 'echoData'")
-            
-            # Data preprocessing
-            if (self.rfdata.headerInfo.Line_Index[249] == self.rfdata.headerInfo.Line_Index[250]):
-                self.rfdata.lineData = self.rfdata.lineData[:, np.arange(2, self.rfdata.lineData.shape[1], 2)]
-            else:
-                self.rfdata.lineData = self.rfdata.lineData[:, np.arange(1, self.rfdata.lineData.shape[1], 2)]
-            
-            self._calculate_parameters()
-            rf_data_all_fund, rf_data_all_harm = self._fill_data_arrays()
-            
-            if not save_numpy:
-                destination = str(filepath[:-3] + '.mat')
-                logging.info(f"Saving as MATLAB file: {destination}")
-                contents = {
-                    'echoData': data_to_save,
-                    'lineData': self.rfdata.lineData,
-                    'lineHeader': self.rfdata.lineHeader,
-                    'headerInfo': self.rfdata.headerInfo,
-                    'dbParams': self.rfdata.dbParams,
-                    'rf_data_all_fund': rf_data_all_fund,
-                    'rf_data_all_harm': rf_data_all_harm,
-                    'NumFrame': self.numFrame,
-                    'NumSonoCTAngles': self.NumSonoCTAngles,
-                    'pt': self.pt,
-                    'multilinefactor': self.multilinefactor,
-                }
-                
-                if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 1:
-                    contents['echoData1'] = self.rfdata.echoData[1]
-                if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 2:
-                    contents['echoData2'] = self.rfdata.echoData[2]
-                if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 3:
-                    contents['echoData3'] = self.rfdata.echoData[3]
-                if hasattr(self.rfdata, 'echoMModeData'):
-                    contents['echoMModeData'] = self.rfdata.echoMModeData
-                if hasattr(self.rfdata, 'miscData'):
-                    contents['miscData'] = self.rfdata.miscData
-                
-                if os.path.exists(destination):
-                    os.remove(destination)
-                savemat(destination, contents)
-                logging.info(f"MATLAB file saved successfully: {destination}")
-            else:
-                logging.info(f"Saving as NumPy files in: {numpy_folder}")
-                np.save(os.path.join(numpy_folder, 'echoData.npy'), data_to_save)
-                np.save(os.path.join(numpy_folder, 'lineData.npy'), self.rfdata.lineData)
-                np.save(os.path.join(numpy_folder, 'lineHeader.npy'), self.rfdata.lineHeader)
-                np.save(os.path.join(numpy_folder, 'rf_data_all_fund.npy'), rf_data_all_fund)
-                np.save(os.path.join(numpy_folder, 'rf_data_all_harm.npy'), rf_data_all_harm)
-                logging.info("NumPy files saved successfully")
-            
-            result_shape = np.array(rf_data_all_fund).shape
-            logging.info(f"Parsing complete. Final data shape: {result_shape}")
-            
-            return result_shape
-            
-        finally:
-            # Restore original logging configuration
-            if save_numpy:
-                # Remove any added handlers
-                current_handlers = list(logger.handlers)
-                for handler in current_handlers:
-                    if handler not in original_handlers:
-                        handler.close()
-                        logger.removeHandler(handler)
-                
-                # Restore original handler levels
-                for handler in original_handlers:
-                    if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
-                        # Restore saved original level if available
-                        if hasattr(handler, '_original_level'):
-                            handler.setLevel(handler._original_level)
-                            delattr(handler, '_original_level')
-                        else:
-                            handler.setLevel(original_level)
-                
-                # Restore original logger level
-                logger.setLevel(original_level)
-                logging.debug("Logging configuration restored to original state")
-    
-    ###################################################################################
-    # Save Header Summary
-    ###################################################################################
-    def _save_header_summary(self, numpy_folder: str):
-        """Save a summary of header information to a text file."""
-        summary_file = os.path.join(numpy_folder, 'header_summary.txt')
-        
-        with open(summary_file, 'w') as f:
-            f.write("=== PHILIPS RF FILE HEADER SUMMARY ===\n\n")
-            
-            # Basic file information
-            if hasattr(self.rfdata, 'headerInfo') and self.rfdata.headerInfo:
-                h = self.rfdata.headerInfo
-                
-                # Number of headers/lines
-                if hasattr(h, 'Data_Type') and h.Data_Type is not None:
-                    f.write(f"Number of headers/lines: {len(h.Data_Type)}\n")
-                
-                # First header information
-                f.write("\n--- First Header Information ---\n")
-                if hasattr(h, 'RF_CaptureVersion') and h.RF_CaptureVersion is not None:
-                    f.write(f"RF Capture Version: {h.RF_CaptureVersion[0]}\n")
-                if hasattr(h, 'Tap_Point') and h.Tap_Point is not None:
-                    f.write(f"Tap Point: {h.Tap_Point[0]}\n")
-                if hasattr(h, 'RF_Sample_Rate') and h.RF_Sample_Rate is not None:
-                    f.write(f"RF Sample Rate: {h.RF_Sample_Rate[0]}\n")
-                if hasattr(h, 'Multilines_Capture') and h.Multilines_Capture is not None:
-                    f.write(f"Multilines Capture: {h.Multilines_Capture[0]}\n")
-                if hasattr(h, 'Data_Gate') and h.Data_Gate is not None:
-                    f.write(f"Data Gate: {h.Data_Gate[0]}\n")
-                
-                # Data types present
-                f.write("\n--- Data Types Present ---\n")
-                if hasattr(h, 'Data_Type') and h.Data_Type is not None:
-                    unique_types = np.unique(h.Data_Type)
-                    f.write(f"Unique Data Types: {unique_types}\n")
-                    
-                    # Count of each data type
-                    for dtype in unique_types:
-                        count = np.sum(h.Data_Type == dtype)
-                        f.write(f"  Type {dtype}: {count} occurrences\n")
-                
-                # Frame and line information
-                f.write("\n--- Frame Information ---\n")
-                if hasattr(h, 'Frame_ID') and h.Frame_ID is not None:
-                    unique_frames = np.unique(h.Frame_ID)
-                    f.write(f"Number of unique frames: {len(unique_frames)}\n")
-                    f.write(f"Frame ID range: {unique_frames.min()} to {unique_frames.max()}\n")
-                
-                if hasattr(h, 'Line_Index') and h.Line_Index is not None:
-                    f.write(f"Line index range: {h.Line_Index.min()} to {h.Line_Index.max()}\n")
-                
-                # Time information
-                f.write("\n--- Time Information ---\n")
-                if hasattr(h, 'Time_Stamp') and h.Time_Stamp is not None:
-                    f.write(f"First timestamp: {h.Time_Stamp[0]}\n")
-                    f.write(f"Last timestamp: {h.Time_Stamp[-1]}\n")
-            
-            # Database parameters
-            if hasattr(self.rfdata, 'dbParams') and self.rfdata.dbParams:
-                f.write("\n--- Database Parameters ---\n")
-                db = self.rfdata.dbParams
-                
-                if hasattr(db, 'acqNumActiveScChannels2d') and db.acqNumActiveScChannels2d:
-                    f.write(f"Active scan channels: {db.acqNumActiveScChannels2d}\n")
-                if hasattr(db, 'numOfSonoCTAngles2dActual') and db.numOfSonoCTAngles2dActual:
-                    f.write(f"SonoCT angles: {db.numOfSonoCTAngles2dActual}\n")
-                if hasattr(db, 'num2DCols') and db.num2DCols is not None:
-                    f.write(f"2D columns shape: {db.num2DCols.shape}\n")
-                    f.write(f"2D columns first row: {db.num2DCols[0, :] if db.num2DCols.size > 0 else 'N/A'}\n")
-            
-            # Calculated parameters
-            if hasattr(self, 'numFrame'):
-                f.write("\n--- Calculated Parameters ---\n")
-                f.write(f"Number of frames: {self.numFrame}\n")
-                f.write(f"TX beams per frame: {self.txBeamperFrame}\n")
-                f.write(f"Number of SonoCT angles: {self.NumSonoCTAngles}\n")
-                f.write(f"Multiline factor: {self.multilinefactor}\n")
-                f.write(f"Used OS: {self.used_os}\n")
-                f.write(f"PT: {self.pt}\n")
-            
-            # Data shapes
-            f.write("\n--- Data Array Shapes ---\n")
-            if hasattr(self.rfdata, 'lineData') and self.rfdata.lineData is not None:
-                f.write(f"Line data shape: {self.rfdata.lineData.shape}\n")
-            if hasattr(self.rfdata, 'lineHeader') and self.rfdata.lineHeader is not None:
-                f.write(f"Line header shape: {self.rfdata.lineHeader.shape}\n")
-            
-            # Available data types
-            f.write("\n--- Available Data Arrays ---\n")
-            data_attrs = ['echoData', 'cwData', 'pwData', 'colorData', 
-                         'echoMModeData', 'colorMModeData', 'dummyData', 
-                         'swiData', 'miscData']
-            
-            for attr in data_attrs:
-                if hasattr(self.rfdata, attr):
-                    data = getattr(self.rfdata, attr)
-                    if data is not None:
-                        if isinstance(data, (list, tuple)):
-                            f.write(f"{attr}: {len(data)} elements\n")
-                            for i, elem in enumerate(data):
-                                if hasattr(elem, 'shape'):
-                                    f.write(f"  [{i}]: {elem.shape}\n")
-                        elif hasattr(data, 'shape'):
-                            f.write(f"{attr}: {data.shape}\n")
-                        else:
-                            f.write(f"{attr}: Available (unknown shape)\n")
-        
-        logging.info(f"Header summary saved to: {summary_file}")
-
-
+   
 ###################################################################################
 # Main Execution
 ###################################################################################
