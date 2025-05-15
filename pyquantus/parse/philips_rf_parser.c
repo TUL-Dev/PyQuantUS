@@ -10,6 +10,13 @@
 #include <time.h>
 
 #ifdef _WIN32 // Windows-specific includes and definitions
+/*
+ * Windows requires specific handling for file operations:
+ * - io.h provides Windows-specific file I/O functions
+ * - Windows prefixes standard POSIX functions with underscore (_)
+ * - O_BINARY flag is required for proper binary file handling on Windows
+ * - ssize_t type needs to be defined as it's not provided by Windows
+ */
 #include <io.h>
 #define open _open
 #define close _close
@@ -18,13 +25,21 @@
 #define O_BINARY _O_BINARY
 typedef long ssize_t;
 #else // Unix-like includes and definitions
+/*
+ * Unix/Linux systems:
+ * - unistd.h provides standard POSIX file I/O functions
+ * - No distinction between binary and text files, but O_BINARY is defined
+ *   as 0 (no-op) for cross-platform compatibility
+ * - This ensures the same code works on both Windows and Unix without modification
+ */
 #include <unistd.h>
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
 #endif
 
-// Helper to get file size
+/////////////////////////////////////////////////////////////////////////////////////
+
 long long get_file_size(const char* fn) {
     struct stat st;
     if (stat(fn, &st) == 0) {
@@ -32,6 +47,8 @@ long long get_file_size(const char* fn) {
     }
     return -1;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
 
 int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
     printf("[get_array_shape] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
@@ -68,6 +85,8 @@ int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
     printf("[get_array_shape] Returning i=%lld\n", i);
     return i;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
 
 int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
     printf("[get_partA] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
@@ -152,6 +171,8 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
     return partA;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////
+
 static PyObject* py_get_partA(PyObject* self, PyObject* args) {
     printf("[py_get_partA] Called\n");
     long long num_clumps;
@@ -171,6 +192,8 @@ static PyObject* py_get_partA(PyObject* self, PyObject* args) {
     printf("[py_get_partA] Returning Python list\n");
     return list;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
 
 int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
     printf("[get_partB] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
@@ -222,6 +245,8 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
     return partB;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////
+
 static PyObject* py_get_partB(PyObject* self, PyObject* args) {
     printf("[py_get_partB] Called\n");
     long long num_clumps;
@@ -242,14 +267,16 @@ static PyObject* py_get_partB(PyObject* self, PyObject* args) {
     return list;
 }
 
-// Define methods
+/////////////////////////////////////////////////////////////////////////////////////
+
 static PyMethodDef MyMethods[] = {
     {"getPartA", py_get_partA, METH_VARARGS, "Get part A data from file"},
     {"getPartB", py_get_partB, METH_VARARGS, "Get part B data from file"},
     {NULL, NULL, 0, NULL}
 };
 
-// Define module
+/////////////////////////////////////////////////////////////////////////////////////
+
 static struct PyModuleDef mymodule = {
     PyModuleDef_HEAD_INIT,
     "philipsRfParser",
@@ -258,6 +285,10 @@ static struct PyModuleDef mymodule = {
     MyMethods
 };
 
+/////////////////////////////////////////////////////////////////////////////////////
+
 PyMODINIT_FUNC PyInit_philipsRfParser(void) {
     return PyModule_Create(&mymodule);
 }
+
+/////////////////////////////////////////////////////////////////////////////////////

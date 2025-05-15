@@ -17,6 +17,8 @@ from philipsRfParser import getPartA, getPartB
 class HeaderInfoStruct:
     """Philips-specific structure containing information from the headers."""
     def __init__(self):
+        logging.debug("Initializing HeaderInfoStruct")
+        
         self.RF_CaptureVersion: Optional[np.ndarray] = None
         self.Tap_Point: Optional[np.ndarray] = None
         self.Data_Gate: Optional[np.ndarray] = None
@@ -36,6 +38,8 @@ class HeaderInfoStruct:
         self.Line_Type: Optional[np.ndarray] = None
         self.Time_Stamp: Optional[np.ndarray] = None
         self.RF_Sample_Rate: Optional[np.ndarray] = None
+        
+        logging.debug("HeaderInfoStruct initialization complete")
 
 ###################################################################################
 # DbParams Class
@@ -43,6 +47,8 @@ class HeaderInfoStruct:
 class DbParams:
     """Philips-specific structure containing signal properties of the scan."""
     def __init__(self):
+        logging.debug("Initializing DbParams")
+        
         self.acqNumActiveScChannels2d: Optional[List[int]] = None
         self.azimuthMultilineFactorXbrOut: Optional[List[int]] = None
         self.azimuthMultilineFactorXbrIn: Optional[List[int]] = None
@@ -66,6 +72,8 @@ class DbParams:
         self.elevationMultilineFactorCf: Optional[List[int]] = None
         self.Planes: Optional[List[int]] = None
         self.tapPoint: Optional[List[int]] = None
+        
+        logging.debug("DbParams initialization complete")
 
 ###################################################################################
 # Rfdata Class
@@ -73,6 +81,8 @@ class DbParams:
 class Rfdata:
     """Philips-specific structure containing constructed RF data."""
     def __init__(self):
+        logging.debug("Initializing Rfdata")
+        
         self.lineData: Optional[np.ndarray] = None
         self.lineHeader: Optional[np.ndarray] = None
         self.headerInfo: Optional[HeaderInfoStruct] = None
@@ -80,6 +90,8 @@ class Rfdata:
         self.dbParams: Optional[DbParams] = None
         self.echoMModeData: Optional[Any] = None
         self.miscData: Optional[Any] = None
+        
+        logging.debug("Rfdata initialization complete")
 
 ###################################################################################
 # Main Parser Class
@@ -89,6 +101,7 @@ class PhilipsRfParser:
     def __init__(self, ML_out: int = 2, ML_in: int = 32, used_os: Optional[int] = None):
         """Initialize the parser with default parameters."""
         logging.info(f"Initializing PhilipsRfParser with ML_out={ML_out}, ML_in={ML_in}, used_os={used_os}")
+        
         self.ML_out: int = ML_out
         self.ML_in: int = ML_in
         self.used_os: Optional[int] = used_os
@@ -99,25 +112,39 @@ class PhilipsRfParser:
         self.multilinefactor: Optional[int] = None
         self.pt: Optional[int] = None
         
+        logging.debug("PhilipsRfParser initialization complete")
+        
     ###################################################################################
     # Utility Functions
     ###################################################################################
     @staticmethod
     def _get_filler_zeros(num: int) -> str:
         """Get string of zeros for padding."""
-        return '0' * max(0, num - 1)
+        logging.debug(f"Creating filler zeros, num={num}")
+        
+        result = '0' * max(0, num - 1)
+        
+        logging.debug(f"Generated {len(result)} filler zeros")
+        return result
 
     ###################################################################################
     # File Type Detection and File Header
     ###################################################################################
     def _detect_file_type(self, file_obj) -> Tuple[bool, bool, int, List[int]]:
         """Detects file type and returns is_voyager, has_file_header, file_header_size, file_header."""
+        logging.info("Starting file type detection")
+        
         VHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 160, 160]
         FHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 11, 11]
         file_header_size = len(VHeader)
+        
+        logging.debug(f"Reading {file_header_size} bytes for header detection")
         file_header = list(file_obj.read(file_header_size))
+        logging.debug(f"Read file header: {file_header[:10]}...")
+        
         is_voyager = False
         has_file_header = False
+        
         if file_header == VHeader:
             logging.info("Header information found - Parsing Voyager RF capture file")
             is_voyager = True
@@ -128,6 +155,8 @@ class PhilipsRfParser:
         else:
             logging.info("No header found - Parsing legacy Voyager RF capture file")
             is_voyager = True
+            
+        logging.debug(f"File type detection complete: is_voyager={is_voyager}, has_file_header={has_file_header}")
         return is_voyager, has_file_header, file_header_size, file_header
 
     ###################################################################################
@@ -135,21 +164,30 @@ class PhilipsRfParser:
     ###################################################################################
     def _parse_file_header_and_offset(self, file_obj, is_voyager: bool, has_file_header: bool, file_header_size: int, filepath: str) -> Tuple[Optional[DbParams], int, str]:
         """Parse file header and calculate total_header_size, endianness, and db_params."""
+        logging.info("Parsing file header and calculating offset")
+        logging.debug(f"Input parameters: is_voyager={is_voyager}, has_file_header={has_file_header}, file_header_size={file_header_size}")
+        
         endianness = 'little'
         db_params = None
         num_file_header_bytes = 0
+        
         if has_file_header:
             if is_voyager:
                 endianness = 'big'
                 logging.debug("Using big-endian for Voyager file")
             else:
                 logging.debug("Using little-endian for Fusion file")
+                
+            logging.info("Parsing file header parameters")
             db_params, num_file_header_bytes = self._parse_file_header(file_obj, endianness)
             total_header_size = file_header_size + 8 + num_file_header_bytes
-            logging.debug(f"Total header size: {total_header_size} bytes")
+            
+            logging.debug(f"Total header size: {total_header_size} bytes (file_header={file_header_size} + 8 + params={num_file_header_bytes})")
         else:
             total_header_size = 0
             logging.debug("No file header to parse")
+            
+        logging.info(f"File header parsing complete: endianness={endianness}, total_header_size={total_header_size}")
         return db_params, total_header_size, endianness
 
     ###################################################################################
@@ -157,40 +195,68 @@ class PhilipsRfParser:
     ###################################################################################
     def _load_raw_rf_data(self, filepath: str, is_voyager: bool, total_header_size: int, read_offset: int, read_size: int) -> Tuple[Any, Optional[int]]:
         """Load raw RF data from file, handling Voyager and Fusion formats."""
-        remaining_size = os.stat(filepath).st_size - total_header_size
+        logging.info(f"Loading raw RF data: is_voyager={is_voyager}, offset={read_offset}MB, size={read_size}MB")
+        
+        file_size = os.stat(filepath).st_size
+        remaining_size = file_size - total_header_size
+        logging.debug(f"File size: {file_size} bytes, header size: {total_header_size} bytes, remaining: {remaining_size} bytes")
+        
         read_offset *= 2 ** 20
         read_size *= 2 ** 20
+        logging.debug(f"Read parameters in bytes: offset={read_offset}, size={read_size}")
+        
         if is_voyager:
+            logging.info("Loading Voyager format data")
+            
             alignment = np.arange(0, remaining_size + 1, 36)
             offset_diff = alignment - read_offset
             read_diff = alignment - read_size
             read_offset = alignment[np.where(offset_diff >= 0)[0][0]].__int__()
             read_size = alignment[np.where(read_diff >= 0)[0][0]].__int__()
+            
             logging.debug(f"Aligned Voyager read - offset: {read_offset}, size: {read_size}")
+            
             with open(filepath, 'rb') as f:
+                f.seek(read_offset)
                 rawrfdata = f.read(read_size)
+                
+            logging.info(f"Loaded {len(rawrfdata)} bytes of Voyager data")
             return rawrfdata, None
         else:
+            logging.info("Loading Fusion format data")
+            
             alignment = np.arange(0, remaining_size + 1, 32)
             offset_diff = alignment - read_offset
             read_diff = alignment - read_size
             matching_indices = np.where(offset_diff >= 0)[0]
+            
             if len(matching_indices) > 0:
                 read_offset = alignment[matching_indices[0]].__int__()
             else:
                 read_offset = 0
+                logging.warning("No matching offset found, using 0")
+                
             matching_indices = np.where(read_diff >= 0)[0]
             if len(matching_indices) > 0:
                 read_size = alignment[matching_indices[0]].__int__()
             else:
                 read_size = remaining_size
+                logging.warning(f"No matching size found, using remaining size: {read_size}")
+                
             num_clumps = int(np.floor(read_size / 32))
             logging.debug(f"Aligned Fusion read - offset: {read_offset}, size: {read_size}, clumps: {num_clumps}")
+            
             offset = total_header_size + read_offset
+            logging.info(f"Reading Fusion data: {num_clumps} clumps from offset {offset}")
+            
             partA = getPartA(num_clumps, filepath, offset)
             partB = getPartB(num_clumps, filepath, offset)
+            logging.debug(f"Retrieved partA: {len(partA)} elements, partB: {len(partB)} elements")
+            
             rawrfdata = np.concatenate((np.array(partA, dtype=int).reshape((12, num_clumps), order='F'), np.array([partB], dtype=int)))
             logging.debug(f"Raw RF data shape: {rawrfdata.shape}")
+            
+            logging.info(f"Loaded Fusion data with shape {rawrfdata.shape}")
             return rawrfdata, num_clumps
 
     ###################################################################################
@@ -198,26 +264,44 @@ class PhilipsRfParser:
     ###################################################################################
     def _reshape_voyager_raw_data(self, rawrfdata: Any) -> Any:
         """Reshape Voyager raw RF data if needed."""
+        logging.info("Reshaping Voyager raw data")
+        
+        initial_size = len(rawrfdata)
+        logging.debug(f"Initial raw data size: {initial_size} bytes")
+        
         num_clumps = np.floor(len(rawrfdata) / 36)
+        logging.debug(f"Calculated clumps: {num_clumps}")
+        
         rlimit = 180_000_000
         if len(rawrfdata) > rlimit:
             logging.warning(f"Large file detected ({len(rawrfdata)} bytes), chunking reshape operation")
+            
             num_chunks = int(np.floor(len(rawrfdata) / rlimit))
             num_rem_bytes = np.mod(len(rawrfdata), rlimit)
             num_clump_group = int(rlimit / 36)
+            logging.debug(f"Chunking: {num_chunks} chunks, {num_rem_bytes} remaining bytes, {num_clump_group} clumps per chunk")
+            
             temp = np.zeros((num_chunks + 1, 3, 12, num_clump_group))
             m = 0
             n = 0
+            
             for i in range(num_chunks):
+                logging.debug(f"Processing chunk {i+1}/{num_chunks}")
                 temp[i] = np.reshape(rawrfdata[m:m + rlimit], (3, 12, num_clump_group))
                 m += rlimit
                 n += num_clump_group
+                
             if num_rem_bytes > 0:
+                logging.debug(f"Processing remaining {num_rem_bytes} bytes")
                 temp[num_chunks] = np.reshape(rawrfdata[m:int(num_clumps * 36)], (3, 12, int(num_clumps - n)))
+                
             rawrfdata = np.concatenate((temp[:]), axis=2)
             logging.debug("Chunked reshape complete")
         else:
             logging.debug("Direct reshape for normal size file")
+            rawrfdata = np.reshape(rawrfdata, (3, 12, int(num_clumps)), order='F')
+            
+        logging.info(f"Voyager reshape complete, final shape: {np.array(rawrfdata).shape}")
         return rawrfdata
 
     ###################################################################################
@@ -225,9 +309,13 @@ class PhilipsRfParser:
     ###################################################################################
     def _parse_header_dispatch(self, rawrfdata: Any, is_voyager: bool) -> HeaderInfoStruct:
         """Dispatch to the correct header parsing method."""
+        logging.info(f"Dispatching header parsing: is_voyager={is_voyager}")
+        
         if is_voyager:
+            logging.debug("Using Voyager header parser")
             return self._parse_header_v(rawrfdata)
         else:
+            logging.debug("Using Fusion header parser")
             return self._parse_header_f(rawrfdata)
 
     ###################################################################################
@@ -235,6 +323,7 @@ class PhilipsRfParser:
     ###################################################################################
     def _parse_rf_data_dispatch(self, rawrfdata: Any, header_info: HeaderInfoStruct, is_voyager: bool) -> Tuple[np.ndarray, np.ndarray, int]:
         """Dispatch to the correct RF data parsing method."""
+        logging.info(f"Dispatching RF data parsing: is_voyager={is_voyager}")
         return self._parse_rf_data(rawrfdata, header_info, is_voyager)
 
     ###################################################################################
@@ -242,6 +331,9 @@ class PhilipsRfParser:
     ###################################################################################
     def _organize_data_types(self, rfdata: Rfdata, header_info: HeaderInfoStruct, tap_point: int) -> Rfdata:
         """Organize data types (echo, color, etc.) and assign them to rfdata."""
+        logging.info(f"Organizing data types, tap_point={tap_point}")
+        logging.debug(f"Available data types in headers: {np.unique(header_info.Data_Type) if hasattr(header_info, 'Data_Type') else 'N/A'}")
+        
         rfdata = self._extract_echo_data(rfdata, header_info, tap_point)
         rfdata = self._extract_cw_data(rfdata, header_info, tap_point)
         rfdata = self._extract_pw_data(rfdata, header_info, tap_point)
@@ -251,100 +343,199 @@ class PhilipsRfParser:
         rfdata = self._extract_dummy_data(rfdata, header_info, tap_point)
         rfdata = self._extract_swi_data(rfdata, header_info, tap_point)
         rfdata = self._extract_misc_data(rfdata, header_info, tap_point)
+        
+        logging.info("Data type organization complete")
         return rfdata
 
     ###################################################################################
     # Echo Data Extraction
     ###################################################################################
     def _extract_echo_data(self, rfdata, header_info, tap_point):
+        logging.info(f"Extracting echo data, tap_point={tap_point}")
+        
         DataType_ECHO = np.arange(1, 15)
+        logging.debug(f"Echo data types: {DataType_ECHO}")
+        
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
             SAMPLE_RATE = float(header_info.RF_Sample_Rate[0])
-            ML_Capture = 16 if SAMPLE_RATE == 0 else 32
+            
+            # Log the sample rate when it's used to determine ML_Capture
+            logging.info(f"RF Sample Rate: {SAMPLE_RATE}")
+            
+            ML_Capture = 16 if SAMPLE_RATE == 0 else 32 # 20MHz Capture
+            logging.debug(f"ML_Capture was 0, set to {ML_Capture} based on sample rate {SAMPLE_RATE}")
+        
+        logging.debug(f"ML_Capture={ML_Capture}")
+        
         if tap_point == 7:
             tap_point = 4
+            logging.debug("Tap point 7 converted to 4")
+            
         xmit_events = len(header_info.Data_Type)
+        logging.debug(f"Number of transmit events: {xmit_events}")
+        
         echo_index = np.zeros(xmit_events).astype(np.int32)
         for dt in DataType_ECHO:
             index = ((header_info.Data_Type & 255) == dt)
             echo_index = np.bitwise_or(echo_index, np.array(index).astype(np.int32))
-        if np.sum(echo_index) == 0 and np.any(header_info.Data_Type == 1):
+            
+        echo_count = np.sum(echo_index)
+        logging.debug(f"Found {echo_count} echo data entries")
+        
+        if echo_count == 0 and np.any(header_info.Data_Type == 1):
             echo_index = (header_info.Data_Type == 1).astype(np.int32)
-        if np.sum(echo_index) > 0:
+            echo_count = np.sum(echo_index)
+            logging.debug(f"Fallback: Found {echo_count} entries with Data_Type=1")
+            
+        if echo_count > 0:
             columns_to_keep = np.where(echo_index == 1)[0]
+            logging.debug(f"Processing {len(columns_to_keep)} echo columns")
+            
             pruning_line_data = rfdata.lineData[:, columns_to_keep]
             pruning_line_header = rfdata.lineHeader[:, columns_to_keep]
+            logging.debug(f"Pruning data shape: {pruning_line_data.shape}")
+            
             if tap_point == 4:
                 echo_data = pruning_line_data
+                logging.debug("Using data directly (tap_point=4)")
             else:
+                logging.debug("Pruning data before use")
                 echo_data = self._prune_data(pruning_line_data, pruning_line_header, ML_Capture)
+                
             if tap_point in [0, 1]:
                 ML_Actual = rfdata.dbParams.azimuthMultilineFactorXbrIn[0] * rfdata.dbParams.elevationMultilineFactor[0]
                 CRE = 1
+                logging.debug(f"Tap point {tap_point}: ML_Actual={ML_Actual}, CRE={CRE}")
                 rfdata.echoData = self._sort_rf(echo_data, ML_Capture, ML_Actual, CRE, False)
             elif tap_point == 2:
                 ML_Actual = rfdata.dbParams.azimuthMultilineFactorXbrOut[0] * rfdata.dbParams.elevationMultilineFactor[0]
                 CRE = rfdata.dbParams.acqNumActiveScChannels2d[0]
+                logging.debug(f"Tap point {tap_point}: ML_Actual={ML_Actual}, CRE={CRE}")
                 rfdata.echoData = self._sort_rf(echo_data, ML_Capture, ML_Actual, CRE, False)
             elif tap_point == 4:
                 ML_Actual = 128
                 CRE = 1
+                logging.debug(f"Tap point {tap_point}: ML_Actual={ML_Actual}, CRE={CRE}")
                 rfdata.echoData = self._sort_rf(echo_data, ML_Actual, ML_Actual, CRE, False)
+                
+            logging.info(f"Echo data extracted successfully, shape: {rfdata.echoData[0].shape if hasattr(rfdata.echoData, '__getitem__') else 'N/A'}")
+        else:
+            logging.warning("No echo data found")
+            
         return rfdata
 
     ###################################################################################
     # CW Data Extraction
     ###################################################################################
     def _extract_cw_data(self, rfdata, header_info, tap_point):
+        logging.info(f"Extracting CW data, tap_point={tap_point}")
+        
         DataType_CW = 16
+        logging.debug(f"CW data type: {DataType_CW}")
+        
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
             SAMPLE_RATE = float(header_info.RF_Sample_Rate[0])
+            
+            # Log the sample rate when it's used to determine ML_Capture
+            logging.info(f"RF Sample Rate: {SAMPLE_RATE}")
+            
             ML_Capture = 16 if SAMPLE_RATE == 0 else 32
+            logging.debug(f"ML_Capture was 0, set to {ML_Capture} based on sample rate {SAMPLE_RATE}")
+        
+        logging.debug(f"ML_Capture={ML_Capture}")
+        
         cw_index = (header_info.Data_Type == DataType_CW)
-        if np.sum(cw_index) > 0:
+        cw_count = np.sum(cw_index)
+        logging.debug(f"Found {cw_count} CW data entries")
+        
+        if cw_count > 0:
+            logging.debug("Processing CW data")
             cw_data = self._prune_data(rfdata.lineData[:, cw_index], rfdata.lineHeader[:, cw_index], ML_Capture)
+            
             ML_Actual = 1
             CRE = 1
+            logging.debug(f"CW sorting: ML_Actual={ML_Actual}, CRE={CRE}")
+            
             rfdata.cwData = self._sort_rf(cw_data, ML_Capture, ML_Actual, CRE, False)
+            logging.info(f"CW data extracted successfully, shape: {rfdata.cwData[0].shape if hasattr(rfdata.cwData, '__getitem__') else 'N/A'}")
+        else:
+            logging.debug("No CW data found")
+            
         return rfdata
 
     ###################################################################################
     # PW Data Extraction
     ###################################################################################
     def _extract_pw_data(self, rfdata, header_info, tap_point):
+        logging.info(f"Extracting PW data, tap_point={tap_point}")
+        
         DataType_PW = [18, 19]
+        logging.debug(f"PW data types: {DataType_PW}")
+        
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
             SAMPLE_RATE = float(header_info.RF_Sample_Rate[0])
             ML_Capture = 16 if SAMPLE_RATE == 0 else 32
+            logging.debug(f"ML_Capture was 0, set to {ML_Capture} based on sample rate {SAMPLE_RATE}")
+            
+        logging.debug(f"ML_Capture={ML_Capture}")
+        
         xmit_events = len(header_info.Data_Type)
         pw_index = np.zeros(xmit_events).astype(bool)
+        
         for dt in DataType_PW:
             index = (header_info.Data_Type == dt)
             pw_index = np.bitwise_or(pw_index, index)
-        if np.sum(pw_index) > 0:
+            
+        pw_count = np.sum(pw_index)
+        logging.debug(f"Found {pw_count} PW data entries")
+        
+        if pw_count > 0:
+            logging.debug("Processing PW data")
             pw_data = self._prune_data(rfdata.lineData[:, pw_index], rfdata.lineHeader[:, pw_index], ML_Capture)
+            
             ML_Actual = 1
             CRE = 1
+            logging.debug(f"PW sorting: ML_Actual={ML_Actual}, CRE={CRE}")
+            
             rfdata.pwData = self._sort_rf(pw_data, ML_Capture, ML_Actual, CRE, False)
+            logging.info(f"PW data extracted successfully, shape: {rfdata.pwData[0].shape if hasattr(rfdata.pwData, '__getitem__') else 'N/A'}")
+        else:
+            logging.debug("No PW data found")
+            
         return rfdata
 
     ###################################################################################
     # Color Data Extraction
     ###################################################################################
     def _extract_color_data(self, rfdata, header_info, tap_point):
+        logging.info(f"Extracting color data, tap_point={tap_point}")
+        
         DataType_COLOR = [17, 21, 22, 23, 24]
+        logging.debug(f"Color data types: {DataType_COLOR}")
+        
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
             SAMPLE_RATE = float(header_info.RF_Sample_Rate[0])
             ML_Capture = 16 if SAMPLE_RATE == 0 else 32
+            logging.debug(f"ML_Capture was 0, set to {ML_Capture} based on sample rate {SAMPLE_RATE}")
+            
+        logging.debug(f"ML_Capture={ML_Capture}")
+        
         xmit_events = len(header_info.Data_Type)
         color_index = np.zeros(xmit_events).astype(bool)
+        
         for dt in DataType_COLOR:
             index = (header_info.Data_Type == dt)
             color_index = np.bitwise_or(color_index, index)
+            
+        color_count = np.sum(color_index)
+        logging.debug(f"Found {color_count} color data entries")
+        
+        if color_count > 0:
+            logging.debug("Processing color data")
         if np.sum(color_index) > 0:
             color_data = self._prune_data(rfdata.lineData[:, color_index], rfdata.lineHeader[:, color_index], ML_Capture)
             if tap_point in [0, 1]:
@@ -359,66 +550,131 @@ class PhilipsRfParser:
     # Echo M-Mode Data Extraction
     ###################################################################################
     def _extract_echo_mmode_data(self, rfdata, header_info, tap_point):
+        logging.info(f"Extracting echo M-Mode data, tap_point={tap_point}")
+        
         DataType_EchoMMode = 26
+        logging.debug(f"Echo M-Mode data type: {DataType_EchoMMode}")
+        
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
             SAMPLE_RATE = float(header_info.RF_Sample_Rate[0])
             ML_Capture = 16 if SAMPLE_RATE == 0 else 32
+            logging.debug(f"ML_Capture was 0, set to {ML_Capture} based on sample rate {SAMPLE_RATE}")
+            
+        logging.debug(f"ML_Capture={ML_Capture}")
+        
         echo_mmode_index = (header_info.Data_Type == DataType_EchoMMode)
-        if np.sum(echo_mmode_index) > 0:
+        echo_mmode_count = np.sum(echo_mmode_index)
+        logging.debug(f"Found {echo_mmode_count} echo M-Mode data entries")
+        
+        if echo_mmode_count > 0:
+            logging.debug("Processing echo M-Mode data")
             echo_mmode_data = self._prune_data(rfdata.lineData[:, echo_mmode_index], rfdata.lineHeader[:, echo_mmode_index], ML_Capture)
+            
             ML_Actual = 1
             CRE = 1
+            logging.debug(f"Echo M-Mode sorting: ML_Actual={ML_Actual}, CRE={CRE}")
+            
             rfdata.echoMModeData = self._sort_rf(echo_mmode_data, ML_Capture, ML_Actual, CRE, False)
+            logging.info(f"Echo M-Mode data extracted successfully, shape: {rfdata.echoMModeData[0].shape if hasattr(rfdata.echoMModeData, '__getitem__') else 'N/A'}")
+        else:
+            logging.debug("No echo M-Mode data found")
+            
         return rfdata
 
     ###################################################################################
     # Color M-Mode Data Extraction
     ###################################################################################
     def _extract_color_mmode_data(self, rfdata, header_info, tap_point):
+        logging.info(f"Extracting color M-Mode data, tap_point={tap_point}")
+        
         DataType_ColorMMode = [27, 28]
+        logging.debug(f"Color M-Mode data types: {DataType_ColorMMode}")
+        
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
             SAMPLE_RATE = float(header_info.RF_Sample_Rate[0])
             ML_Capture = 16 if SAMPLE_RATE == 0 else 32
+            logging.debug(f"ML_Capture was 0, set to {ML_Capture} based on sample rate {SAMPLE_RATE}")
+            
+        logging.debug(f"ML_Capture={ML_Capture}")
+        
         xmit_events = len(header_info.Data_Type)
         color_mmode_index = np.zeros(xmit_events).astype(bool)
+        
         for dt in DataType_ColorMMode:
             index = (header_info.Data_Type == dt)
             color_mmode_index = np.bitwise_or(color_mmode_index, index)
-        if np.sum(color_mmode_index) > 0:
+            
+        color_mmode_count = np.sum(color_mmode_index)
+        logging.debug(f"Found {color_mmode_count} color M-Mode data entries")
+        
+        if color_mmode_count > 0:
+            logging.debug("Processing color M-Mode data")
             color_mmode_data = self._prune_data(rfdata.lineData[:, color_mmode_index], rfdata.lineHeader[:, color_mmode_index], ML_Capture)
+            
             ML_Actual = 1
             CRE = 1
+            logging.debug(f"Color M-Mode sorting: ML_Actual={ML_Actual}, CRE={CRE}")
+            
             rfdata.colorMModeData = self._sort_rf(color_mmode_data, ML_Capture, ML_Actual, CRE, False)
+            logging.info(f"Color M-Mode data extracted successfully, shape: {rfdata.colorMModeData[0].shape if hasattr(rfdata.colorMModeData, '__getitem__') else 'N/A'}")
+        else:
+            logging.debug("No color M-Mode data found")
+            
         return rfdata
 
     ###################################################################################
     # Dummy Data Extraction
     ###################################################################################
     def _extract_dummy_data(self, rfdata, header_info, tap_point):
+        logging.info(f"Extracting dummy data, tap_point={tap_point}")
+        
         DataType_Dummy = [20, 25, 29, 30, 31]
+        logging.debug(f"Dummy data types: {DataType_Dummy}")
+        
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
             SAMPLE_RATE = float(header_info.RF_Sample_Rate[0])
             ML_Capture = 16 if SAMPLE_RATE == 0 else 32
+            logging.debug(f"ML_Capture was 0, set to {ML_Capture} based on sample rate {SAMPLE_RATE}")
+            
+        logging.debug(f"ML_Capture={ML_Capture}")
+        
         xmit_events = len(header_info.Data_Type)
         dummy_index = np.zeros(xmit_events).astype(bool)
+        
         for dt in DataType_Dummy:
             index = (header_info.Data_Type == dt)
             dummy_index = np.bitwise_or(dummy_index, index)
-        if np.sum(dummy_index) > 0:
+            
+        dummy_count = np.sum(dummy_index)
+        logging.debug(f"Found {dummy_count} dummy data entries")
+        
+        if dummy_count > 0:
+            logging.debug("Processing dummy data")
             dummy_data = self._prune_data(rfdata.lineData[:, dummy_index], rfdata.lineHeader[:, dummy_index], ML_Capture)
+            
             ML_Actual = 2
             CRE = 1
+            logging.debug(f"Dummy sorting: ML_Actual={ML_Actual}, CRE={CRE}")
+            
             rfdata.dummyData = self._sort_rf(dummy_data, ML_Capture, ML_Actual, CRE, False)
+            logging.info(f"Dummy data extracted successfully, shape: {rfdata.dummyData[0].shape if hasattr(rfdata.dummyData, '__getitem__') else 'N/A'}")
+        else:
+            logging.debug("No dummy data found")
+            
         return rfdata
 
     ###################################################################################
     # SWI Data Extraction
     ###################################################################################
     def _extract_swi_data(self, rfdata, header_info, tap_point):
+        logging.info(f"Extracting SWI data, tap_point={tap_point}")
+        
         DataType_SWI = [90, 91]
+        logging.debug(f"SWI data types: {DataType_SWI}")
+        
         ML_Capture = 128 if tap_point == 7 else float(header_info.Multilines_Capture[0])
         if ML_Capture == 0:
             SAMPLE_RATE = float(header_info.RF_Sample_Rate[0])
@@ -685,7 +941,7 @@ class PhilipsRfParser:
         return rf_data_all_fund, rf_data_all_harm
 
     ###################################################################################
-    # Original Parsing Methods
+    # Voyager Header Parsing
     ###################################################################################
     def _parse_header_v(self, rawrfdata):
         """Parse header for Voyager systems."""
@@ -695,6 +951,27 @@ class PhilipsRfParser:
         iHeader = np.where(np.uint8(rawrfdata[2,0,:])&224)
         numHeaders = len(iHeader)-1 # Ignore last header as it is part of a partial line
         logging.debug(f"Found {numHeaders} headers in Voyager data")
+
+        # Initialize header arrays 
+        temp_headerInfo.RF_CaptureVersion = np.zeros(numHeaders, dtype=np.uint8)
+        temp_headerInfo.Tap_Point = np.zeros(numHeaders, dtype=np.uint8)
+        temp_headerInfo.Data_Gate = np.zeros(numHeaders, dtype=np.uint8)
+        temp_headerInfo.Multilines_Capture = np.zeros(numHeaders, dtype=np.uint8)
+        temp_headerInfo.RF_Sample_Rate = np.zeros(numHeaders, dtype=np.uint8)
+        temp_headerInfo.Steer = np.zeros(numHeaders, dtype=np.uint8)
+        temp_headerInfo.elevationPlaneOffset = np.zeros(numHeaders, dtype=np.uint8)
+        temp_headerInfo.PM_Index = np.zeros(numHeaders, dtype=np.uint8)
+        temp_headerInfo.Line_Index = np.zeros(numHeaders, dtype=np.uint16)
+        temp_headerInfo.Pulse_Index = np.zeros(numHeaders, dtype=np.uint16)
+        temp_headerInfo.Data_Format = np.zeros(numHeaders, dtype=np.uint16)
+        temp_headerInfo.Data_Type = np.zeros(numHeaders, dtype=np.uint16)
+        temp_headerInfo.Header_Tag = np.zeros(numHeaders, dtype=np.uint16)
+        temp_headerInfo.Threed_Pos = np.zeros(numHeaders, dtype=np.uint16)
+        temp_headerInfo.Mode_Info = np.zeros(numHeaders, dtype=np.uint16)
+        temp_headerInfo.Frame_ID = np.zeros(numHeaders, dtype=np.uint32)
+        temp_headerInfo.CSID = np.zeros(numHeaders, dtype=np.uint16)
+        temp_headerInfo.Line_Type = np.zeros(numHeaders, dtype=np.uint16)
+        temp_headerInfo.Time_Stamp = np.zeros(numHeaders, dtype=np.uint32)
 
         # Get infor for each header
         for m in range(numHeaders):
@@ -721,6 +998,11 @@ class PhilipsRfParser:
             iBit += 4
             temp_headerInfo.RF_Sample_Rate[m] = int(packedHeader[iBit],2)
             iBit += 1
+            
+            # Log sample rate for first header
+            if m == 0:
+                logging.info(f"Sample rate from first Voyager header: {temp_headerInfo.RF_Sample_Rate[m]}")
+                
             temp_headerInfo.Steer[m] = int(packedHeader[iBit:iBit+6],2)
             iBit += 6
             temp_headerInfo.elevationPlaneOffset[m] = int(packedHeader[iBit:iBit+8],2)
@@ -747,7 +1029,7 @@ class PhilipsRfParser:
             iBit += 16
             temp_headerInfo.Line_Type[m] = int(packedHeader[iBit:iBit+16],2)
             iBit += 16
-            temp_headerInfo.Time_Stamp = int(packedHeader[iBit:iBit+32],2)
+            temp_headerInfo.Time_Stamp[m] = int(packedHeader[iBit:iBit+32],2)
 
         logging.info(f"Voyager header parsing complete - processed {numHeaders} headers")
         return temp_headerInfo
@@ -821,6 +1103,11 @@ class PhilipsRfParser:
             iBit += 15 # Waste 15 bits (unused)
             HeaderInfo.RF_Sample_Rate[m] = int(packedHeader[iBit], 2)
             iBit += 1
+            
+            # Log sample rate for first header
+            if m == 0:
+                logging.info(f"Sample rate from first header: {HeaderInfo.RF_Sample_Rate[m]}")
+                
             HeaderInfo.Steer[m] = int(packedHeader[iBit:iBit+6], 2)
             iBit += 6
             HeaderInfo.elevationPlaneOffset[m] = int(packedHeader[iBit:iBit+8], 2)
@@ -1137,12 +1424,55 @@ class PhilipsRfParser:
     ###################################################################################
     def philipsRfParser(self, filepath: str, save_numpy: bool = False) -> np.ndarray:
         """Parse Philips RF data file, save as .mat file, and return shape of data.
-        If save_numpy is True, only save the processed data as .npy files in a folder named 'sample_npy' in the sample path.
+        If save_numpy is True, only save the processed data as .npy files in a folder named '{sample_name}_extracted' in the sample path.
         If save_numpy is False, only save as .mat file."""
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        
+        # Set up logging
+        if save_numpy:
+            # Create numpy folder with sample name + '_extracted'
+            sample_name = os.path.splitext(os.path.basename(filepath))[0]
+            numpy_folder = os.path.join(os.path.dirname(filepath), f'{sample_name}_extracted')
+            if not os.path.exists(numpy_folder):
+                os.makedirs(numpy_folder)
+            
+            # Set up file logging to the numpy folder - all levels
+            log_file = os.path.join(numpy_folder, 'parsing_log.txt')
+            file_handler = logging.FileHandler(log_file, mode='w')
+            file_handler.setLevel(logging.DEBUG)  # Capture all levels for file
+            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+            
+            # Set up console logging - only INFO and WARNING
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+            
+            # Create custom filter for console to only show INFO and WARNING
+            class InfoWarningFilter(logging.Filter):
+                def filter(self, record):
+                    return record.levelno in (logging.INFO, logging.WARNING)
+            
+            console_handler.addFilter(InfoWarningFilter())
+            
+            # Configure logger
+            logger = logging.getLogger()
+            # Clear any existing handlers
+            logger.handlers.clear()
+            # Add both handlers
+            logger.addHandler(file_handler)
+            logger.addHandler(console_handler)
+            logger.setLevel(logging.DEBUG)  # Logger needs to be at DEBUG to capture all messages
+        else:
+            logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        
         logging.info(f"Starting Philips RF parsing for file: {filepath}")
         logging.info(f"Save format: {'NumPy arrays' if save_numpy else 'MATLAB file'}")
+        
         self.rfdata = self._parse_rf(filepath, 0, 2000)
+        
+        # Save header summary if saving as numpy
+        if save_numpy:
+            self._save_header_summary(numpy_folder)
+        
         # Try to find the first available data type to save
         data_priority = [
             ('echoData', 'echoData'),
@@ -1155,6 +1485,7 @@ class PhilipsRfParser:
             ('swiData', 'swiData'),
             ('miscData', 'miscData'),
         ]
+        
         data_to_save = None
         data_type_label = None
         for attr, label in data_priority:
@@ -1164,18 +1495,23 @@ class PhilipsRfParser:
                 if isinstance(data_to_save, (list, tuple)) and len(data_to_save) > 0:
                     data_to_save = data_to_save[0]
                 break
+        
         if data_to_save is None or (hasattr(data_to_save, 'size') and data_to_save.size == 0):
             error_msg = f"No supported data found in RF file. Data_Type values: {np.unique(self.rfdata.headerInfo.Data_Type) if hasattr(self.rfdata.headerInfo, 'Data_Type') else 'N/A'}. lineData shape: {self.rfdata.lineData.shape if hasattr(self.rfdata, 'lineData') else 'N/A'}"
             logging.error(error_msg)
             raise RuntimeError(error_msg)
+        
         logging.info(f"Saving data type: {data_type_label} as 'echoData'")
+        
         # Data preprocessing
         if (self.rfdata.headerInfo.Line_Index[249] == self.rfdata.headerInfo.Line_Index[250]):
             self.rfdata.lineData = self.rfdata.lineData[:, np.arange(2, self.rfdata.lineData.shape[1], 2)]
         else:
             self.rfdata.lineData = self.rfdata.lineData[:, np.arange(1, self.rfdata.lineData.shape[1], 2)]
+        
         self._calculate_parameters()
         rf_data_all_fund, rf_data_all_harm = self._fill_data_arrays()
+        
         if not save_numpy:
             destination = str(filepath[:-3] + '.mat')
             logging.info(f"Saving as MATLAB file: {destination}")
@@ -1192,6 +1528,7 @@ class PhilipsRfParser:
                 'pt': self.pt,
                 'multilinefactor': self.multilinefactor,
             }
+            
             if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 1:
                 contents['echoData1'] = self.rfdata.echoData[1]
             if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 2:
@@ -1202,14 +1539,12 @@ class PhilipsRfParser:
                 contents['echoMModeData'] = self.rfdata.echoMModeData
             if hasattr(self.rfdata, 'miscData'):
                 contents['miscData'] = self.rfdata.miscData
+            
             if os.path.exists(destination):
                 os.remove(destination)
             savemat(destination, contents)
             logging.info(f"MATLAB file saved successfully: {destination}")
         else:
-            numpy_folder = os.path.join(os.path.dirname(filepath), 'sample_npy')
-            if not os.path.exists(numpy_folder):
-                os.makedirs(numpy_folder)
             logging.info(f"Saving as NumPy files in: {numpy_folder}")
             np.save(os.path.join(numpy_folder, 'echoData.npy'), data_to_save)
             np.save(os.path.join(numpy_folder, 'lineData.npy'), self.rfdata.lineData)
@@ -1217,9 +1552,125 @@ class PhilipsRfParser:
             np.save(os.path.join(numpy_folder, 'rf_data_all_fund.npy'), rf_data_all_fund)
             np.save(os.path.join(numpy_folder, 'rf_data_all_harm.npy'), rf_data_all_harm)
             logging.info("NumPy files saved successfully")
+        
         result_shape = np.array(rf_data_all_fund).shape
         logging.info(f"Parsing complete. Final data shape: {result_shape}")
+        
+        # Clean up handlers if they were added
+        if save_numpy:
+            logger = logging.getLogger()
+            for handler in logger.handlers[:]:
+                handler.close()
+                logger.removeHandler(handler)
+        
         return result_shape
+
+    def _save_header_summary(self, numpy_folder: str):
+        """Save a summary of header information to a text file."""
+        summary_file = os.path.join(numpy_folder, 'header_summary.txt')
+        
+        with open(summary_file, 'w') as f:
+            f.write("=== PHILIPS RF FILE HEADER SUMMARY ===\n\n")
+            
+            # Basic file information
+            if hasattr(self.rfdata, 'headerInfo') and self.rfdata.headerInfo:
+                h = self.rfdata.headerInfo
+                
+                # Number of headers/lines
+                if hasattr(h, 'Data_Type') and h.Data_Type is not None:
+                    f.write(f"Number of headers/lines: {len(h.Data_Type)}\n")
+                
+                # First header information
+                f.write("\n--- First Header Information ---\n")
+                if hasattr(h, 'RF_CaptureVersion') and h.RF_CaptureVersion is not None:
+                    f.write(f"RF Capture Version: {h.RF_CaptureVersion[0]}\n")
+                if hasattr(h, 'Tap_Point') and h.Tap_Point is not None:
+                    f.write(f"Tap Point: {h.Tap_Point[0]}\n")
+                if hasattr(h, 'RF_Sample_Rate') and h.RF_Sample_Rate is not None:
+                    f.write(f"RF Sample Rate: {h.RF_Sample_Rate[0]}\n")
+                if hasattr(h, 'Multilines_Capture') and h.Multilines_Capture is not None:
+                    f.write(f"Multilines Capture: {h.Multilines_Capture[0]}\n")
+                if hasattr(h, 'Data_Gate') and h.Data_Gate is not None:
+                    f.write(f"Data Gate: {h.Data_Gate[0]}\n")
+                
+                # Data types present
+                f.write("\n--- Data Types Present ---\n")
+                if hasattr(h, 'Data_Type') and h.Data_Type is not None:
+                    unique_types = np.unique(h.Data_Type)
+                    f.write(f"Unique Data Types: {unique_types}\n")
+                    
+                    # Count of each data type
+                    for dtype in unique_types:
+                        count = np.sum(h.Data_Type == dtype)
+                        f.write(f"  Type {dtype}: {count} occurrences\n")
+                
+                # Frame and line information
+                f.write("\n--- Frame Information ---\n")
+                if hasattr(h, 'Frame_ID') and h.Frame_ID is not None:
+                    unique_frames = np.unique(h.Frame_ID)
+                    f.write(f"Number of unique frames: {len(unique_frames)}\n")
+                    f.write(f"Frame ID range: {unique_frames.min()} to {unique_frames.max()}\n")
+                
+                if hasattr(h, 'Line_Index') and h.Line_Index is not None:
+                    f.write(f"Line index range: {h.Line_Index.min()} to {h.Line_Index.max()}\n")
+                
+                # Time information
+                f.write("\n--- Time Information ---\n")
+                if hasattr(h, 'Time_Stamp') and h.Time_Stamp is not None:
+                    f.write(f"First timestamp: {h.Time_Stamp[0]}\n")
+                    f.write(f"Last timestamp: {h.Time_Stamp[-1]}\n")
+            
+            # Database parameters
+            if hasattr(self.rfdata, 'dbParams') and self.rfdata.dbParams:
+                f.write("\n--- Database Parameters ---\n")
+                db = self.rfdata.dbParams
+                
+                if hasattr(db, 'acqNumActiveScChannels2d') and db.acqNumActiveScChannels2d:
+                    f.write(f"Active scan channels: {db.acqNumActiveScChannels2d}\n")
+                if hasattr(db, 'numOfSonoCTAngles2dActual') and db.numOfSonoCTAngles2dActual:
+                    f.write(f"SonoCT angles: {db.numOfSonoCTAngles2dActual}\n")
+                if hasattr(db, 'num2DCols') and db.num2DCols is not None:
+                    f.write(f"2D columns shape: {db.num2DCols.shape}\n")
+                    f.write(f"2D columns first row: {db.num2DCols[0, :] if db.num2DCols.size > 0 else 'N/A'}\n")
+            
+            # Calculated parameters
+            if hasattr(self, 'numFrame'):
+                f.write("\n--- Calculated Parameters ---\n")
+                f.write(f"Number of frames: {self.numFrame}\n")
+                f.write(f"TX beams per frame: {self.txBeamperFrame}\n")
+                f.write(f"Number of SonoCT angles: {self.NumSonoCTAngles}\n")
+                f.write(f"Multiline factor: {self.multilinefactor}\n")
+                f.write(f"Used OS: {self.used_os}\n")
+                f.write(f"PT: {self.pt}\n")
+            
+            # Data shapes
+            f.write("\n--- Data Array Shapes ---\n")
+            if hasattr(self.rfdata, 'lineData') and self.rfdata.lineData is not None:
+                f.write(f"Line data shape: {self.rfdata.lineData.shape}\n")
+            if hasattr(self.rfdata, 'lineHeader') and self.rfdata.lineHeader is not None:
+                f.write(f"Line header shape: {self.rfdata.lineHeader.shape}\n")
+            
+            # Available data types
+            f.write("\n--- Available Data Arrays ---\n")
+            data_attrs = ['echoData', 'cwData', 'pwData', 'colorData', 
+                         'echoMModeData', 'colorMModeData', 'dummyData', 
+                         'swiData', 'miscData']
+            
+            for attr in data_attrs:
+                if hasattr(self.rfdata, attr):
+                    data = getattr(self.rfdata, attr)
+                    if data is not None:
+                        if isinstance(data, (list, tuple)):
+                            f.write(f"{attr}: {len(data)} elements\n")
+                            for i, elem in enumerate(data):
+                                if hasattr(elem, 'shape'):
+                                    f.write(f"  [{i}]: {elem.shape}\n")
+                        elif hasattr(data, 'shape'):
+                            f.write(f"{attr}: {data.shape}\n")
+                        else:
+                            f.write(f"{attr}: Available (unknown shape)\n")
+        
+        logging.info(f"Header summary saved to: {summary_file}")
 
 
 ###################################################################################
@@ -1231,6 +1682,8 @@ if __name__ == "__main__":
     
     # Hardcoded file path - no command line arguments needed
     filepath = r"D:\Omid\0_samples\Philips\David\sample.rf"
+    #filepath = r"C:\0_Main\2_Quantitative_ultrasound\2_github\test\3d.rf"
+    
     logging.info(f"Starting main execution with file: {filepath}")
     parser = PhilipsRfParser()
     parser.philipsRfParser(filepath, save_numpy=True)
