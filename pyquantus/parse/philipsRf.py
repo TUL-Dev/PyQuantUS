@@ -1463,7 +1463,14 @@ class PhilipsRfParser:
         If save_numpy is True, only save the processed data as .npy files in a folder named '{sample_name}_extracted' in the sample path.
         If save_numpy is False, only save as .mat file."""
         
-        # Set up logging
+        # Get the root logger - it may already be configured
+        logger = logging.getLogger()
+        original_handlers = list(logger.handlers)  # Save original handlers
+        original_level = logger.level
+        
+        # Create formatter for consistent output
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        
         if save_numpy:
             # Create numpy folder with sample name + '_extracted'
             sample_name = os.path.splitext(os.path.basename(filepath))[0]
@@ -1471,137 +1478,154 @@ class PhilipsRfParser:
             if not os.path.exists(numpy_folder):
                 os.makedirs(numpy_folder)
             
-            # Set up file logging to the numpy folder - all levels
+            # Add file logging to the numpy folder with detailed output
             log_file = os.path.join(numpy_folder, 'parsing_log.txt')
             file_handler = logging.FileHandler(log_file, mode='w')
             file_handler.setLevel(logging.DEBUG)  # Capture all levels for file
-            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
             
-            # Set up console logging - only INFO and WARNING
-            console_handler = logging.StreamHandler()
-            console_handler.setLevel(logging.INFO)
-            console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-            
-            # Create custom filter for console to only show INFO and WARNING
-            class InfoWarningFilter(logging.Filter):
-                def filter(self, record):
-                    return record.levelno in (logging.INFO, logging.WARNING)
-            
-            console_handler.addFilter(InfoWarningFilter())
-            
-            # Configure logger
-            logger = logging.getLogger()
-            # Clear any existing handlers
-            logger.handlers.clear()
-            # Add both handlers
+            # Use a detailed formatter that includes source location and module info
+            file_formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+            )
+            file_handler.setFormatter(file_formatter)
             logger.addHandler(file_handler)
-            logger.addHandler(console_handler)
-            logger.setLevel(logging.DEBUG)  # Logger needs to be at DEBUG to capture all messages
-        else:
-            logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+            
+            # Ensure logger level is at DEBUG to capture all messages
+            logger.setLevel(logging.DEBUG)
+            
+            # Make console handler show only INFO and above if it existed before
+            for handler in original_handlers:
+                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                    # Save original level to restore later
+                    if not hasattr(handler, '_original_level'):
+                        handler._original_level = handler.level
+                    handler.setLevel(logging.INFO)
+            
+            logging.debug("Detailed debug logging enabled to file: {}".format(log_file))
         
         logging.info(f"Starting Philips RF parsing for file: {filepath}")
         logging.info(f"Save format: {'NumPy arrays' if save_numpy else 'MATLAB file'}")
         
-        self.rfdata = self._parse_rf(filepath, 0, 2000)
-        
-        # Save header summary if saving as numpy
-        if save_numpy:
-            self._save_header_summary(numpy_folder)
-        
-        # Try to find the first available data type to save
-        data_priority = [
-            ('echoData', 'echoData'),
-            ('cwData', 'cwData'),
-            ('pwData', 'pwData'),
-            ('colorData', 'colorData'),
-            ('echoMModeData', 'echoMModeData'),
-            ('colorMModeData', 'colorMModeData'),
-            ('dummyData', 'dummyData'),
-            ('swiData', 'swiData'),
-            ('miscData', 'miscData'),
-        ]
-        
-        data_to_save = None
-        data_type_label = None
-        for attr, label in data_priority:
-            if hasattr(self.rfdata, attr) and getattr(self.rfdata, attr) is not None:
-                data_to_save = getattr(self.rfdata, attr)
-                data_type_label = label
-                if isinstance(data_to_save, (list, tuple)) and len(data_to_save) > 0:
-                    data_to_save = data_to_save[0]
-                break
-        
-        has_valid_data = data_to_save is not None and (not hasattr(data_to_save, 'size') or data_to_save.size > 0)
-        if not has_valid_data:
-            error_msg = f"No supported data found in RF file. Data_Type values: {np.unique(self.rfdata.headerInfo.Data_Type) if hasattr(self.rfdata.headerInfo, 'Data_Type') else 'N/A'}. lineData shape: {self.rfdata.lineData.shape if hasattr(self.rfdata, 'lineData') else 'N/A'}"
-            logging.error(error_msg)
-            raise RuntimeError(error_msg)
-        
-        logging.info(f"Saving data type: {data_type_label} as 'echoData'")
-        
-        # Data preprocessing
-        if (self.rfdata.headerInfo.Line_Index[249] == self.rfdata.headerInfo.Line_Index[250]):
-            self.rfdata.lineData = self.rfdata.lineData[:, np.arange(2, self.rfdata.lineData.shape[1], 2)]
-        else:
-            self.rfdata.lineData = self.rfdata.lineData[:, np.arange(1, self.rfdata.lineData.shape[1], 2)]
-        
-        self._calculate_parameters()
-        rf_data_all_fund, rf_data_all_harm = self._fill_data_arrays()
-        
-        if not save_numpy:
-            destination = str(filepath[:-3] + '.mat')
-            logging.info(f"Saving as MATLAB file: {destination}")
-            contents = {
-                'echoData': data_to_save,
-                'lineData': self.rfdata.lineData,
-                'lineHeader': self.rfdata.lineHeader,
-                'headerInfo': self.rfdata.headerInfo,
-                'dbParams': self.rfdata.dbParams,
-                'rf_data_all_fund': rf_data_all_fund,
-                'rf_data_all_harm': rf_data_all_harm,
-                'NumFrame': self.numFrame,
-                'NumSonoCTAngles': self.NumSonoCTAngles,
-                'pt': self.pt,
-                'multilinefactor': self.multilinefactor,
-            }
+        try:
+            self.rfdata = self._parse_rf(filepath, 0, 2000)
             
-            if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 1:
-                contents['echoData1'] = self.rfdata.echoData[1]
-            if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 2:
-                contents['echoData2'] = self.rfdata.echoData[2]
-            if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 3:
-                contents['echoData3'] = self.rfdata.echoData[3]
-            if hasattr(self.rfdata, 'echoMModeData'):
-                contents['echoMModeData'] = self.rfdata.echoMModeData
-            if hasattr(self.rfdata, 'miscData'):
-                contents['miscData'] = self.rfdata.miscData
+            # Save header summary if saving as numpy
+            if save_numpy:
+                self._save_header_summary(numpy_folder)
             
-            if os.path.exists(destination):
-                os.remove(destination)
-            savemat(destination, contents)
-            logging.info(f"MATLAB file saved successfully: {destination}")
-        else:
-            logging.info(f"Saving as NumPy files in: {numpy_folder}")
-            np.save(os.path.join(numpy_folder, 'echoData.npy'), data_to_save)
-            np.save(os.path.join(numpy_folder, 'lineData.npy'), self.rfdata.lineData)
-            np.save(os.path.join(numpy_folder, 'lineHeader.npy'), self.rfdata.lineHeader)
-            np.save(os.path.join(numpy_folder, 'rf_data_all_fund.npy'), rf_data_all_fund)
-            np.save(os.path.join(numpy_folder, 'rf_data_all_harm.npy'), rf_data_all_harm)
-            logging.info("NumPy files saved successfully")
-        
-        result_shape = np.array(rf_data_all_fund).shape
-        logging.info(f"Parsing complete. Final data shape: {result_shape}")
-        
-        # Clean up handlers if they were added
-        if save_numpy:
-            logger = logging.getLogger()
-            for handler in logger.handlers[:]:
-                handler.close()
-                logger.removeHandler(handler)
-        
-        return result_shape
-
+            # Try to find the first available data type to save
+            data_priority = [
+                ('echoData', 'echoData'),
+                ('cwData', 'cwData'),
+                ('pwData', 'pwData'),
+                ('colorData', 'colorData'),
+                ('echoMModeData', 'echoMModeData'),
+                ('colorMModeData', 'colorMModeData'),
+                ('dummyData', 'dummyData'),
+                ('swiData', 'swiData'),
+                ('miscData', 'miscData'),
+            ]
+            
+            data_to_save = None
+            data_type_label = None
+            for attr, label in data_priority:
+                if hasattr(self.rfdata, attr) and getattr(self.rfdata, attr) is not None:
+                    data_to_save = getattr(self.rfdata, attr)
+                    data_type_label = label
+                    if isinstance(data_to_save, (list, tuple)) and len(data_to_save) > 0:
+                        data_to_save = data_to_save[0]
+                    break
+            
+            has_valid_data = data_to_save is not None and (not hasattr(data_to_save, 'size') or data_to_save.size > 0)
+            if not has_valid_data:
+                error_msg = f"No supported data found in RF file. Data_Type values: {np.unique(self.rfdata.headerInfo.Data_Type) if hasattr(self.rfdata.headerInfo, 'Data_Type') else 'N/A'}. lineData shape: {self.rfdata.lineData.shape if hasattr(self.rfdata, 'lineData') else 'N/A'}"
+                logging.error(error_msg)
+                raise RuntimeError(error_msg)
+            
+            logging.info(f"Saving data type: {data_type_label} as 'echoData'")
+            
+            # Data preprocessing
+            if (self.rfdata.headerInfo.Line_Index[249] == self.rfdata.headerInfo.Line_Index[250]):
+                self.rfdata.lineData = self.rfdata.lineData[:, np.arange(2, self.rfdata.lineData.shape[1], 2)]
+            else:
+                self.rfdata.lineData = self.rfdata.lineData[:, np.arange(1, self.rfdata.lineData.shape[1], 2)]
+            
+            self._calculate_parameters()
+            rf_data_all_fund, rf_data_all_harm = self._fill_data_arrays()
+            
+            if not save_numpy:
+                destination = str(filepath[:-3] + '.mat')
+                logging.info(f"Saving as MATLAB file: {destination}")
+                contents = {
+                    'echoData': data_to_save,
+                    'lineData': self.rfdata.lineData,
+                    'lineHeader': self.rfdata.lineHeader,
+                    'headerInfo': self.rfdata.headerInfo,
+                    'dbParams': self.rfdata.dbParams,
+                    'rf_data_all_fund': rf_data_all_fund,
+                    'rf_data_all_harm': rf_data_all_harm,
+                    'NumFrame': self.numFrame,
+                    'NumSonoCTAngles': self.NumSonoCTAngles,
+                    'pt': self.pt,
+                    'multilinefactor': self.multilinefactor,
+                }
+                
+                if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 1:
+                    contents['echoData1'] = self.rfdata.echoData[1]
+                if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 2:
+                    contents['echoData2'] = self.rfdata.echoData[2]
+                if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 3:
+                    contents['echoData3'] = self.rfdata.echoData[3]
+                if hasattr(self.rfdata, 'echoMModeData'):
+                    contents['echoMModeData'] = self.rfdata.echoMModeData
+                if hasattr(self.rfdata, 'miscData'):
+                    contents['miscData'] = self.rfdata.miscData
+                
+                if os.path.exists(destination):
+                    os.remove(destination)
+                savemat(destination, contents)
+                logging.info(f"MATLAB file saved successfully: {destination}")
+            else:
+                logging.info(f"Saving as NumPy files in: {numpy_folder}")
+                np.save(os.path.join(numpy_folder, 'echoData.npy'), data_to_save)
+                np.save(os.path.join(numpy_folder, 'lineData.npy'), self.rfdata.lineData)
+                np.save(os.path.join(numpy_folder, 'lineHeader.npy'), self.rfdata.lineHeader)
+                np.save(os.path.join(numpy_folder, 'rf_data_all_fund.npy'), rf_data_all_fund)
+                np.save(os.path.join(numpy_folder, 'rf_data_all_harm.npy'), rf_data_all_harm)
+                logging.info("NumPy files saved successfully")
+            
+            result_shape = np.array(rf_data_all_fund).shape
+            logging.info(f"Parsing complete. Final data shape: {result_shape}")
+            
+            return result_shape
+            
+        finally:
+            # Restore original logging configuration
+            if save_numpy:
+                # Remove any added handlers
+                current_handlers = list(logger.handlers)
+                for handler in current_handlers:
+                    if handler not in original_handlers:
+                        handler.close()
+                        logger.removeHandler(handler)
+                
+                # Restore original handler levels
+                for handler in original_handlers:
+                    if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                        # Restore saved original level if available
+                        if hasattr(handler, '_original_level'):
+                            handler.setLevel(handler._original_level)
+                            delattr(handler, '_original_level')
+                        else:
+                            handler.setLevel(original_level)
+                
+                # Restore original logger level
+                logger.setLevel(original_level)
+                logging.debug("Logging configuration restored to original state")
+    
+    ###################################################################################
+    # Save Header Summary
+    ###################################################################################
     def _save_header_summary(self, numpy_folder: str):
         """Save a summary of header information to a text file."""
         summary_file = os.path.join(numpy_folder, 'header_summary.txt')
@@ -1714,8 +1738,30 @@ class PhilipsRfParser:
 # Main Execution
 ###################################################################################
 if __name__ == "__main__":
-    # Configure logging for main execution
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    # === Logging Configuration for Complete Debug Output ===
+    # Configure the root logger to capture absolutely everything
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)  # Capture all levels
+    
+    # Create a detailed formatter that includes module names for better tracking
+    detailed_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+    )
+    
+    # Console handler with full debug output
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)  # Show everything, including DEBUG
+    console_handler.setFormatter(detailed_formatter)
+    
+    # Clear any existing handlers and add our handler
+    root_logger.handlers.clear()
+    root_logger.addHandler(console_handler)
+    
+    # Log system information for diagnostic purposes
+    logging.debug("==== Debug Logging Activated ====")
+    logging.debug(f"Python version: {platform.python_version()}")
+    logging.debug(f"Platform: {platform.platform()}")
+    logging.debug(f"Current directory: {os.getcwd()}")
     
     # Hardcoded file path - no command line arguments needed
     filepath = r"D:\Omid\0_samples\Philips\David\sample.rf"
