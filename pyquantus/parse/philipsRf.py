@@ -747,13 +747,8 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
             return partB.reshape((1, -1))
 
         
-        # rawrfdata = read_custom_format(filepath, totalHeaderSize, readOffset, numClumps)
-        if platform.system() != 'Windows':
-            partA = callGetPartA(numClumps, filepath, offset)
-            partB = callGetPartB(numClumps, filepath, offset)
-        else: # Less efficient but works on all platforms (Python-based)
-            partA = get_partA(numClumps, filepath, offset)
-            partB = get_partB(numClumps, filepath, offset)
+        partA = get_partA(numClumps, filepath, offset)
+        partB = get_partB(numClumps, filepath, offset)
         rawrfdata = np.concatenate((partA, partB), axis=0)
 
     # Reshape Raw RF Dawta
