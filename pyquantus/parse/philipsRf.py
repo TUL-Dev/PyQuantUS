@@ -51,29 +51,29 @@ class PhilipsRfParser:
         def __init__(self):
             logging.debug("Initializing DbParams")
             
-            self.acqNumActiveScChannels2d: List[int] = None
-            self.azimuthMultilineFactorXbrOut: List[int] = None
-            self.azimuthMultilineFactorXbrIn: List[int] = None
-            self.numOfSonoCTAngles2dActual: List[int] = None
-            self.elevationMultilineFactor: List[int] = None
-            self.numPiPulses: List[int] = None
+            self.acqNumActiveScChannels2d: np.ndarray = None
+            self.azimuthMultilineFactorXbrOut: np.ndarray = None
+            self.azimuthMultilineFactorXbrIn: np.ndarray = None
+            self.numOfSonoCTAngles2dActual: np.ndarray = None
+            self.elevationMultilineFactor: np.ndarray = None
+            self.numPiPulses: np.ndarray = None
             self.num2DCols: np.ndarray = None
-            self.fastPiEnabled: List[int] = None
-            self.numZones2d: List[int] = None
-            self.numSubVols: Any = None
-            self.numPlanes: Any = None
-            self.zigZagEnabled: Any = None
-            self.azimuthMultilineFactorXbrOutCf: List[int] = None
-            self.azimuthMultilineFactorXbrInCf: List[int] = None
-            self.multiLineFactorCf: List[int] = None
-            self.linesPerEnsCf: List[int] = None
-            self.ensPerSeqCf: List[int] = None
-            self.numCfCols: List[int] = None
-            self.numCfEntries: List[int] = None
-            self.numCfDummies: List[int] = None
-            self.elevationMultilineFactorCf: List[int] = None
-            self.Planes: List[int] = None
-            self.tapPoint: List[int] = None
+            self.fastPiEnabled: np.ndarray = None
+            self.numZones2d: np.ndarray = None
+            self.numSubVols: np.ndarray = None
+            self.numPlanes: np.ndarray = None
+            self.zigZagEnabled: np.ndarray = None
+            self.azimuthMultilineFactorXbrOutCf: np.ndarray = None
+            self.azimuthMultilineFactorXbrInCf: np.ndarray = None
+            self.multiLineFactorCf: np.ndarray = None
+            self.linesPerEnsCf: np.ndarray = None
+            self.ensPerSeqCf: np.ndarray = None
+            self.numCfCols: np.ndarray = None
+            self.numCfEntries: np.ndarray = None
+            self.numCfDummies: np.ndarray = None
+            self.elevationMultilineFactorCf: np.ndarray = None
+            self.Planes: np.ndarray = None
+            self.tapPoint: np.ndarray = None
             
             logging.debug("DbParams initialization complete")
 
@@ -117,6 +117,12 @@ class PhilipsRfParser:
         self.numFrame: int = None
         self.multilinefactor: int = None
         self.pt: int = None
+        self.read_offset_MB: int = 0
+        self.read_size_MB: int = 2000
+        self.is_voyager = None
+        self.is_fusion = None
+        self.has_file_header = None
+        self.file_header_size = None
         
         # Define constant parameters for headers
         self.VHeader = [0, 0, 0, 0, 255, 255, 0, 0, 255, 255, 255, 255, 0, 0, 255, 255, 255, 255, 160, 160]
@@ -171,7 +177,7 @@ class PhilipsRfParser:
         
         try:
             logging.info(f"Initiating RF data parsing")
-            self.rfdata = self._parse_rf(filepath, 0, 2000)
+            self.rfdata = self._parse_rf(filepath, read_offset_MB=self.read_offset_MB, read_size_MB=self.read_size_MB)
             
             # Save header summary if saving as numpy
             sample_name = os.path.splitext(os.path.basename(filepath))[0]
@@ -241,17 +247,13 @@ class PhilipsRfParser:
             for handler in original_handlers:
                 if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
                     handler.setFormatter(console_formatter)
+                    # Do not lower the level to INFO; keep at DEBUG to show all logs in terminal
+                    # if not hasattr(handler, '_original_level'):
+                    #     handler._original_level = handler.level
+                    # handler.setLevel(logging.INFO)  # <-- REMOVED to allow DEBUG logs in terminal
             
             # Ensure logger level is at DEBUG to capture all messages
             logger.setLevel(logging.DEBUG)
-            
-            # Make console handler show only INFO and above if it existed before
-            for handler in original_handlers:
-                if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
-                    # Save original level to restore later
-                    if not hasattr(handler, '_original_level'):
-                        handler._original_level = handler.level
-                    handler.setLevel(logging.INFO)
             
             logging.debug(f"Detailed debug logging enabled to file: {log_file}")
         
@@ -426,26 +428,27 @@ class PhilipsRfParser:
     ###################################################################################
     # Main RF Parsing Orchestrator
     ###################################################################################
-    def _parse_rf(self, filepath: str, read_offset: int, read_size: int) -> 'PhilipsRfParser.Rfdata':
+    def _parse_rf(self, filepath: str, read_offset_MB: int, read_size_MB: int) -> 'PhilipsRfParser.Rfdata':
         """Open and parse RF data file (refactored into smaller methods)."""
         logging.info(f"Opening RF file: {filepath}")
-        logging.debug(f"Read parameters - offset: {read_offset}MB, size: {read_size}MB")
+        logging.debug(f"Read parameters - offset: {read_offset_MB}MB, size: {read_size_MB}MB")
         rfdata = PhilipsRfParser.Rfdata()
         with open(filepath, 'rb') as file_obj:
-            is_voyager, has_file_header, file_header_size, file_header = self._detect_file_type(file_obj)
-            db_params, total_header_size, endianness = self._parse_file_header_and_offset(file_obj, is_voyager, has_file_header, file_header_size, filepath)
+            file_header = self._detect_file_type(file_obj)
+            db_params, total_header_size, endianness = self._parse_file_header_and_offset(file_obj, filepath=filepath)
         rfdata.dbParams = db_params
-        rawrfdata, num_clumps = self._load_raw_rf_data(filepath, is_voyager, total_header_size, read_offset, read_size)
-        if is_voyager:
+        rawrfdata, num_clumps = self._load_raw_rf_data(filepath, total_header_size, read_offset_MB, read_size_MB)
+        if self.is_voyager:
             rawrfdata = self._reshape_voyager_raw_data(rawrfdata)
-        header_info = self._parse_header_dispatch(rawrfdata, is_voyager)
-        line_data, line_header, tap_point = self._parse_rf_data_dispatch(rawrfdata, header_info, is_voyager)
+        header_info = self._parse_header_dispatch(rawrfdata)
+        line_data, line_header, tap_point = self._parse_rf_data_dispatch(rawrfdata, header_info)
         rfdata.lineData = line_data
         rfdata.lineHeader = line_header
         rfdata.headerInfo = header_info
         del rawrfdata
         rfdata = self._organize_data_types(rfdata, header_info, tap_point)
         logging.debug(f"RF parsing complete")
+        logging.debug(f"RF data shape: {rfdata.lineData.shape}")
         return rfdata
 
     ###################################################################################
@@ -561,10 +564,12 @@ class PhilipsRfParser:
         file_handle.write("\n--- Database Parameters ---\n")
         db = self.rfdata.dbParams
         
-        if hasattr(db, 'acqNumActiveScChannels2d') and db.acqNumActiveScChannels2d:
-            file_handle.write(f"Active scan channels: {db.acqNumActiveScChannels2d}\n")
-        if hasattr(db, 'numOfSonoCTAngles2dActual') and db.numOfSonoCTAngles2dActual:
-            file_handle.write(f"SonoCT angles: {db.numOfSonoCTAngles2dActual}\n")
+        if hasattr(db, 'acqNumActiveScChannels2d') and db.acqNumActiveScChannels2d is not None:
+            file_handle.write(f"Active scan channels: {db.acqNumActiveScChannels2d.shape}\n")
+            file_handle.write(f"2D columns shape: {db.num2DCols.shape}\n")
+            file_handle.write(f"2D columns first row: {db.num2DCols[0, :] if db.num2DCols.size > 0 else 'N/A'}\n")
+        if hasattr(db, 'numOfSonoCTAngles2dActual') and db.numOfSonoCTAngles2dActual is not None:
+            file_handle.write(f"SonoCT angles: {db.numOfSonoCTAngles2dActual.shape}\n")
         if hasattr(db, 'num2DCols') and db.num2DCols is not None:
             file_handle.write(f"2D columns shape: {db.num2DCols.shape}\n")
             file_handle.write(f"2D columns first row: {db.num2DCols[0, :] if db.num2DCols.size > 0 else 'N/A'}\n")
@@ -727,61 +732,59 @@ class PhilipsRfParser:
     ###################################################################################
     # File Type Detection and File Header
     ####################################################################################
-    def _detect_file_type(self, file_obj) -> Tuple[bool, bool, int, List[int]]:
-        """Detects file type and returns is_voyager, has_file_header, file_header_size, file_header."""
-        logging.info(f"Starting file type detection")
+    def _detect_file_type(self, file_obj) -> List[int]:
+        """
+        Detects the type of the RF data file by reading its header and comparing it to known header patterns.
+
+        Returns:
+            file_header (List[int]): The actual header bytes read from the file, as a list of ints.
+        """
+        self.file_header_size = len(self.VHeader)
+        logging.debug(f"File header size: {self.file_header_size}")
+        file_header = list(file_obj.read(self.file_header_size))
+        logging.debug(f"Read file header: {file_header}")
         
-        file_header_size = len(self.VHeader)
-        
-        logging.debug(f"Reading {file_header_size} bytes for header detection")
-        file_header = list(file_obj.read(file_header_size))
-        logging.debug(f"Read file header: {file_header[:10]}...")
-        
-        is_voyager = False
-        has_file_header = False
+        self.is_voyager = False
+        self.is_fusion = False
+        self.has_file_header = False
         
         if file_header == self.VHeader:
             logging.info(f"Header information found - Parsing Voyager RF capture file")
-            is_voyager = True
-            has_file_header = True
+            self.is_voyager = True
+            self.has_file_header = True
         elif file_header == self.FHeader:
             logging.info(f"Header information found - Parsing Fusion RF capture file")
-            has_file_header = True
+            self.is_fusion = True
+            self.has_file_header = True
         else:
             logging.info(f"No header found - Parsing legacy Voyager RF capture file")
-            is_voyager = True
-            
-        logging.debug(f"File type detection complete: is_voyager={is_voyager}, has_file_header={has_file_header}")
-        return is_voyager, has_file_header, file_header_size, file_header
+            self.is_voyager = True
+        logging.debug(f"File type detection complete: is_voyager={self.is_voyager}, is_fusion={self.is_fusion}, has_file_header={self.has_file_header}")
+        return file_header
 
     ###################################################################################
     # File Header Parsing
     ####################################################################################
-    def _parse_file_header_and_offset(self, file_obj, is_voyager: bool, has_file_header: bool, file_header_size: int, filepath: str) -> Tuple['PhilipsRfParser.DbParams', int, str]:
+    def _parse_file_header_and_offset(self, file_obj, filepath: str) -> Tuple['PhilipsRfParser.DbParams', int, str]:
         """Parse file header and calculate total_header_size, endianness, and db_params."""
         logging.info(f"Parsing file header and calculating offset")
-        logging.debug(f"Input parameters: is_voyager={is_voyager}, has_file_header={has_file_header}, file_header_size={file_header_size}")
-        
+        logging.debug(f"Input parameters: is_voyager={self.is_voyager}, has_file_header={self.has_file_header}, file_header_size={self.file_header_size}")
         endianness = 'little'
         db_params = PhilipsRfParser.DbParams()
         num_file_header_bytes = 0
-        
-        if has_file_header:
-            if is_voyager:
+        if self.has_file_header:
+            if self.is_voyager:
                 endianness = 'big'
                 logging.debug(f"Using big-endian for Voyager file")
             else:
                 logging.debug(f"Using little-endian for Fusion file")
-                
             logging.info(f"Parsing file header parameters")
             db_params, num_file_header_bytes = self._parse_file_header(file_obj, endianness)
-            total_header_size = file_header_size + 8 + num_file_header_bytes
-            
-            logging.debug(f"Total header size: {total_header_size} bytes (file_header={file_header_size} + 8 + params={num_file_header_bytes})")
+            total_header_size = self.file_header_size + 8 + num_file_header_bytes
+            logging.debug(f"Total header size: {total_header_size} bytes (file_header={self.file_header_size} + 8 + params={num_file_header_bytes})")
         else:
             total_header_size = 0
             logging.debug(f"No file header to parse")
-            
         logging.info(f"File header parsing complete: endianness={endianness}, total_header_size={total_header_size}")
         return db_params, total_header_size, endianness
 
@@ -820,13 +823,11 @@ class PhilipsRfParser:
     ###################################################################################
     # Helper Methods
     ###################################################################################
-    def _read_int_array(self, file_obj, endianness: str, count: int) -> List[int]:
-        """Helper method to read an array of integers."""
+    def _read_int_array(self, file_obj, endianness: str, count: int) -> np.ndarray:
+        """Helper method to read an array of integers as a numpy array for speed."""
         logging.debug(f"Reading {count} integers with endianness '{endianness}'")
-        
-        result = [int.from_bytes(file_obj.read(4), endianness, signed=False) for _ in range(count)]
-        
-        logging.debug(f"Read {len(result)} integers, first few: {result[:min(5, len(result))]}")
+        result = np.frombuffer(file_obj.read(4*count), dtype=np.dtype('<u4') if endianness=='little' else np.dtype('>u4'))
+        logging.debug(f"Read {result.size} integers, first few: {result[:min(5, len(result))]}")
         return result
     
     ###################################################################################
@@ -863,9 +864,9 @@ class PhilipsRfParser:
         # Additional parameters
         temp_dbParams.fastPiEnabled = self._read_int_array(file_obj, endianness, 4)
         temp_dbParams.numZones2d = self._read_int_array(file_obj, endianness, 4)
-        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)
-        temp_dbParams.numPlanes = self._read_int_array(file_obj, endianness, 1)
-        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)[0]
+        temp_dbParams.numPlanes = self._read_int_array(file_obj, endianness, 1)[0]
+        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)[0]
     
     ###################################################################################
     # File Header Parsing
@@ -890,9 +891,9 @@ class PhilipsRfParser:
         temp_dbParams.numZones2d = self._read_int_array(file_obj, endianness, 4)
         
         # Single values
-        temp_dbParams.numSubVols = int.from_bytes(file_obj.read(4), endianness, signed=False)
-        temp_dbParams.numPlanes = int.from_bytes(file_obj.read(4), endianness, signed=False)
-        temp_dbParams.zigZagEnabled = int.from_bytes(file_obj.read(4), endianness, signed=False)
+        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)[0]
+        temp_dbParams.numPlanes = self._read_int_array(file_obj, endianness, 1)[0]
+        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)[0]
         
         # Color flow parameters
         temp_dbParams.multiLineFactorCf = self._read_int_array(file_obj, endianness, 4)
@@ -934,13 +935,13 @@ class PhilipsRfParser:
         # Additional parameters
         temp_dbParams.fastPiEnabled = self._read_int_array(file_obj, endianness, 3)
         temp_dbParams.numZones2d = self._read_int_array(file_obj, endianness, 3)
-        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)[0]
 
         # Planes instead of numPlanes
-        temp_dbParams.Planes = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.Planes = self._read_int_array(file_obj, endianness, 1)[0]
 
         # More parameters
-        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)[0]
 
         # Color flow parameters
         temp_dbParams.linesPerEnsCf = self._read_int_array(file_obj, endianness, 3)
@@ -982,11 +983,11 @@ class PhilipsRfParser:
         # Additional parameters
         temp_dbParams.fastPiEnabled = self._read_int_array(file_obj, endianness, 3)
         temp_dbParams.numZones2d = self._read_int_array(file_obj, endianness, 3)
-        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)[0]
 
-        temp_dbParams.numPlanes = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.numPlanes = self._read_int_array(file_obj, endianness, 1)[0]
 
-        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)[0]
 
         # Color flow parameters
         temp_dbParams.linesPerEnsCf = self._read_int_array(file_obj, endianness, 3)
@@ -1003,7 +1004,7 @@ class PhilipsRfParser:
         logging.debug("Reading file header version 6")
         
         # Tap point parameter
-        temp_dbParams.tapPoint = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.tapPoint = self._read_int_array(file_obj, endianness, 1)[0]
         
         # Basic parameters (arrays of 3)
         temp_dbParams.acqNumActiveScChannels2d = self._read_int_array(file_obj, endianness, 3)
@@ -1023,9 +1024,9 @@ class PhilipsRfParser:
         # Additional parameters
         temp_dbParams.fastPiEnabled = self._read_int_array(file_obj, endianness, 3)
         temp_dbParams.numZones2d = self._read_int_array(file_obj, endianness, 3)
-        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)
-        temp_dbParams.numPlanes = self._read_int_array(file_obj, endianness, 1)
-        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)
+        temp_dbParams.numSubVols = self._read_int_array(file_obj, endianness, 1)[0]
+        temp_dbParams.numPlanes = self._read_int_array(file_obj, endianness, 1)[0]
+        temp_dbParams.zigZagEnabled = self._read_int_array(file_obj, endianness, 1)[0]
         
         # Color flow parameters
         temp_dbParams.linesPerEnsCf = self._read_int_array(file_obj, endianness, 3)
@@ -1037,20 +1038,18 @@ class PhilipsRfParser:
     ###################################################################################
     # Raw Data Loading
     ###################################################################################
-    def _load_raw_rf_data(self, filepath: str, is_voyager: bool, total_header_size: int, read_offset: int, read_size: int) -> Tuple[Any, int]:
+    def _load_raw_rf_data(self, filepath: str, total_header_size: int, read_offset: int, read_size: int) -> Tuple[Any, int]:
         """Load raw RF data from file, handling Voyager and Fusion formats."""
-        logging.info(f"Loading raw RF data: is_voyager={is_voyager}, offset={read_offset}MB, size={read_size}MB")
-        
-        # Calculate file sizes and convert units
+        logging.info(f"Loading raw RF data: is_voyager={self.is_voyager}, is_fusion={self.is_fusion}, offset={read_offset}MB, size={read_size}MB")
         file_size, remaining_size, read_offset_bytes, read_size_bytes = self._calculate_read_parameters(
             filepath, total_header_size, read_offset, read_size
         )
-        
-        # Load data based on format
-        if is_voyager:
+        if self.is_voyager:
             return self._load_voyager_data(filepath, remaining_size, read_offset_bytes, read_size_bytes)
-        else:
+        elif self.is_fusion:
             return self._load_fusion_data(filepath, total_header_size, remaining_size, read_offset_bytes, read_size_bytes)
+        else:
+            raise RuntimeError("Unknown file type: neither Voyager nor Fusion detected.")
 
     ###################################################################################
     # File Header Parsing
@@ -1217,16 +1216,17 @@ class PhilipsRfParser:
     ###################################################################################
     # Header and RF Data Parsing Dispatch
     ###################################################################################
-    def _parse_header_dispatch(self, rawrfdata: Any, is_voyager: bool) -> 'PhilipsRfParser.HeaderInfoStruct':
+    def _parse_header_dispatch(self, rawrfdata: Any) -> 'PhilipsRfParser.HeaderInfoStruct':
         """Dispatch to the correct header parsing method."""
-        logging.info(f"Dispatching header parsing: is_voyager={is_voyager}")
-        
-        if is_voyager:
+        logging.info(f"Dispatching header parsing: is_voyager={self.is_voyager}, is_fusion={self.is_fusion}")
+        if self.is_voyager:
             logging.debug(f"Using Voyager header parser")
             return self._parse_header_v(rawrfdata)
-        else:
+        elif self.is_fusion:
             logging.debug(f"Using Fusion header parser")
             return self._parse_header_f(rawrfdata)
+        else:
+            raise RuntimeError("Unknown file type: neither Voyager nor Fusion detected.")
 
     ###################################################################################
     # Voyager Header Parsing
@@ -1509,29 +1509,29 @@ class PhilipsRfParser:
     ###################################################################################
     # RF Data Parsing Dispatch
     ###################################################################################
-    def _parse_rf_data_dispatch(self, rawrfdata: Any, header_info: 'PhilipsRfParser.HeaderInfoStruct', is_voyager: bool) -> Tuple[np.ndarray, np.ndarray, int]:
+    def _parse_rf_data_dispatch(self, rawrfdata: Any, header_info: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray, int]:
         """Dispatch to the correct RF data parsing method."""
-        logging.info(f"Dispatching RF data parsing: is_voyager={is_voyager}")
-        return self._parse_rf_data(rawrfdata, header_info, is_voyager)
+        logging.info(f"Dispatching RF data parsing: is_voyager={self.is_voyager}, is_fusion={self.is_fusion}")
+        return self._parse_rf_data(rawrfdata, header_info)
 
     ###################################################################################
     # RF Data Parsing
     ###################################################################################
-    def _parse_rf_data(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct', isVoyager: bool) -> Tuple[np.ndarray, np.ndarray, int]:
+    def _parse_rf_data(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray, int]:
         """Parse RF signal data."""
         logging.info("Parsing RF signal data...")
         Tap_Point = headerInfo.Tap_Point[0]
-        logging.debug(f"Tap Point: {Tap_Point}, isVoyager: {isVoyager}")
-        
-        if isVoyager:
+        logging.debug(f"Tap Point: {Tap_Point}, isVoyager: {self.is_voyager}, isFusion: {self.is_fusion}")
+        if self.is_voyager:
             lineData, lineHeader = self._parse_data_v(rawrfdata, headerInfo)
-        else: # isFusion
+        elif self.is_fusion:
             lineData, lineHeader = self._parse_data_f(rawrfdata, headerInfo)
             Tap_Point = headerInfo.Tap_Point[0]
             if Tap_Point == 0: # Correct for MS 19 bits of 21 real data bits
                 logging.debug("Applying bit shift correction for Tap Point 0")
                 lineData = lineData << 2
-        
+        else:
+            raise RuntimeError("Unknown file type: neither Voyager nor Fusion detected.")
         # After parsing lineData, log a sample of the first and last 20 rows for a nonzero column
         nonzero_col = None
         for col in range(lineData.shape[1]):
@@ -1544,7 +1544,6 @@ class PhilipsRfParser:
             logging.info(f"Min: {lineData[:, nonzero_col].min()}, Max: {lineData[:, nonzero_col].max()}")
         else:
             logging.warning("No nonzero columns found in lineData!")
-        
         logging.info(f"RF data parsing complete - lineData: {lineData.shape}, lineHeader: {lineHeader.shape}")
         return lineData, lineHeader, Tap_Point
 
@@ -2428,7 +2427,7 @@ if __name__ == "__main__":
     # === Logging Configuration for Complete Debug Output ===
     # Configure the root logger to capture absolutely everything
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)  # Capture all levels
+    root_logger.setLevel(logging.DEBUG)  # Capture all levels
     
     # Create a detailed formatter that includes function names
     detailed_formatter = logging.Formatter(
