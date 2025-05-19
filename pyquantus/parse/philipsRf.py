@@ -282,13 +282,13 @@ class PhilipsRfParser:
             # Detect the file type and set the appropriate flags
             self._detect_file_type(file_obj)
             # Parse the file header and calculate the total header size
-            db_params, total_header_size = self._parse_file_header_and_offset(file_obj, filepath=filepath)
+            db_params, total_header_size_bytes = self._parse_file_header_and_offset(file_obj)
         
         # Assign the parsed database parameters to the rfdata object
         rfdata.dbParams = db_params
         
         # Load the raw RF data from the file
-        rawrfdata, num_clumps = self._load_raw_rf_data(filepath, total_header_size, read_offset_MB, read_size_MB)
+        rawrfdata, _ = self._load_raw_rf_data(filepath, total_header_size_bytes, read_offset_MB, read_size_MB)
         
         # If the data is from a Voyager system, reshape it accordingly
         if self.is_voyager:
@@ -319,7 +319,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # File Type Detection
+    # Detect the file type
     ####################################################################################
     def _detect_file_type(self, file_obj) -> None:
         """
@@ -377,9 +377,9 @@ class PhilipsRfParser:
         )
         
     ###################################################################################
-    # File Header Parsing
+    # Parse the file header
     ####################################################################################
-    def _parse_file_header_and_offset(self, file_obj, filepath: str) -> Tuple['PhilipsRfParser.DbParams', int, str]:
+    def _parse_file_header_and_offset(self, file_obj) -> Tuple['PhilipsRfParser.DbParams', int, str]:
         """Parse file header and calculate total_header_size, endianness, and db_params.
         
         Endianness refers to the order of bytes in binary data. In this context, it determines 
@@ -398,8 +398,7 @@ class PhilipsRfParser:
         
         Args:
             file_obj: The file object to read from
-            filepath: Path to the file being processed
-            
+
         Returns:
             Tuple containing:
                 - Database parameters
@@ -434,18 +433,18 @@ class PhilipsRfParser:
             # - file_header_bytes: signature bytes (20)
             # - 8 bytes: 4 for version + 4 for header size info
             # - num_file_header_bytes: actual parameters
-            total_header_size = self.file_header_size + 8 + num_file_header_bytes
+            total_header_size_bytes = self.file_header_size + 8 + num_file_header_bytes
             
-            logging.debug(f"Total header size: {total_header_size} bytes (file_header={self.file_header_size} + 8 + params={num_file_header_bytes})")
+            logging.debug(f"Total header size: {total_header_size_bytes} bytes (file_header={self.file_header_size} + 8 + params={num_file_header_bytes})")
         else:
             # If no file header is present, set total header size to 0
-            total_header_size = 0
+            total_header_size_bytes = 0
             logging.debug(f"No file header to parse")
             
         # Log the completion of file header parsing
-        logging.info(f"File header parsing complete: endianness={endianness}, total_header_size={total_header_size}")
+        logging.info(f"File header parsing complete: endianness={endianness}, total_header_size={total_header_size_bytes}")
         # Return the database parameters and total header size
-        return db_params, total_header_size
+        return db_params, total_header_size_bytes
 
     ###################################################################################
     # File Header Parsing
@@ -795,23 +794,657 @@ class PhilipsRfParser:
     ###################################################################################
     # Raw Data Loading
     ###################################################################################
-    def _load_raw_rf_data(self, filepath: str, total_header_size: int, read_offset: int, read_size: int) -> Tuple[Any, int]:
+    def _load_raw_rf_data(self, filepath: str, total_header_size_bytes: int, read_offset_MB: int, read_size_MB: int) -> Tuple[Any, int]:
         """Load raw RF data from file, handling Voyager and Fusion formats."""
-        logging.info(f"Loading raw RF data: is_voyager={self.is_voyager}, is_fusion={self.is_fusion}, offset={read_offset}MB, size={read_size}MB")
-        file_size, remaining_size, read_offset_bytes, read_size_bytes = self._calculate_read_parameters(
-            filepath, total_header_size, read_offset, read_size
-        )
+        logging.info(f"Loading raw RF data: is_voyager={self.is_voyager}, is_fusion={self.is_fusion}, offset={read_offset_MB}MB, size={read_size_MB}MB")
+        
+        # Calculate the parameters needed for reading the file
+        _, remaining_size_bytes, read_offset_bytes, read_size_bytes = self._calculate_file_sizes(filepath,
+                                                                                                total_header_size_bytes,
+                                                                                                read_offset_MB,
+                                                                                                read_size_MB
+                                                                                                )
+        
+        # Load data based on the file type
         if self.is_voyager:
-            return self._load_voyager_data(filepath, remaining_size, read_offset_bytes, read_size_bytes)
+            return self._load_voyager_data(filepath, remaining_size_bytes, read_offset_bytes, read_size_bytes)
         elif self.is_fusion:
-            return self._load_fusion_data(filepath, total_header_size, remaining_size, read_offset_bytes, read_size_bytes)
+            return self._load_fusion_data(filepath, total_header_size_bytes, remaining_size_bytes, read_offset_bytes, read_size_bytes)
         else:
+            # Raise an error if the file type is unknown
             raise RuntimeError("Unknown file type: neither Voyager nor Fusion detected.")
     
+    ###################################################################################
+    # File Size Calculation
+    ###################################################################################
+    def _calculate_file_sizes(self, filepath: str, total_header_size: int, read_offset_MB: int, read_size_MB: int) -> Tuple[int, int, int, int]:
+        """Calculate file sizes and convert MB to bytes for read parameters."""
+        
+        # Get the total file size in bytes
+        file_size_bytes = os.stat(filepath).st_size
+        
+        # Calculate the remaining size after the header
+        remaining_size_bytes = file_size_bytes - total_header_size
+        logging.debug(f"File size: {file_size_bytes} bytes, header size: {total_header_size} bytes, remaining: {remaining_size_bytes} bytes")
+        
+        # Convert read offset and size from MB to bytes
+        read_offset_bytes = read_offset_MB * (2 ** 20)
+        read_size_bytes = read_size_MB * (2 ** 20)
+        logging.debug(f"Read parameters in bytes: offset={read_offset_bytes}, size={read_size_bytes}")
+        
+        return file_size_bytes, remaining_size_bytes, read_offset_bytes, read_size_bytes
     
+    ###################################################################################
+    # Load Voyager data
+    ###################################################################################
+    def _load_voyager_data(self, filepath: str, remaining_size_bytes: int, read_offset_bytes: int, read_size_bytes: int) -> Tuple[Any, int]:
+        """Load data in Voyager format."""
+        logging.info("Loading Voyager format data")
+        
+        # Align read parameters to Voyager data format
+        read_offset_bytes, read_size_bytes = self._align_voyager_parameters(remaining_size_bytes, read_offset_bytes, read_size_bytes)
+        
+        # Read the raw data
+        with open(filepath, 'rb') as f:
+            f.seek(read_offset_bytes)
+            rawrfdata = f.read(read_size_bytes)
+        
+        logging.info(f"Loaded {len(rawrfdata)} bytes of Voyager data")
+        return rawrfdata, 0
     
+    ###################################################################################
+    # Alignment for Voyager
+    ###################################################################################
+    def _align_voyager_parameters(self, remaining_size_bytes: int, read_offset_bytes: int, read_size_bytes: int) -> Tuple[int, int]:
+        """Align read parameters to Voyager format boundaries (36 bytes)."""
+        alignment_bytes = np.arange(0, remaining_size_bytes + 1, 36)
+        offset_diff_bytes = alignment_bytes - read_offset_bytes
+        read_diff_bytes = alignment_bytes - read_size_bytes
+        
+        aligned_offset_bytes = alignment_bytes[np.where(offset_diff_bytes >= 0)[0][0]].__int__()
+        aligned_size_bytes = alignment_bytes[np.where(read_diff_bytes >= 0)[0][0]].__int__()
+        
+        logging.debug(f"Aligned Voyager read - offset: {aligned_offset_bytes}, size: {aligned_size_bytes}")
+        return aligned_offset_bytes, aligned_size_bytes
+
+    ###################################################################################
+    # File Header Parsing
+    ###################################################################################
+    def _load_fusion_data(self, filepath: str, total_header_size_bytes: int, remaining_size_bytes: int, read_offset_bytes: int, read_size_bytes: int) -> Tuple[Any, int]:
+        """Load data in Fusion format."""
+        logging.info("Loading Fusion format data")
+        
+        # Align read parameters to Fusion data format
+        read_offset_bytes, read_size_bytes = self._align_fusion_parameters(remaining_size_bytes, read_offset_bytes, read_size_bytes)
+        
+        # Calculate number of clumps and final offset
+        num_clumps = int(np.floor(read_size_bytes / 32))
+        offset_bytes = total_header_size_bytes + read_offset_bytes
+        logging.info(f"Reading Fusion data: {num_clumps} clumps from offset {offset_bytes}")
+        
+        # Read and process the data
+        rawrfdata = self._read_and_process_fusion_data(filepath, offset_bytes, num_clumps)
+        
+        logging.info(f"Loaded Fusion data with shape {rawrfdata.shape}")
+        return rawrfdata, num_clumps
     
+    ###################################################################################
+    # Alignment for Fusion
+    ###################################################################################
+    def _align_fusion_parameters(self, remaining_size_bytes: int, read_offset_bytes: int, read_size_bytes: int) -> Tuple[int, int]:
+        """Align read parameters to Fusion format boundaries (32 bytes)."""
+        
+        # Calculate alignment bytes based on 32-byte boundaries
+        alignment_bytes = np.arange(0, remaining_size_bytes + 1, 32)
+        offset_diff_bytes = alignment_bytes - read_offset_bytes
+        read_diff_bytes = alignment_bytes - read_size_bytes
+        
+        # Find matching offset
+        matching_indices = np.where(offset_diff_bytes >= 0)[0]
+        if len(matching_indices) > 0:
+            aligned_offset_bytes = alignment_bytes[matching_indices[0]].__int__()
+        else:
+            aligned_offset_bytes = 0
+            logging.warning("No matching offset found, using 0")
+        
+        # Find matching size
+        matching_indices = np.where(read_diff_bytes >= 0)[0]
+        if len(matching_indices) > 0:
+            aligned_size_bytes = alignment_bytes[matching_indices[0]].__int__()
+        else:
+            aligned_size_bytes = remaining_size_bytes
+            logging.warning(f"No matching size found, using remaining size: {aligned_size_bytes}")
+        
+        logging.debug(f"Aligned Fusion read - offset: {aligned_offset_bytes}, size: {aligned_size_bytes}")
+        return aligned_offset_bytes, aligned_size_bytes
     
+    ###################################################################################
+    # Read and process Fusion format data
+    ###################################################################################
+    def _read_and_process_fusion_data(self, filepath: str, offset_bytes: int, num_clumps: int, use_python: bool = True) -> np.ndarray:
+        """Read and process Fusion format data.
+        
+        Args:
+            filepath: Path to the RF data file
+            offset_bytes: Offset in bytes where to start reading
+            num_clumps: Number of data clumps to read
+            use_python: If True, use Python implementation instead of C
+        """
+        logging.debug(f"Starting to process {num_clumps} clumps...")
+        logging.debug(f"Using Python implementation: {use_python}")
+        logging.debug(f"Offset bytes: {offset_bytes}")
+        logging.debug(f"Filepath: {filepath}")
+        
+        if use_python:
+            # Use Python implementation
+            part_a = self._get_part_a_py(num_clumps, filepath, offset_bytes)
+            part_b = self._get_part_b_py(num_clumps, filepath, offset_bytes)
+        else:
+            # Use C implementation from philipsRfParser module
+            part_a = getPartA(num_clumps, filepath, offset_bytes)
+            part_b = getPartB(num_clumps, filepath, offset_bytes)
+            
+        logging.debug(f"Retrieved partA: {len(part_a)} elements, partB: {len(part_b)} elements")
+        
+        # Process and reshape the data
+        rawrfdata = np.concatenate((
+            np.array(part_a, dtype=int).reshape((12, num_clumps), order='F'),
+            np.array([part_b], dtype=int)
+        ))
+        logging.debug(f"Raw RF data shape: {rawrfdata.shape}")
+        
+        return rawrfdata
+
+    ###################################################################################
+    # Python implementations of C functions - getPartA
+    ###################################################################################
+    def _get_part_a_py(self, num_clumps: int, filepath: str, offset_bytes: int) -> list:
+        """Python implementation of getPartA from C code.
+        Follows exact same implementation as philips_rf_parser.c get_partA function.
+        """
+        logging.debug(f"[_get_part_a_py] Starting to process {num_clumps} clumps...")
+        
+        part_a = [0] * (12 * num_clumps)  # Pre-allocate array like C
+        bytes_read = bytearray(256)  # Match C allocation
+        
+        with open(filepath, 'rb') as fd:
+            fd.seek(offset_bytes)
+            
+            i = 0  # Byte position in current chunk
+            x = 0  # Position in output array
+            j = 0  # Chunk counter
+            bits_left = 0
+            bit_offset = 4  # Initial bit offset
+            last_percentage = -1  # Track last logged percentage
+            
+            while j < num_clumps:
+                if not j or i == 31:  # Start of new chunk
+                    assert bit_offset == 4
+                    bit_offset = 8
+                    chunk = fd.read(32)
+                    if not chunk:
+                        break
+                    bytes_read[:len(chunk)] = chunk
+                    j += 1
+                    i = 0
+                    
+                    # Log progress percentage for each chunk
+                    current_percentage = (j * 100) // num_clumps
+                    if current_percentage > last_percentage:
+                        logging.debug(f"[_get_part_a_py] Progress: {current_percentage}%")
+                        last_percentage = current_percentage
+                else:
+                    # Exactly match C bit manipulation
+                    mask = ((~0) << (8 - bit_offset)) & 0xFF
+                    first = (bytes_read[i] & mask) >> (8 - bit_offset)
+                    first |= (bytes_read[i + 1] << bit_offset)
+                    
+                    second = bytes_read[i + 1]
+                    second = second >> (8 - bit_offset)
+                    second |= (bytes_read[i + 2] << bit_offset)
+                    
+                    third = bytes_read[i + 2]
+                    third = third >> (8 - bit_offset)
+                    
+                    bits_left = 5 - bit_offset
+                    if bits_left > 0:
+                        i += 1
+                        mask = ~((~0) << bits_left) & 0xFF
+                        temp = mask & bytes_read[i + 2]
+                        third |= temp << bit_offset
+                        bit_offset = 8 - bits_left
+                    elif bits_left < 0:
+                        mask = ~(((~0) << 5)) & 0xFF
+                        third &= mask
+                        bit_offset = -bits_left
+                    else:
+                        i += 1
+                        bit_offset = 8
+                    
+                    value = ((first & 0xFF) << 16) | ((second & 0xFF) << 8) | (third & 0xFF)
+                    part_a[x] = value
+                    x += 1
+                    i += 2
+        
+        logging.debug("[_get_part_a_py] Processing completed (100%)")
+        return part_a
+
+    ###################################################################################
+    # Python implementations of C functions - getPartB
+    ###################################################################################
+    def _get_part_b_py(self, num_clumps: int, filepath: str, offset_bytes: int) -> list:
+        """Python implementation of getPartB from C code.
+        Follows exact same implementation as philips_rf_parser.c get_partB function.
+        """
+        logging.debug(f"[_get_part_b_py] Starting to process {num_clumps} clumps...")
+        
+        part_b = [0] * num_clumps  # Pre-allocate array like C
+        bytes_read = bytearray(256)  # Match C allocation
+        mask = ~((~0) << 4) & 0xFF  # 4-bit mask
+        
+        with open(filepath, 'rb') as fd:
+            fd.seek(offset_bytes)
+            
+            x = 0
+            last_percentage = -1  # Track last logged percentage
+            
+            while x < num_clumps:
+                chunk = fd.read(32)
+                if not chunk:
+                    break
+                bytes_read[:len(chunk)] = chunk
+                cur_num = bytes_read[0] & mask
+                part_b[x] = cur_num
+                x += 1
+                
+                # Log progress percentage every 5%
+                current_percentage = (x * 100) // num_clumps
+                if current_percentage > last_percentage and current_percentage % 5 == 0:
+                    logging.debug(f"[_get_part_b_py] Progress: {current_percentage}%")
+                    last_percentage = current_percentage
+        
+        logging.debug("[_get_part_b_py] Processing completed (100%)")
+        return part_b
+
+    ###################################################################################
+    # Reshape Voyager raw data
+    ###################################################################################
+    def _reshape_voyager_raw_data(self, rawrfdata: Any) -> Any:
+        """Reshape Voyager raw RF data if needed."""
+        logging.info("Reshaping Voyager raw data")
+        
+        initial_size = len(rawrfdata)
+        logging.debug(f"Initial raw data size: {initial_size} bytes")
+        
+        num_clumps = np.floor(len(rawrfdata) / 36)
+        logging.debug(f"Calculated clumps: {num_clumps}")
+        
+        rlimit = 180_000_000
+        if len(rawrfdata) > rlimit:
+            logging.warning(f"Large file detected ({len(rawrfdata)} bytes), chunking reshape operation")
+            
+            num_chunks = int(np.floor(len(rawrfdata) / rlimit))
+            num_rem_bytes = np.mod(len(rawrfdata), rlimit)
+            num_clump_group = int(rlimit / 36)
+            logging.debug(f"Chunking: {num_chunks} chunks, {num_rem_bytes} remaining bytes, {num_clump_group} clumps per chunk")
+            
+            temp = np.zeros((num_chunks + 1, 3, 12, num_clump_group))
+            m = 0
+            n = 0
+            
+            for i in range(num_chunks):
+                logging.debug(f"Processing chunk {i+1}/{num_chunks}")
+                temp[i] = np.reshape(rawrfdata[m:m + rlimit], (3, 12, num_clump_group))
+                m += rlimit
+                n += num_clump_group
+                
+            if num_rem_bytes > 0:
+                logging.debug(f"Processing remaining {num_rem_bytes} bytes")
+                temp[num_chunks] = np.reshape(rawrfdata[m:int(num_clumps * 36)], (3, 12, int(num_clumps - n)))
+                
+            rawrfdata = np.concatenate((temp[:]), axis=2)
+            logging.debug("Chunked reshape complete")
+        else:
+            logging.debug("Direct reshape for normal size file")
+            rawrfdata = np.reshape(rawrfdata, (3, 12, int(num_clumps)), order='F')
+            
+        logging.info(f"Voyager reshape complete, final shape: {np.array(rawrfdata).shape}")
+        return rawrfdata
+
+    ###################################################################################
+    # Parse header dispatch
+    ###################################################################################
+    def _parse_header_dispatch(self, rawrfdata: Any) -> 'PhilipsRfParser.HeaderInfoStruct':
+        """Dispatch to the correct header parsing method."""
+        logging.info(f"Dispatching header parsing: is_voyager={self.is_voyager}, is_fusion={self.is_fusion}")
+        if self.is_voyager:
+            logging.debug(f"Using Voyager header parser")
+            return self._parse_header_voyager(rawrfdata)
+        elif self.is_fusion:
+            logging.debug(f"Using Fusion header parser")
+            return self._parse_header_fusion(rawrfdata)
+        else:
+            raise RuntimeError("Unknown file type: neither Voyager nor Fusion detected.")
+
+    ###################################################################################
+    # Voyager Header Parsing
+    ###################################################################################
+    def _parse_header_voyager(self, rawrfdata):
+        """Parse header for Voyager systems."""
+        logging.info("Parsing Voyager header information")
+        
+        # Find headers and initialize structure
+        temp_headerInfo = PhilipsRfParser.HeaderInfoStruct()
+        iHeader, numHeaders = self._find_voyager_headers(rawrfdata)
+        
+        # Initialize header arrays
+        temp_headerInfo = self._initialize_header_arrays(temp_headerInfo, numHeaders)
+        
+        # Process each header
+        self._process_voyager_headers(rawrfdata, iHeader, numHeaders, temp_headerInfo)
+        
+        logging.info(f"Voyager header parsing complete - processed {numHeaders} headers")
+        return temp_headerInfo
+
+    ###################################################################################
+    # Find headers in Voyager data
+    ###################################################################################
+    def _find_voyager_headers(self, rawrfdata):
+        """Find headers in Voyager data."""
+        iHeader = np.where(np.uint8(rawrfdata[2,0,:])&224)
+        numHeaders = len(iHeader)-1  # Ignore last header as it is part of a partial line
+        logging.debug(f"Found {numHeaders} headers in Voyager data")
+        return iHeader, numHeaders
+
+    ###################################################################################
+    # Voyager Header Parsing
+    ###################################################################################
+    def _initialize_header_arrays(self, header_info, numHeaders):
+        """Initialize header arrays with appropriate sizes and types."""
+        logging.debug(f"Initializing header arrays for {numHeaders} headers")
+        
+        # Initialize 8-bit fields
+        header_info.RF_CaptureVersion = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.Tap_Point = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.Data_Gate = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.Multilines_Capture = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.RF_Sample_Rate = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.Steer = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.elevationPlaneOffset = np.zeros(numHeaders, dtype=np.uint8)
+        header_info.PM_Index = np.zeros(numHeaders, dtype=np.uint8)
+        logging.debug("Initialized 8-bit fields")
+        
+        # Initialize 16-bit fields
+        header_info.Line_Index = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Pulse_Index = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Data_Format = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Data_Type = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Header_Tag = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Threed_Pos = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Mode_Info = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.CSID = np.zeros(numHeaders, dtype=np.uint16)
+        header_info.Line_Type = np.zeros(numHeaders, dtype=np.uint16)
+        logging.debug("Initialized 16-bit fields")
+        
+        # Initialize 32-bit fields
+        header_info.Frame_ID = np.zeros(numHeaders, dtype=np.uint32)
+        header_info.Time_Stamp = np.zeros(numHeaders, dtype=np.uint32)
+        logging.debug("Initialized 32-bit fields")
+        
+        logging.info("Header arrays initialization complete")
+        return header_info
+
+    ###################################################################################
+    # Process each header in Voyager data
+    ###################################################################################
+    def _process_voyager_headers(self, rawrfdata, iHeader, numHeaders, temp_headerInfo):
+        """Process each header in Voyager data."""
+        for m in range(numHeaders):
+            if m % 1000 == 0:
+                logging.debug(f"Processing Voyager header {m}/{numHeaders}")
+            
+            # Build packed header string from raw data
+            packedHeader = self._build_voyager_packed_header(rawrfdata, iHeader, m)
+            
+            # Parse the header values
+            self._parse_voyager_header_values(packedHeader, m, temp_headerInfo)
+
+    ###################################################################################
+    # Build packed header string from raw data
+    ###################################################################################
+    def _build_voyager_packed_header(self, rawrfdata, iHeader, m):
+        """Build packed header string from raw data."""
+        logging.debug(f"Building packed header for header index {m}")
+        
+        packedHeader = ''
+        for k in np.arange(11, 0, -1):
+            temp = ''
+            for i in np.arange(2, 0, -1):
+                value = np.uint8(rawrfdata[i, k, iHeader[m]])
+                temp += bin(value)
+                
+            # Discard first 3 bits, redundant info
+            packedHeader += temp[3:24]
+            logging.debug(f"Intermediate packed header: {packedHeader}")
+        logging.debug(f"Final packed header: {packedHeader}")
+        
+        return packedHeader
+
+    ###################################################################################
+    # Voyager Header Parsing
+    ###################################################################################
+    def _parse_voyager_header_values(self, packedHeader, m, header_info):
+        """Parse values from packed header string."""
+        iBit = 0
+        
+        # Parse 8-bit fields
+        header_info.RF_CaptureVersion[m] = int(packedHeader[iBit:iBit+4], 2)
+        iBit += 4
+        header_info.Tap_Point[m] = int(packedHeader[iBit:iBit+3], 2)
+        iBit += 3
+        header_info.Data_Gate[m] = int(packedHeader[iBit], 2)
+        iBit += 1
+        header_info.Multilines_Capture[m] = int(packedHeader[iBit:iBit+4], 2)
+        iBit += 4
+        header_info.RF_Sample_Rate[m] = int(packedHeader[iBit], 2)
+        iBit += 1
+        
+        # Log sample rate for first header
+        if m == 0:
+            logging.info(f"Sample rate from first Voyager header: {header_info.RF_Sample_Rate[m]}")
+        
+        header_info.Steer[m] = int(packedHeader[iBit:iBit+6], 2)
+        iBit += 6
+        header_info.elevationPlaneOffset[m] = int(packedHeader[iBit:iBit+8], 2)
+        iBit += 8
+        header_info.PM_Index[m] = int(packedHeader[iBit:iBit+2], 2)
+        iBit += 2
+        
+        # Parse 16-bit fields
+        header_info.Line_Index[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Pulse_Index[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Data_Format[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Data_Type[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Header_Tag[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Threed_Pos[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Mode_Info[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        
+        # Parse 32-bit fields
+        header_info.Frame_ID[m] = int(packedHeader[iBit:iBit+32], 2)
+        iBit += 32
+        header_info.CSID[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Line_Type[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        header_info.Time_Stamp[m] = int(packedHeader[iBit:iBit+32], 2)
+
+    ###################################################################################
+    # Fusion Header Parsing
+    ###################################################################################
+    def _parse_header_fusion(self, rawrfdata):
+        """Parse header for Fusion systems."""
+        logging.info('Entering parseHeaderF - parsing Fusion headers')
+        
+        # Find headers and initialize structure
+        iHeader, numHeaders = self._find_fusion_headers(rawrfdata)
+        HeaderInfo = PhilipsRfParser.HeaderInfoStruct()
+        
+        # Initialize arrays
+        HeaderInfo = self._initialize_header_arrays(HeaderInfo, numHeaders)
+        
+        # Process each header
+        self._process_fusion_headers(rawrfdata, iHeader, numHeaders, HeaderInfo)
+        
+        logging.info(f'Exiting parseHeaderF - numHeaders: {numHeaders}, Data_Type shape: {HeaderInfo.Data_Type.shape}')
+        return HeaderInfo
+
+    ###################################################################################
+    # Find headers in Fusion data
+    ###################################################################################
+    def _find_fusion_headers(self, rawrfdata):
+        """Find and extract header locations in Fusion format RF data.
+
+        This method identifies the positions of headers in Fusion format data by performing
+        a bitwise operation on the first row of the raw RF data. In Fusion format, headers
+        are identified by a specific bit pattern where (value & 1572864 == 524288).
+        Each header occupies exactly one "Clump" in the data.
+
+        Args:
+            rawrfdata (numpy.ndarray): Raw RF data array. Expected to be a 2D array where:
+                - First dimension represents the rows (13 rows per clump)
+                - Second dimension represents the columns (number of clumps)
+
+        Returns:
+            tuple: A tuple containing:
+                - iHeader (numpy.ndarray): Array of indices where headers are found
+                - numHeaders (int): Number of valid headers (excluding the last partial header)
+
+        Note:
+            - The method uses the bit pattern 1572864 (0x180000) as a mask and looks for
+              values that equal 524288 (0x80000) after masking
+            - The last header is ignored as it is typically part of a partial line
+            - Header indices can be used to extract header information in subsequent processing
+        """
+        
+        # Find indices where the bitwise AND operation between the first row of rawrfdata and 1572864 equals 524288
+        iHeader = np.array(np.where(rawrfdata[0,:]&1572864 == 524288))[0]
+        numHeaders = iHeader.size - 1  # Ignore last header as it is a part of a partial line
+        logging.info(f"Found {numHeaders} headers in Fusion data")
+        logging.debug(f"iHeader: {iHeader}")
+
+        return iHeader, numHeaders
+
+    ###################################################################################
+    # Process each header in Fusion data
+    ###################################################################################
+    def _process_fusion_headers(self, rawrfdata, iHeader, numHeaders, HeaderInfo):
+        """Process each header in Fusion data."""
+        logging.info("Extracting header information...")
+        for m in range(numHeaders):
+            if m % 1000 == 0:
+                logging.debug(f"Processing Fusion header {m}/{numHeaders}")
+            
+            # Build packed header string from raw data
+            packedHeader = self._build_fusion_packed_header(rawrfdata, iHeader, m)
+            
+            # Parse the header values
+            self._parse_fusion_header_values(packedHeader, m, HeaderInfo)
+
+    ###################################################################################
+    # Fusion Header Parsing
+    ###################################################################################
+    def _build_fusion_packed_header(self, rawrfdata, iHeader, m):
+        """Build packed header string from raw data for Fusion systems."""
+        # Get the data from the 13th element (index 12)
+        packedHeader = bin(rawrfdata[12, iHeader[m]])[2:]
+        
+        # Add leading zeros if needed
+        remainingZeros = 4 - len(packedHeader)
+        if remainingZeros > 0:
+            zeros = self._get_filler_zeros(remainingZeros)
+            packedHeader = str(zeros + packedHeader)
+        
+        # Add data from remaining elements in reverse order
+        for i in np.arange(11, -1, -1):
+            curBin = bin(int(rawrfdata[i, iHeader[m]]))[2:]
+            remainingZeros = 21 - len(curBin)
+            if remainingZeros > 0:
+                zeros = self._get_filler_zeros(remainingZeros)
+                curBin = str(zeros + curBin)
+            packedHeader += curBin
+        
+        return packedHeader
+
+    ###################################################################################
+    # Fusion Header Parsing
+    ###################################################################################
+    def _parse_fusion_header_values(self, packedHeader, m, HeaderInfo):
+        """Parse values from packed header string for Fusion systems."""
+        iBit = 2  # Start at bit 2
+        
+        # Parse 8-bit fields
+        HeaderInfo.RF_CaptureVersion[m] = int(packedHeader[iBit:iBit+4], 2)
+        iBit += 4
+        HeaderInfo.Tap_Point[m] = int(packedHeader[iBit:iBit+3], 2)
+        iBit += 3
+        HeaderInfo.Data_Gate[m] = int(packedHeader[iBit], 2)
+        iBit += 1
+        HeaderInfo.Multilines_Capture[m] = int(packedHeader[iBit:iBit+4], 2)
+        iBit += 4
+        iBit += 15  # Skip 15 unused bits
+        HeaderInfo.RF_Sample_Rate[m] = int(packedHeader[iBit], 2)
+        iBit += 1
+        
+        # Log sample rate for first header
+        if m == 0:
+            logging.info(f"Sample rate from first header: {HeaderInfo.RF_Sample_Rate[m]}")
+        
+        HeaderInfo.Steer[m] = int(packedHeader[iBit:iBit+6], 2)
+        iBit += 6
+        HeaderInfo.elevationPlaneOffset[m] = int(packedHeader[iBit:iBit+8], 2)
+        iBit += 8
+        HeaderInfo.PM_Index[m] = int(packedHeader[iBit:iBit+2], 2)
+        iBit += 2
+        
+        # Parse 16-bit fields
+        HeaderInfo.Line_Index[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Pulse_Index[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Data_Format[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Data_Type[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Header_Tag[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Threed_Pos[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Mode_Info[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        
+        # Parse 32-bit fields
+        HeaderInfo.Frame_ID[m] = int(packedHeader[iBit:iBit+32], 2)
+        iBit += 32
+        HeaderInfo.CSID[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        HeaderInfo.Line_Type[m] = int(packedHeader[iBit:iBit+16], 2)
+        iBit += 16
+        
+        # Special handling for Time_Stamp - concatenate specific bit ranges
+        HeaderInfo.Time_Stamp[m] = int(str(packedHeader[iBit:iBit+13]+packedHeader[iBit+15:iBit+34]), 2)
+
+
+
+
+
+
     ###################################################################################
     # Logging Restoration
     ###################################################################################
@@ -1276,460 +1909,33 @@ class PhilipsRfParser:
 
 
 
-    ###################################################################################
-    # File Header Parsing
-    ###################################################################################
-    def _calculate_read_parameters(self, filepath: str, total_header_size: int, read_offset: int, read_size: int) -> Tuple[int, int, int, int]:
-        """Calculate file sizes and convert MB to bytes for read parameters."""
-        file_size = os.stat(filepath).st_size
-        remaining_size = file_size - total_header_size
-        logging.debug(f"File size: {file_size} bytes, header size: {total_header_size} bytes, remaining: {remaining_size} bytes")
-        
-        # Convert from MB to bytes
-        read_offset_bytes = read_offset * (2 ** 20)
-        read_size_bytes = read_size * (2 ** 20)
-        logging.debug(f"Read parameters in bytes: offset={read_offset_bytes}, size={read_size_bytes}")
-        
-        return file_size, remaining_size, read_offset_bytes, read_size_bytes
 
-    ###################################################################################
-    # File Header Parsing
-    ###################################################################################
-    def _load_voyager_data(self, filepath: str, remaining_size: int, read_offset: int, read_size: int) -> Tuple[Any, int]:
-        """Load data in Voyager format."""
-        logging.info("Loading Voyager format data")
-        
-        # Align read parameters to Voyager data format
-        read_offset, read_size = self._align_voyager_parameters(remaining_size, read_offset, read_size)
-        
-        # Read the raw data
-        with open(filepath, 'rb') as f:
-            f.seek(read_offset)
-            rawrfdata = f.read(read_size)
-        
-        logging.info(f"Loaded {len(rawrfdata)} bytes of Voyager data")
-        return rawrfdata, 0
 
-    ###################################################################################
-    # File Header Parsing
-    ###################################################################################
-    def _align_voyager_parameters(self, remaining_size: int, read_offset: int, read_size: int) -> Tuple[int, int]:
-        """Align read parameters to Voyager format boundaries (36 bytes)."""
-        alignment = np.arange(0, remaining_size + 1, 36)
-        offset_diff = alignment - read_offset
-        read_diff = alignment - read_size
-        
-        aligned_offset = alignment[np.where(offset_diff >= 0)[0][0]].__int__()
-        aligned_size = alignment[np.where(read_diff >= 0)[0][0]].__int__()
-        
-        logging.debug(f"Aligned Voyager read - offset: {aligned_offset}, size: {aligned_size}")
-        return aligned_offset, aligned_size
 
-    ###################################################################################
-    # File Header Parsing
-    ###################################################################################
-    def _load_fusion_data(self, filepath: str, total_header_size: int, remaining_size: int, read_offset: int, read_size: int) -> Tuple[Any, int]:
-        """Load data in Fusion format."""
-        logging.info("Loading Fusion format data")
-        
-        # Align read parameters to Fusion data format
-        read_offset, read_size = self._align_fusion_parameters(remaining_size, read_offset, read_size)
-        
-        # Calculate number of clumps and final offset
-        num_clumps = int(np.floor(read_size / 32))
-        offset = total_header_size + read_offset
-        logging.info(f"Reading Fusion data: {num_clumps} clumps from offset {offset}")
-        
-        # Read and process the data
-        rawrfdata = self._read_and_process_fusion_data(filepath, offset, num_clumps)
-        
-        logging.info(f"Loaded Fusion data with shape {rawrfdata.shape}")
-        return rawrfdata, num_clumps
 
-    ###################################################################################
-    # File Header Parsing
-    ###################################################################################
-    def _align_fusion_parameters(self, remaining_size: int, read_offset: int, read_size: int) -> Tuple[int, int]:
-        """Align read parameters to Fusion format boundaries (32 bytes)."""
-        alignment = np.arange(0, remaining_size + 1, 32)
-        offset_diff = alignment - read_offset
-        read_diff = alignment - read_size
-        
-        # Find matching offset
-        matching_indices = np.where(offset_diff >= 0)[0]
-        if len(matching_indices) > 0:
-            aligned_offset = alignment[matching_indices[0]].__int__()
-        else:
-            aligned_offset = 0
-            logging.warning("No matching offset found, using 0")
-        
-        # Find matching size
-        matching_indices = np.where(read_diff >= 0)[0]
-        if len(matching_indices) > 0:
-            aligned_size = alignment[matching_indices[0]].__int__()
-        else:
-            aligned_size = remaining_size
-            logging.warning(f"No matching size found, using remaining size: {aligned_size}")
-        
-        logging.debug(f"Aligned Fusion read - offset: {aligned_offset}, size: {aligned_size}")
-        return aligned_offset, aligned_size
 
-    ###################################################################################
-    # File Header Parsing
-    ###################################################################################
-    def _read_and_process_fusion_data(self, filepath: str, offset: int, num_clumps: int) -> np.ndarray:
-        """Read and process Fusion format data using external functions."""
-        # External functions from philipsRfParser module
-        partA = getPartA(num_clumps, filepath, offset)
-        partB = getPartB(num_clumps, filepath, offset)
-        logging.debug(f"Retrieved partA: {len(partA)} elements, partB: {len(partB)} elements")
-        
-        # Process and reshape the data
-        rawrfdata = np.concatenate((
-            np.array(partA, dtype=int).reshape((12, num_clumps), order='F'), 
-            np.array([partB], dtype=int)
-        ))
-        logging.debug(f"Raw RF data shape: {rawrfdata.shape}")
-        
-        return rawrfdata
 
-    ###################################################################################
-    # Data Reshaping
-    ###################################################################################
-    def _reshape_voyager_raw_data(self, rawrfdata: Any) -> Any:
-        """Reshape Voyager raw RF data if needed."""
-        logging.info("Reshaping Voyager raw data")
-        
-        initial_size = len(rawrfdata)
-        logging.debug(f"Initial raw data size: {initial_size} bytes")
-        
-        num_clumps = np.floor(len(rawrfdata) / 36)
-        logging.debug(f"Calculated clumps: {num_clumps}")
-        
-        rlimit = 180_000_000
-        if len(rawrfdata) > rlimit:
-            logging.warning(f"Large file detected ({len(rawrfdata)} bytes), chunking reshape operation")
-            
-            num_chunks = int(np.floor(len(rawrfdata) / rlimit))
-            num_rem_bytes = np.mod(len(rawrfdata), rlimit)
-            num_clump_group = int(rlimit / 36)
-            logging.debug(f"Chunking: {num_chunks} chunks, {num_rem_bytes} remaining bytes, {num_clump_group} clumps per chunk")
-            
-            temp = np.zeros((num_chunks + 1, 3, 12, num_clump_group))
-            m = 0
-            n = 0
-            
-            for i in range(num_chunks):
-                logging.debug(f"Processing chunk {i+1}/{num_chunks}")
-                temp[i] = np.reshape(rawrfdata[m:m + rlimit], (3, 12, num_clump_group))
-                m += rlimit
-                n += num_clump_group
-                
-            if num_rem_bytes > 0:
-                logging.debug(f"Processing remaining {num_rem_bytes} bytes")
-                temp[num_chunks] = np.reshape(rawrfdata[m:int(num_clumps * 36)], (3, 12, int(num_clumps - n)))
-                
-            rawrfdata = np.concatenate((temp[:]), axis=2)
-            logging.debug("Chunked reshape complete")
-        else:
-            logging.debug("Direct reshape for normal size file")
-            rawrfdata = np.reshape(rawrfdata, (3, 12, int(num_clumps)), order='F')
-            
-        logging.info(f"Voyager reshape complete, final shape: {np.array(rawrfdata).shape}")
-        return rawrfdata
 
-    ###################################################################################
-    # Header and RF Data Parsing Dispatch
-    ###################################################################################
-    def _parse_header_dispatch(self, rawrfdata: Any) -> 'PhilipsRfParser.HeaderInfoStruct':
-        """Dispatch to the correct header parsing method."""
-        logging.info(f"Dispatching header parsing: is_voyager={self.is_voyager}, is_fusion={self.is_fusion}")
-        if self.is_voyager:
-            logging.debug(f"Using Voyager header parser")
-            return self._parse_header_v(rawrfdata)
-        elif self.is_fusion:
-            logging.debug(f"Using Fusion header parser")
-            return self._parse_header_f(rawrfdata)
-        else:
-            raise RuntimeError("Unknown file type: neither Voyager nor Fusion detected.")
 
-    ###################################################################################
-    # Voyager Header Parsing
-    ###################################################################################
-    def _parse_header_v(self, rawrfdata):
-        """Parse header for Voyager systems."""
-        logging.info("Parsing Voyager header information")
-        
-        # Find headers and initialize structure
-        temp_headerInfo = PhilipsRfParser.HeaderInfoStruct()
-        iHeader, numHeaders = self._find_voyager_headers(rawrfdata)
-        
-        # Initialize header arrays
-        temp_headerInfo = self._initialize_header_arrays(temp_headerInfo, numHeaders)
-        
-        # Process each header
-        self._process_voyager_headers(rawrfdata, iHeader, numHeaders, temp_headerInfo)
-        
-        logging.info(f"Voyager header parsing complete - processed {numHeaders} headers")
-        return temp_headerInfo
+
+
     
-    ###################################################################################
-    # Voyager Header Parsing
-    ###################################################################################
-    def _find_voyager_headers(self, rawrfdata):
-        """Find headers in Voyager data."""
-        iHeader = np.where(np.uint8(rawrfdata[2,0,:])&224)
-        numHeaders = len(iHeader)-1  # Ignore last header as it is part of a partial line
-        logging.debug(f"Found {numHeaders} headers in Voyager data")
-        return iHeader, numHeaders
 
-    ###################################################################################
-    # Voyager Header Parsing
-    ###################################################################################
-    def _initialize_header_arrays(self, header_info, numHeaders):
-        """Initialize header arrays with appropriate sizes and types."""
-        # Initialize 8-bit fields
-        header_info.RF_CaptureVersion = np.zeros(numHeaders, dtype=np.uint8)
-        header_info.Tap_Point = np.zeros(numHeaders, dtype=np.uint8)
-        header_info.Data_Gate = np.zeros(numHeaders, dtype=np.uint8)
-        header_info.Multilines_Capture = np.zeros(numHeaders, dtype=np.uint8)
-        header_info.RF_Sample_Rate = np.zeros(numHeaders, dtype=np.uint8)
-        header_info.Steer = np.zeros(numHeaders, dtype=np.uint8)
-        header_info.elevationPlaneOffset = np.zeros(numHeaders, dtype=np.uint8)
-        header_info.PM_Index = np.zeros(numHeaders, dtype=np.uint8)
-        
-        # Initialize 16-bit fields
-        header_info.Line_Index = np.zeros(numHeaders, dtype=np.uint16)
-        header_info.Pulse_Index = np.zeros(numHeaders, dtype=np.uint16)
-        header_info.Data_Format = np.zeros(numHeaders, dtype=np.uint16)
-        header_info.Data_Type = np.zeros(numHeaders, dtype=np.uint16)
-        header_info.Header_Tag = np.zeros(numHeaders, dtype=np.uint16)
-        header_info.Threed_Pos = np.zeros(numHeaders, dtype=np.uint16)
-        header_info.Mode_Info = np.zeros(numHeaders, dtype=np.uint16)
-        header_info.CSID = np.zeros(numHeaders, dtype=np.uint16)
-        header_info.Line_Type = np.zeros(numHeaders, dtype=np.uint16)
-        
-        # Initialize 32-bit fields
-        header_info.Frame_ID = np.zeros(numHeaders, dtype=np.uint32)
-        header_info.Time_Stamp = np.zeros(numHeaders, dtype=np.uint32)
-        
-        return header_info
 
-    ###################################################################################
-    # Voyager Header Parsing
-    ###################################################################################
-    def _process_voyager_headers(self, rawrfdata, iHeader, numHeaders, temp_headerInfo):
-        """Process each header in Voyager data."""
-        for m in range(numHeaders):
-            if m % 1000 == 0:
-                logging.debug(f"Processing Voyager header {m}/{numHeaders}")
-            
-            # Build packed header string from raw data
-            packedHeader = self._build_voyager_packed_header(rawrfdata, iHeader, m)
-            
-            # Parse the header values
-            self._parse_voyager_header_values(packedHeader, m, temp_headerInfo)
 
-    ###################################################################################
-    # Voyager Header Parsing
-    ###################################################################################
-    def _build_voyager_packed_header(self, rawrfdata, iHeader, m):
-        """Build packed header string from raw data."""
-        packedHeader = ''
-        for k in np.arange(11, 0, -1):
-            temp = ''
-            for i in np.arange(2, 0, -1):
-                temp += bin(np.uint8(rawrfdata[i, k, iHeader[m]]))
-            # Discard first 3 bits, redundant info
-            packedHeader += temp[3:24]
-        return packedHeader
 
-    ###################################################################################
-    # Voyager Header Parsing
-    ###################################################################################
-    def _parse_voyager_header_values(self, packedHeader, m, header_info):
-        """Parse values from packed header string."""
-        iBit = 0
-        
-        # Parse 8-bit fields
-        header_info.RF_CaptureVersion[m] = int(packedHeader[iBit:iBit+4], 2)
-        iBit += 4
-        header_info.Tap_Point[m] = int(packedHeader[iBit:iBit+3], 2)
-        iBit += 3
-        header_info.Data_Gate[m] = int(packedHeader[iBit], 2)
-        iBit += 1
-        header_info.Multilines_Capture[m] = int(packedHeader[iBit:iBit+4], 2)
-        iBit += 4
-        header_info.RF_Sample_Rate[m] = int(packedHeader[iBit], 2)
-        iBit += 1
-        
-        # Log sample rate for first header
-        if m == 0:
-            logging.info(f"Sample rate from first Voyager header: {header_info.RF_Sample_Rate[m]}")
-        
-        header_info.Steer[m] = int(packedHeader[iBit:iBit+6], 2)
-        iBit += 6
-        header_info.elevationPlaneOffset[m] = int(packedHeader[iBit:iBit+8], 2)
-        iBit += 8
-        header_info.PM_Index[m] = int(packedHeader[iBit:iBit+2], 2)
-        iBit += 2
-        
-        # Parse 16-bit fields
-        header_info.Line_Index[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        header_info.Pulse_Index[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        header_info.Data_Format[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        header_info.Data_Type[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        header_info.Header_Tag[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        header_info.Threed_Pos[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        header_info.Mode_Info[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        
-        # Parse 32-bit fields
-        header_info.Frame_ID[m] = int(packedHeader[iBit:iBit+32], 2)
-        iBit += 32
-        header_info.CSID[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        header_info.Line_Type[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        header_info.Time_Stamp[m] = int(packedHeader[iBit:iBit+32], 2)
 
-    ###################################################################################
-    # Fusion Header Parsing
-    ###################################################################################
-    def _parse_header_f(self, rawrfdata):
-        """Parse header for Fusion systems."""
-        logging.info('Entering parseHeaderF - parsing Fusion headers')
-        
-        # Find headers and initialize structure
-        iHeader, numHeaders = self._find_fusion_headers(rawrfdata)
-        HeaderInfo = PhilipsRfParser.HeaderInfoStruct()
-        
-        # Initialize arrays
-        HeaderInfo = self._initialize_header_arrays(HeaderInfo, numHeaders)
-        
-        # Process each header
-        self._process_fusion_headers(rawrfdata, iHeader, numHeaders, HeaderInfo)
-        
-        logging.info(f'Exiting parseHeaderF - numHeaders: {numHeaders}, Data_Type shape: {HeaderInfo.Data_Type.shape}')
-        return HeaderInfo
 
-    ###################################################################################
-    # Fusion Header Parsing
-    ###################################################################################
-    def _find_fusion_headers(self, rawrfdata):
-        """Find headers in Fusion data."""
-        # Find header clumps
-        # iHeader pts to the index of the header clump
-        # Note that each header is exactly 1 "Clump" long
-        iHeader = np.array(np.where(rawrfdata[0,:]&1572864 == 524288))[0]
-        numHeaders = iHeader.size - 1  # Ignore last header as it is a part of a partial line
-        logging.info(f"Found {numHeaders} headers in Fusion data")
-        return iHeader, numHeaders
 
-    ###################################################################################
-    # Fusion Header Parsing
-    ###################################################################################
-    def _process_fusion_headers(self, rawrfdata, iHeader, numHeaders, HeaderInfo):
-        """Process each header in Fusion data."""
-        logging.info("Extracting header information...")
-        for m in range(numHeaders):
-            if m % 1000 == 0:
-                logging.debug(f"Processing Fusion header {m}/{numHeaders}")
-            
-            # Build packed header string from raw data
-            packedHeader = self._build_fusion_packed_header(rawrfdata, iHeader, m)
-            
-            # Parse the header values
-            self._parse_fusion_header_values(packedHeader, m, HeaderInfo)
 
-    ###################################################################################
-    # Fusion Header Parsing
-    ###################################################################################
-    def _build_fusion_packed_header(self, rawrfdata, iHeader, m):
-        """Build packed header string from raw data for Fusion systems."""
-        # Get the data from the 13th element (index 12)
-        packedHeader = bin(rawrfdata[12, iHeader[m]])[2:]
-        
-        # Add leading zeros if needed
-        remainingZeros = 4 - len(packedHeader)
-        if remainingZeros > 0:
-            zeros = self._get_filler_zeros(remainingZeros)
-            packedHeader = str(zeros + packedHeader)
-        
-        # Add data from remaining elements in reverse order
-        for i in np.arange(11, -1, -1):
-            curBin = bin(int(rawrfdata[i, iHeader[m]]))[2:]
-            remainingZeros = 21 - len(curBin)
-            if remainingZeros > 0:
-                zeros = self._get_filler_zeros(remainingZeros)
-                curBin = str(zeros + curBin)
-            packedHeader += curBin
-        
-        return packedHeader
 
-    ###################################################################################
-    # Fusion Header Parsing
-    ###################################################################################
-    def _parse_fusion_header_values(self, packedHeader, m, HeaderInfo):
-        """Parse values from packed header string for Fusion systems."""
-        iBit = 2  # Start at bit 2
-        
-        # Parse 8-bit fields
-        HeaderInfo.RF_CaptureVersion[m] = int(packedHeader[iBit:iBit+4], 2)
-        iBit += 4
-        HeaderInfo.Tap_Point[m] = int(packedHeader[iBit:iBit+3], 2)
-        iBit += 3
-        HeaderInfo.Data_Gate[m] = int(packedHeader[iBit], 2)
-        iBit += 1
-        HeaderInfo.Multilines_Capture[m] = int(packedHeader[iBit:iBit+4], 2)
-        iBit += 4
-        iBit += 15  # Skip 15 unused bits
-        HeaderInfo.RF_Sample_Rate[m] = int(packedHeader[iBit], 2)
-        iBit += 1
-        
-        # Log sample rate for first header
-        if m == 0:
-            logging.info(f"Sample rate from first header: {HeaderInfo.RF_Sample_Rate[m]}")
-        
-        HeaderInfo.Steer[m] = int(packedHeader[iBit:iBit+6], 2)
-        iBit += 6
-        HeaderInfo.elevationPlaneOffset[m] = int(packedHeader[iBit:iBit+8], 2)
-        iBit += 8
-        HeaderInfo.PM_Index[m] = int(packedHeader[iBit:iBit+2], 2)
-        iBit += 2
-        
-        # Parse 16-bit fields
-        HeaderInfo.Line_Index[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        HeaderInfo.Pulse_Index[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        HeaderInfo.Data_Format[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        HeaderInfo.Data_Type[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        HeaderInfo.Header_Tag[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        HeaderInfo.Threed_Pos[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        HeaderInfo.Mode_Info[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        
-        # Parse 32-bit fields
-        HeaderInfo.Frame_ID[m] = int(packedHeader[iBit:iBit+32], 2)
-        iBit += 32
-        HeaderInfo.CSID[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        HeaderInfo.Line_Type[m] = int(packedHeader[iBit:iBit+16], 2)
-        iBit += 16
-        
-        # Special handling for Time_Stamp - concatenate specific bit ranges
-        HeaderInfo.Time_Stamp[m] = int(str(packedHeader[iBit:iBit+13]+packedHeader[iBit+15:iBit+34]), 2)
+
+
+
+
+
+
+
 
     ###################################################################################
     # RF Data Parsing Dispatch
@@ -2638,13 +2844,13 @@ class PhilipsRfParser:
     @staticmethod
     def _get_filler_zeros(num: int) -> str:
         """Get string of zeros for padding."""
-        logging.debug(f"Creating filler zeros, num={num}")
+        #logging.debug(f"Creating filler zeros, num={num}")
         
         # Ensure we don't create negative length strings
         count = max(0, num - 1)
         result = '0' * count
         
-        logging.debug(f"Generated {len(result)} filler zeros")
+        #logging.debug(f"Generated {len(result)} filler zeros")
         return result
 
     ###################################################################################
