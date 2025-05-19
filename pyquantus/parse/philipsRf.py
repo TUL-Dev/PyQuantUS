@@ -114,6 +114,8 @@ class PhilipsRfParser:
         """
         logging.info(f"Initializing PhilipsRfParser with multiline_output={multiline_output}, multiline_input={multiline_input}, offset_samples={offset_samples}")
         
+        self.use_c = False
+        
         self.multiline_output: int = multiline_output  # Formerly ML_out
         self.multiline_input: int = multiline_input    # Formerly ML_in
         self.offset_samples: int = offset_samples      # Formerly used_os
@@ -883,7 +885,7 @@ class PhilipsRfParser:
         logging.info(f"Reading Fusion data: {num_clumps} clumps from offset {offset_bytes}")
         
         # Read and process the data
-        rawrfdata = self._read_and_process_fusion_data(filepath, offset_bytes, num_clumps)
+        rawrfdata = self._read_and_process_fusion_data(filepath, offset_bytes, num_clumps, use_c=self.use_c)
         
         logging.info(f"Loaded Fusion data with shape {rawrfdata.shape}")
         return rawrfdata, num_clumps
@@ -921,28 +923,28 @@ class PhilipsRfParser:
     ###################################################################################
     # Read and process Fusion format data
     ###################################################################################
-    def _read_and_process_fusion_data(self, filepath: str, offset_bytes: int, num_clumps: int, use_python: bool = True) -> np.ndarray:
+    def _read_and_process_fusion_data(self, filepath: str, offset_bytes: int, num_clumps: int, use_c: bool) -> np.ndarray:
         """Read and process Fusion format data.
         
         Args:
             filepath: Path to the RF data file
             offset_bytes: Offset in bytes where to start reading
             num_clumps: Number of data clumps to read
-            use_python: If True, use Python implementation instead of C
+            use_c: If True, use C implementation instead of Python
         """
         logging.debug(f"Starting to process {num_clumps} clumps...")
-        logging.debug(f"Using Python implementation: {use_python}")
+        logging.debug(f"Using C implementation: {use_c}")
         logging.debug(f"Offset bytes: {offset_bytes}")
         logging.debug(f"Filepath: {filepath}")
         
-        if use_python:
-            # Use Python implementation
-            part_a = self._get_part_a_py(num_clumps, filepath, offset_bytes)
-            part_b = self._get_part_b_py(num_clumps, filepath, offset_bytes)
-        else:
+        if use_c:
             # Use C implementation from philipsRfParser module
             part_a = getPartA(num_clumps, filepath, offset_bytes)
             part_b = getPartB(num_clumps, filepath, offset_bytes)
+        else:
+            # Use Python implementation
+            part_a = self._get_part_a_py(num_clumps, filepath, offset_bytes)
+            part_b = self._get_part_b_py(num_clumps, filepath, offset_bytes)
             
         logging.debug(f"Retrieved partA: {len(part_a)} elements, partB: {len(part_b)} elements")
         
@@ -975,7 +977,7 @@ class PhilipsRfParser:
             j = 0  # Chunk counter
             bits_left = 0
             bit_offset = 4  # Initial bit offset
-            last_percentage = -1  # Track last logged percentage
+            last_percentage = -1
             
             while j < num_clumps:
                 if not j or i == 31:  # Start of new chunk
@@ -988,41 +990,40 @@ class PhilipsRfParser:
                     j += 1
                     i = 0
                     
-                    # Log progress percentage for each chunk
+                    # Log progress percentage
                     current_percentage = (j * 100) // num_clumps
                     if current_percentage > last_percentage:
                         logging.debug(f"[_get_part_a_py] Progress: {current_percentage}%")
                         last_percentage = current_percentage
                 else:
                     # Exactly match C bit manipulation
-                    mask = ((~0) << (8 - bit_offset)) & 0xFF
+                    mask = (~0) << (8 - bit_offset)
                     first = (bytes_read[i] & mask) >> (8 - bit_offset)
                     first |= (bytes_read[i + 1] << bit_offset)
                     
-                    second = bytes_read[i + 1]
-                    second = second >> (8 - bit_offset)
+                    second = bytes_read[i + 1] >> (8 - bit_offset)
                     second |= (bytes_read[i + 2] << bit_offset)
                     
-                    third = bytes_read[i + 2]
-                    third = third >> (8 - bit_offset)
+                    third = bytes_read[i + 2] >> (8 - bit_offset)
                     
                     bits_left = 5 - bit_offset
                     if bits_left > 0:
                         i += 1
-                        mask = ~((~0) << bits_left) & 0xFF
+                        mask = ~((~0) << bits_left)
                         temp = mask & bytes_read[i + 2]
                         third |= temp << bit_offset
                         bit_offset = 8 - bits_left
                     elif bits_left < 0:
-                        mask = ~(((~0) << 5)) & 0xFF
+                        mask = ~((~0) << 5)
                         third &= mask
                         bit_offset = -bits_left
                     else:
                         i += 1
                         bit_offset = 8
                     
-                    value = ((first & 0xFF) << 16) | ((second & 0xFF) << 8) | (third & 0xFF)
-                    part_a[x] = value
+                    # Create a bytes object to match C's memory layout
+                    value_bytes = bytes([first & 0xFF, second & 0xFF, third & 0xFF, 0])
+                    part_a[x] = int.from_bytes(value_bytes, byteorder='little')
                     x += 1
                     i += 2
         
@@ -1040,25 +1041,30 @@ class PhilipsRfParser:
         
         part_b = [0] * num_clumps  # Pre-allocate array like C
         bytes_read = bytearray(256)  # Match C allocation
-        mask = ~((~0) << 4) & 0xFF  # 4-bit mask
+        mask = ~((~0) << 4)  # 4-bit mask
         
         with open(filepath, 'rb') as fd:
             fd.seek(offset_bytes)
             
             x = 0
-            last_percentage = -1  # Track last logged percentage
+            j = 0
+            last_percentage = -1
             
-            while x < num_clumps:
+            while j < num_clumps:
                 chunk = fd.read(32)
                 if not chunk:
                     break
                 bytes_read[:len(chunk)] = chunk
-                cur_num = bytes_read[0] & mask
-                part_b[x] = cur_num
+                
+                # Match C implementation exactly
+                cur_num = bytes_read[0]
+                cur_num &= mask
+                part_b[x] = int(cur_num)  # Cast to int like C does
                 x += 1
+                j += 1
                 
                 # Log progress percentage every 5%
-                current_percentage = (x * 100) // num_clumps
+                current_percentage = (j * 100) // num_clumps
                 if current_percentage > last_percentage and current_percentage % 5 == 0:
                     logging.debug(f"[_get_part_b_py] Progress: {current_percentage}%")
                     last_percentage = current_percentage
@@ -1329,16 +1335,38 @@ class PhilipsRfParser:
         Note:
             - The method uses the bit pattern 1572864 (0x180000) as a mask and looks for
               values that equal 524288 (0x80000) after masking
-            - The last header is ignored as it is typically part of a partial line
-            - Header indices can be used to extract header information in subsequent processing
         """
-        
-        # Find indices where the bitwise AND operation between the first row of rawrfdata and 1572864 equals 524288
-        iHeader = np.array(np.where(rawrfdata[0,:]&1572864 == 524288))[0]
-        numHeaders = iHeader.size - 1  # Ignore last header as it is a part of a partial line
-        logging.info(f"Found {numHeaders} headers in Fusion data")
-        logging.debug(f"iHeader: {iHeader}")
+        logging.info('Entering _find_fusion_headers')
+        logging.info(f'Raw RF data shape: {rawrfdata.shape}')
 
+        # Get first row of data and perform bitwise operation
+        first_row = rawrfdata[0, :]
+        logging.info(f'First row shape: {first_row.shape}')
+        
+        # Apply bit mask to find headers
+        mask = 1572864  # 0x180000
+        target = 524288  # 0x80000
+        masked_values = first_row & mask
+        logging.info(f'Number of values after masking: {len(masked_values)}')
+        
+        # Find indices where the masked value equals the target
+        iHeader = np.where(masked_values == target)[0]
+        logging.info(f'Found {len(iHeader)} potential header locations at indices: {iHeader[:min(10, len(iHeader))]}... (showing first 10 of {len(iHeader)})')
+
+        # Calculate number of headers (excluding last partial header)
+        if len(iHeader) > 1:
+            # Check spacing between headers
+            header_spacing = np.diff(iHeader)
+            logging.info(f'Spacing between headers: {header_spacing}')
+            
+            # Get number of complete headers
+            numHeaders = len(iHeader) - 1
+            logging.info(f'Number of complete headers (excluding last partial): {numHeaders}')
+        else:
+            numHeaders = 0
+            logging.info('No complete headers found')
+
+        logging.info('Exiting _find_fusion_headers')
         return iHeader, numHeaders
 
     ###################################################################################
@@ -1445,6 +1473,10 @@ class PhilipsRfParser:
 
 
 
+
+
+    
+    
     ###################################################################################
     # Logging Restoration
     ###################################################################################
@@ -2904,7 +2936,6 @@ class PhilipsRfParser:
         logging.debug(f"Output arrays initialized successfully")
         return out0, out1, out2, out3
 
-   
 ###################################################################################
 # Main Execution
 ###################################################################################
