@@ -115,7 +115,7 @@ class PhilipsRfParser:
         """
         logging.info(f"Initializing PhilipsRfParser with multiline_output={multiline_output}, multiline_input={multiline_input}, offset_samples={offset_samples}")
         
-        self.use_c = False
+        self.use_c = True
         
         self.multiline_output: int = multiline_output  # Formerly ML_out
         self.multiline_input: int = multiline_input    # Formerly ML_in
@@ -380,7 +380,7 @@ class PhilipsRfParser:
         )
         
     ###################################################################################
-    # Parse the file header
+    # Parse the file header and calculate total_header_size, endianness, and db_params.
     ####################################################################################
     def _parse_file_header_and_offset(self, file_obj) -> Tuple['PhilipsRfParser.DbParams', int, str]:
         """Parse file header and calculate total_header_size, endianness, and db_params.
@@ -884,7 +884,7 @@ class PhilipsRfParser:
         return aligned_offset_bytes, aligned_size_bytes
 
     ###################################################################################
-    # File Header Parsing
+    # Load Fusion data
     ###################################################################################
     def _load_fusion_data(self, filepath: str, total_header_size_bytes: int, remaining_size_bytes: int, read_offset_bytes: int, read_size_bytes: int) -> Tuple[Any, int]:
         """Load data in Fusion format."""
@@ -1177,7 +1177,7 @@ class PhilipsRfParser:
         return iHeader, numHeaders
 
     ###################################################################################
-    # Voyager Header Parsing
+    # Initialize header arrays
     ###################################################################################
     def _initialize_header_arrays(self, header_info, numHeaders):
         """Initialize header arrays with appropriate sizes and types."""
@@ -1251,7 +1251,7 @@ class PhilipsRfParser:
         return packedHeader
 
     ###################################################################################
-    # Voyager Header Parsing
+    # Parse values from packed header string
     ###################################################################################
     def _parse_voyager_header_values(self, packedHeader, m, header_info):
         """Parse values from packed header string."""
@@ -1371,7 +1371,7 @@ class PhilipsRfParser:
         if len(iHeader) > 1:
             # Check spacing between headers
             header_spacing = np.diff(iHeader)
-            logging.info(f'Spacing between headers: {header_spacing}')
+            logging.info(f'Spacing between headers: {header_spacing[:5]}...{header_spacing[-5:]} (showing first 5 and last 5 of {len(header_spacing)})')
             
             # Get number of complete headers
             numHeaders = len(iHeader) - 1
@@ -1413,8 +1413,8 @@ class PhilipsRfParser:
             zeros = self._get_filler_zeros(remainingZeros)
             packedHeader = str(zeros + packedHeader)
         
-        # Add data from remaining elements in reverse order
-        for i in np.arange(11, -1, -1):
+        # Add data from remaining elements in forward order to match little-endian
+        for i in range(12):
             curBin = bin(int(rawrfdata[i, iHeader[m]]))[2:]
             remainingZeros = 21 - len(curBin)
             if remainingZeros > 0:
@@ -1537,7 +1537,7 @@ class PhilipsRfParser:
         return self._parse_rf_data(rawrfdata, header_info)
 
     ###################################################################################
-    # RF Data Parsing
+    # Parse RF signal data
     ###################################################################################
     def _parse_rf_data(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray, int]:
         """Parse RF signal data."""
@@ -1579,7 +1579,7 @@ class PhilipsRfParser:
         return lineData, lineHeader, Tap_Point
 
     ###################################################################################
-    # Voyager Data Parsing
+    # Parse Voyager data
     ###################################################################################
     def _parse_data_voyager(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray]:
         """Parse RF data for Voyager systems."""
@@ -1623,7 +1623,7 @@ class PhilipsRfParser:
         return lineData, lineHeader
 
     ###################################################################################
-    # Fusion Data Parsing
+    # Parse Fusion data
     ###################################################################################
     def _parse_data_fusion(self, rawrfdata, headerInfo: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, np.ndarray]:
         """Parse RF data for Fusion systems."""
@@ -1742,7 +1742,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # Echo Data Extraction
+    # Get multiline capture settings and adjust tap point if needed
     ###################################################################################
     def _get_echo_capture_settings(self, header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> Tuple[float, int]:
         """Get multiline capture settings and adjust tap point if needed."""
@@ -1769,11 +1769,15 @@ class PhilipsRfParser:
         return ML_Capture, tap_point
 
     ###################################################################################
-    # Echo Data Extraction
+    # Find echo data indices
     ###################################################################################
     def _find_echo_data_indices(self, header_info: 'PhilipsRfParser.HeaderInfoStruct') -> Tuple[np.ndarray, int]:
         """Find indices of echo data in the dataset."""
         xmit_events = len(header_info.Data_Type)
+        
+        # log header_info.Data_Type
+        logging.debug(f"header_info.Data_Type first 10 elements: {header_info.Data_Type[:10]}")
+        logging.debug(f"header_info.Data_Type last 10 elements: {header_info.Data_Type[-10:]}")
         logging.debug(f"Number of transmit events: {xmit_events}")
         
         # Build index of echo data types
@@ -1794,7 +1798,7 @@ class PhilipsRfParser:
         return echo_index, echo_count
 
     ###################################################################################
-    # Echo Data Extraction
+    # Process echo data
     ###################################################################################
     def _process_echo_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', 
                           echo_index: np.ndarray, ML_Capture: float, tap_point: int) -> 'PhilipsRfParser.Rfdata':
@@ -1817,7 +1821,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # Echo Data Extraction
+    # Get echo data for the specified tap point
     ###################################################################################
     def _get_echo_data_for_tap_point(self, rfdata: 'PhilipsRfParser.Rfdata', pruning_line_data: np.ndarray, 
                                     pruning_line_header: np.ndarray, ML_Capture: float, tap_point: int) -> np.ndarray:
@@ -1832,7 +1836,7 @@ class PhilipsRfParser:
         return echo_data
 
     ###################################################################################
-    # Echo Data Extraction
+    # Sort echo data based on tap point and assign to rfdata
     ###################################################################################
     def _sort_echo_data_by_tap_point(self, rfdata: 'PhilipsRfParser.Rfdata', echo_data: np.ndarray, 
                                     ML_Capture: float, tap_point: int) -> 'PhilipsRfParser.Rfdata':
@@ -1856,7 +1860,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # CW Data Extraction
+    # Continuous Wave Data Extraction
     ###################################################################################
     def _extract_cw_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Extract CW data from RF data."""
@@ -1895,7 +1899,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # Data Pruning Utility
+    # Prune data
     ###################################################################################
     def _prune_data(self, line_data, line_header, multiline_capture):
         """Remove false gate data at beginning of the line."""
@@ -1954,7 +1958,7 @@ class PhilipsRfParser:
         return pruned_data
 
     ###################################################################################
-    # RF Sorting Utility
+    # Sort RF data based on multiline parameters
     ###################################################################################
     def _sort_rf(self, RFinput, Stride, ML, CRE=1, isVoyager=True):
         """Sort RF data based on multiline parameters.
@@ -1990,7 +1994,7 @@ class PhilipsRfParser:
         return out0, out1, out2, out3
 
     ###################################################################################
-    # RF Sorting Utility
+    # Initialize dimensions for RF sorting
     ###################################################################################
     def _initialize_rf_sort_dimensions(self, RFinput, Stride, ML):
         """Initialize dimensions for RF sorting."""
@@ -2008,7 +2012,7 @@ class PhilipsRfParser:
         return N, xmit_events, depth, multilines
 
     ###################################################################################
-    # RF Sorting Utility
+    # Initialize output arrays based on cross-resolution-enhancement value
     ###################################################################################
     def _initialize_rf_sort_outputs(self, depth, ML, xmit_events, CRE):
         """Initialize output arrays based on CRE value.
@@ -2059,7 +2063,7 @@ class PhilipsRfParser:
         return out0, out1, out2, out3
 
     ###################################################################################
-    # RF Sorting Utility
+    # Get the appropriate ML sort list based on Stride and CRE
     ###################################################################################
     def _get_ml_sort_list(self, Stride, CRE):
         """Get the appropriate ML sort list based on Stride and CRE."""
@@ -2118,7 +2122,7 @@ class PhilipsRfParser:
         return multiline_sort_list
 
     ###################################################################################
-    # RF Sorting Utility
+    # Check if the ML sort list is valid for the requested parameters
     ###################################################################################
     def _check_ml_sort_validity(self, ML, multiline_sort_list, CRE, Stride):
         """Check if the ML sort list is valid for the requested parameters."""
@@ -2146,7 +2150,7 @@ class PhilipsRfParser:
         logging.debug(f"ML sort list validity check complete")
 
     ###################################################################################
-    # RF Sorting Utility
+    # Fill output arrays based on the sort list
     ###################################################################################
     def _fill_rf_sort_outputs(self, RFinput, out0, out1, out2, out3, multilines, multiline_sort_list, depth, Stride, ML, CRE):
         """Fill output arrays based on the sort list."""
@@ -2209,7 +2213,7 @@ class PhilipsRfParser:
         return out0, out1, out2, out3
 
     ###################################################################################
-    # RF Sorting Utility
+    # Fill a specific output array with data from the input array
     ###################################################################################
     def _fill_output_array(self, output_array, input_array, depth, k, iML_index, Stride):
         """Fill a specific output array with data from the input array."""
@@ -2231,7 +2235,7 @@ class PhilipsRfParser:
         output_array[:depth, k, :] = input_array[indices]
 
     ###################################################################################
-    # PW Data Extraction
+    # Extract pulse wave data from RF data
     ###################################################################################
     def _extract_pw_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Extract PW data from RF data."""
@@ -2272,7 +2276,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # Color Data Extraction
+    # Extract color data from RF data
     ###################################################################################
     def _extract_color_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Extract color data from RF data."""
@@ -2310,7 +2314,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # Echo M-Mode Data Extraction
+    # Extract echo M-Mode data from RF data
     ###################################################################################
     def _extract_echo_mmode_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Extract echo M-Mode data from RF data."""
@@ -2345,7 +2349,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # Color M-Mode Data Extraction
+    # Extract color M-Mode data from RF data
     ###################################################################################
     def _extract_color_mmode_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Extract color M-Mode data from RF data."""
@@ -2386,7 +2390,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # Dummy Data Extraction
+    # Extract dummy data from RF data
     ###################################################################################
     def _extract_dummy_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Extract dummy data from RF data."""
@@ -2427,7 +2431,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # SWI Data Extraction
+    # Extract SWI data from RF data
     ###################################################################################
     def _extract_swi_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Extract SWI data from RF data."""
@@ -2468,7 +2472,7 @@ class PhilipsRfParser:
         return rfdata
 
     ###################################################################################
-    # Misc Data Extraction
+    # Extract miscellaneous data from RF data
     ###################################################################################
     def _extract_misc_data(self, rfdata: 'PhilipsRfParser.Rfdata', header_info: 'PhilipsRfParser.HeaderInfoStruct', tap_point: int) -> 'PhilipsRfParser.Rfdata':
         """Extract miscellaneous data from RF data."""
@@ -2512,26 +2516,21 @@ class PhilipsRfParser:
     # Save Header Summary
     ###################################################################################
     def _save_header_summary(self, numpy_folder: str):
-        """Save a summary of header information to a text file."""
-        summary_file = os.path.join(numpy_folder, 'header_summary.txt')
+        """Log a summary of header information."""
+        logging.info("=== PHILIPS RF FILE HEADER SUMMARY ===")
         
-        with open(summary_file, 'w') as f:
-            f.write("=== PHILIPS RF FILE HEADER SUMMARY ===\n\n")
-            
-            # Write each section of the summary
-            self._write_header_info_section(f)
-            self._write_db_params_section(f)
-            self._write_calculated_params_section(f)
-            self._write_data_shapes_section(f)
-            self._write_available_data_section(f)
-        
-        logging.info(f"Header summary saved to: {summary_file}")
+        # Log each section of the summary
+        self._write_header_info_section()
+        self._write_db_params_section()
+        self._write_calculated_params_section()
+        self._write_data_shapes_section()
+        self._write_available_data_section()
 
     ###################################################################################
-    # Header Information Section Writing
+    # Log header information section
     ###################################################################################
-    def _write_header_info_section(self, file_handle):
-        """Write header information section to the summary file."""
+    def _write_header_info_section(self):
+        """Log header information section."""
         if not hasattr(self.rfdata, 'headerInfo') or not self.rfdata.headerInfo:
             return
             
@@ -2539,26 +2538,26 @@ class PhilipsRfParser:
         
         # Number of headers/lines
         if hasattr(h, 'Data_Type') and h.Data_Type is not None:
-            file_handle.write(f"Number of headers/lines: {len(h.Data_Type)}\n")
+            logging.info(f"Number of headers/lines: {len(h.Data_Type)}")
         
         # First header information
-        file_handle.write("\n--- First Header Information ---\n")
-        self._write_first_header_info(file_handle, h)
+        logging.info("--- First Header Information ---")
+        self._write_first_header_info(h)
         
         # Data types present
-        self._write_data_types_info(file_handle, h)
+        self._write_data_types_info(h)
         
         # Frame and line information
-        self._write_frame_info(file_handle, h)
+        self._write_frame_info(h)
         
         # Time information
-        self._write_time_info(file_handle, h)
+        self._write_time_info(h)
 
     ###################################################################################
-    # First Header Information Section Writing
+    # Log first header information section
     ###################################################################################
-    def _write_first_header_info(self, file_handle, h):
-        """Write information from the first header."""
+    def _write_first_header_info(self, h):
+        """Log information from the first header."""
         header_fields = [
             ('RF_CaptureVersion', 'RF Capture Version'),
             ('Tap_Point', 'Tap Point'),
@@ -2569,101 +2568,101 @@ class PhilipsRfParser:
         
         for attr, label in header_fields:
             if hasattr(h, attr) and getattr(h, attr) is not None:
-                file_handle.write(f"{label}: {getattr(h, attr)[0]}\n")
+                logging.info(f"{label}: {getattr(h, attr)[0]}")
 
     ###################################################################################
-    # Data Types Information Section Writing
+    # Data Types Information Section 
     ###################################################################################
-    def _write_data_types_info(self, file_handle, h):
-        """Write information about data types."""
-        file_handle.write("\n--- Data Types Present ---\n")
+    def _write_data_types_info(self, h):
+        """Log information about data types."""
+        logging.info("--- Data Types Present ---")
         if hasattr(h, 'Data_Type') and h.Data_Type is not None:
             unique_types = np.unique(h.Data_Type)
-            file_handle.write(f"Unique Data Types: {unique_types}\n")
+            logging.info(f"Unique Data Types: {unique_types}")
             
             # Count of each data type
             for dtype in unique_types:
                 count = np.sum(h.Data_Type == dtype)
-                file_handle.write(f"  Type {dtype}: {count} occurrences\n")
+                logging.info(f"  Type {dtype}: {count} occurrences")
 
     ###################################################################################
-    # Frame Information Section Writing
+    # Frame Information Section 
     ###################################################################################
-    def _write_frame_info(self, file_handle, h):
-        """Write information about frames and lines."""
-        file_handle.write("\n--- Frame Information ---\n")
+    def _write_frame_info(self, h):
+        """Log information about frames and lines."""
+        logging.info("--- Frame Information ---")
         if hasattr(h, 'Frame_ID') and h.Frame_ID is not None:
             unique_frames = np.unique(h.Frame_ID)
-            file_handle.write(f"Number of unique frames: {len(unique_frames)}\n")
-            file_handle.write(f"Frame ID range: {unique_frames.min()} to {unique_frames.max()}\n")
+            logging.info(f"Number of unique frames: {len(unique_frames)}")
+            logging.info(f"Frame ID range: {unique_frames.min()} to {unique_frames.max()}")
         
         if hasattr(h, 'Line_Index') and h.Line_Index is not None:
-            file_handle.write(f"Line index range: {h.Line_Index.min()} to {h.Line_Index.max()}\n")
+            logging.info(f"Line index range: {h.Line_Index.min()} to {h.Line_Index.max()}")
 
     ###################################################################################
-    # Time Information Section Writing
+    # Time Information Section 
     ###################################################################################
-    def _write_time_info(self, file_handle, h):
-        """Write time-related information."""
-        file_handle.write("\n--- Time Information ---\n")
+    def _write_time_info(self, h):
+        """Log time-related information."""
+        logging.info("--- Time Information ---")
         if hasattr(h, 'Time_Stamp') and h.Time_Stamp is not None:
-            file_handle.write(f"First timestamp: {h.Time_Stamp[0]}\n")
-            file_handle.write(f"Last timestamp: {h.Time_Stamp[-1]}\n")
+            logging.info(f"First timestamp: {h.Time_Stamp[0]}")
+            logging.info(f"Last timestamp: {h.Time_Stamp[-1]}")
 
     ###################################################################################
-    # Database Parameters Section Writing
+    # Database Parameters Section 
     ###################################################################################
-    def _write_db_params_section(self, file_handle):
-        """Write database parameters section to the summary file."""
+    def _write_db_params_section(self):
+        """Log database parameters section."""
         if not hasattr(self.rfdata, 'dbParams') or not self.rfdata.dbParams:
             return
             
-        file_handle.write("\n--- Database Parameters ---\n")
+        logging.info("--- Database Parameters ---")
         db = self.rfdata.dbParams
         
         if hasattr(db, 'acqNumActiveScChannels2d') and db.acqNumActiveScChannels2d is not None:
-            file_handle.write(f"Active scan channels: {db.acqNumActiveScChannels2d.shape}\n")
-            file_handle.write(f"2D columns shape: {db.num2DCols.shape}\n")
-            file_handle.write(f"2D columns first row: {db.num2DCols[0, :] if db.num2DCols.size > 0 else 'N/A'}\n")
+            logging.info(f"Active scan channels: {db.acqNumActiveScChannels2d.shape}")
+            logging.info(f"2D columns shape: {db.num2DCols.shape}")
+            logging.info(f"2D columns first row: {db.num2DCols[0, :] if db.num2DCols.size > 0 else 'N/A'}")
         if hasattr(db, 'numOfSonoCTAngles2dActual') and db.numOfSonoCTAngles2dActual is not None:
-            file_handle.write(f"SonoCT angles: {db.numOfSonoCTAngles2dActual.shape}\n")
+            logging.info(f"SonoCT angles: {db.numOfSonoCTAngles2dActual.shape}")
         if hasattr(db, 'num2DCols') and db.num2DCols is not None:
-            file_handle.write(f"2D columns shape: {db.num2DCols.shape}\n")
-            file_handle.write(f"2D columns first row: {db.num2DCols[0, :] if db.num2DCols.size > 0 else 'N/A'}\n")
+            logging.info(f"2D columns shape: {db.num2DCols.shape}")
+            logging.info(f"2D columns first row: {db.num2DCols[0, :] if db.num2DCols.size > 0 else 'N/A'}")
 
     ###################################################################################
-    # Calculated Parameters Section Writing
+    # Calculated Parameters Section 
     ###################################################################################
-    def _write_calculated_params_section(self, file_handle):
-        """Write calculated parameters section to the summary file."""
+    def _write_calculated_params_section(self):
+        """Log calculated parameters section."""
         if not hasattr(self, 'num_frames'):
             return
             
-        file_handle.write("\n--- Calculated Parameters ---\n")
-        file_handle.write(f"Number of frames: {self.num_frames}\n")
-        file_handle.write(f"TX beams per frame: {self.tx_beams_per_frame}\n")
-        file_handle.write(f"Number of SonoCT angles: {self.num_sonoct_angles}\n")
-        file_handle.write(f"Multiline factor: {self.multiline_factor}\n")
-        file_handle.write(f"Used OS: {self.offset_samples}\n")
-        file_handle.write(f"PT: {self.points_per_line}\n")
+        logging.info("--- Calculated Parameters ---")
+        logging.info(f"Number of frames: {self.num_frames}")
+        logging.info(f"TX beams per frame: {self.tx_beams_per_frame}")
+        logging.info(f"Number of SonoCT angles: {self.num_sonoct_angles}")
+        logging.info(f"Multiline factor: {self.multiline_factor}")
+        logging.info(f"Used OS: {self.offset_samples}")
+        logging.info(f"PT: {self.points_per_line}")
 
     ###################################################################################
-    # Data Shapes Section Writing
+    # Data Shapes Section 
     ###################################################################################
-    def _write_data_shapes_section(self, file_handle):
-        """Write data shapes section to the summary file."""
-        file_handle.write("\n--- Data Array Shapes ---\n")
+    def _write_data_shapes_section(self):
+        """Log data shapes section."""
+        logging.info("--- Data Array Shapes ---")
         if hasattr(self.rfdata, 'lineData') and self.rfdata.lineData is not None:
-            file_handle.write(f"Line data shape: {self.rfdata.lineData.shape}\n")
+            logging.info(f"Line data shape: {self.rfdata.lineData.shape}")
         if hasattr(self.rfdata, 'lineHeader') and self.rfdata.lineHeader is not None:
-            file_handle.write(f"Line header shape: {self.rfdata.lineHeader.shape}\n")
+            logging.info(f"Line header shape: {self.rfdata.lineHeader.shape}")
 
     ###################################################################################
-    # Available Data Types Section Writing
+    # Available Data Types Section 
     ###################################################################################
-    def _write_available_data_section(self, file_handle):
-        """Write available data types section to the summary file."""
-        file_handle.write("\n--- Available Data Arrays ---\n")
+    def _write_available_data_section(self):
+        """Log available data types section."""
+        logging.info("--- Available Data Arrays ---")
         data_attrs = ['echoData', 'cwData', 'pwData', 'colorData', 
                      'echoMModeData', 'colorMModeData', 'dummyData', 
                      'swiData', 'miscData']
@@ -2673,14 +2672,14 @@ class PhilipsRfParser:
                 data = getattr(self.rfdata, attr)
                 if data is not None:
                     if isinstance(data, (list, tuple)):
-                        file_handle.write(f"{attr}: {len(data)} elements\n")
+                        logging.info(f"{attr}: {len(data)} elements")
                         for i, elem in enumerate(data):
                             if hasattr(elem, 'shape'):
-                                file_handle.write(f"  [{i}]: {elem.shape}\n")
+                                logging.info(f"  [{i}]: {elem.shape}")
                     elif hasattr(data, 'shape'):
-                        file_handle.write(f"{attr}: {data.shape}\n")
+                        logging.info(f"{attr}: {data.shape}")
                     else:
-                        file_handle.write(f"{attr}: Available (unknown shape)\n")
+                        logging.info(f"{attr}: Available (unknown shape)")
 
     ###################################################################################
     # Primary Data Detection
@@ -2881,13 +2880,43 @@ class PhilipsRfParser:
         destination = str(filepath[:-3] + '.mat')
         logging.info(f"Saving as MATLAB file: {destination}")
         
-        # Prepare contents dictionary
+        # Debug log the state of all variables before saving
+        logging.debug("=== Data state before saving ===")
+        logging.debug(f"data_to_save: {type(data_to_save) if data_to_save is not None else 'None'}")
+        logging.debug(f"rf_data_all_fund: {type(rf_data_all_fund) if rf_data_all_fund is not None else 'None'}")
+        logging.debug(f"rf_data_all_harm: {type(rf_data_all_harm) if rf_data_all_harm is not None else 'None'}")
+        
+        # Convert None values to empty numpy arrays
+        data_to_save = data_to_save if data_to_save is not None else np.array([])
+        rf_data_all_fund = rf_data_all_fund if rf_data_all_fund is not None else np.array([])
+        rf_data_all_harm = rf_data_all_harm if rf_data_all_harm is not None else np.array([])
+        
+        # Convert HeaderInfoStruct and DbParams to dictionaries
+        header_info_dict = {}
+        if hasattr(self.rfdata, 'headerInfo'):
+            for attr in dir(self.rfdata.headerInfo):
+                if not attr.startswith('_'):  # Skip private attributes
+                    value = getattr(self.rfdata.headerInfo, attr)
+                    if value is None:
+                        value = np.array([])
+                    header_info_dict[attr] = value
+                    
+        db_params_dict = {}
+        if hasattr(self.rfdata, 'dbParams'):
+            for attr in dir(self.rfdata.dbParams):
+                if not attr.startswith('_'):  # Skip private attributes
+                    value = getattr(self.rfdata.dbParams, attr)
+                    if value is None:
+                        value = np.array([])
+                    db_params_dict[attr] = value
+        
+        # Prepare contents dictionary with validation
         contents = {
             'echoData': data_to_save,
-            'lineData': self.rfdata.lineData,
-            'lineHeader': self.rfdata.lineHeader,
-            'headerInfo': self.rfdata.headerInfo,
-            'dbParams': self.rfdata.dbParams,
+            'lineData': getattr(self.rfdata, 'lineData', np.array([])),
+            'lineHeader': getattr(self.rfdata, 'lineHeader', np.array([])),
+            'headerInfo': header_info_dict,
+            'dbParams': db_params_dict,
             'rf_data_all_fund': rf_data_all_fund,
             'rf_data_all_harm': rf_data_all_harm,
             'NumFrame': self.num_frames,
@@ -2904,10 +2933,14 @@ class PhilipsRfParser:
             contents['echoData2'] = self.rfdata.echoData[2]
         if hasattr(self.rfdata, 'echoData') and isinstance(self.rfdata.echoData, (list, tuple)) and len(self.rfdata.echoData) > 3:
             contents['echoData3'] = self.rfdata.echoData[3]
-        if hasattr(self.rfdata, 'echoMModeData'):
+        if hasattr(self.rfdata, 'echoMModeData') and self.rfdata.echoMModeData is not None:
             contents['echoMModeData'] = self.rfdata.echoMModeData
-        if hasattr(self.rfdata, 'miscData'):
+        else:
+            contents['echoMModeData'] = np.array([])
+        if hasattr(self.rfdata, 'miscData') and self.rfdata.miscData is not None:
             contents['miscData'] = self.rfdata.miscData
+        else:
+            contents['miscData'] = np.array([])
         
         # Remove existing file if necessary
         if os.path.exists(destination):
@@ -2915,12 +2948,19 @@ class PhilipsRfParser:
             os.remove(destination)
         
         # Save the file
-        savemat(destination, contents)
-        logging.info(f"MATLAB file saved successfully: {destination}")
-        return np.array(rf_data_all_fund).shape
+        try:
+            savemat(destination, contents)
+            logging.info(f"MATLAB file saved successfully: {destination}")
+            return np.array(rf_data_all_fund).shape if rf_data_all_fund is not None else (0,)
+        except Exception as e:
+            logging.error(f"Error saving MATLAB file: {str(e)}")
+            logging.error("Contents that failed to save:")
+            for key, value in contents.items():
+                logging.error(f"{key}: type={type(value)}")
+            raise
 
     ###################################################################################
-    # Logging Restoration
+    # Restore logging configuration
     ###################################################################################
     def _restore_logging(self, logger_state, save_numpy: bool):
         """Restore original logging configuration."""
@@ -2970,26 +3010,14 @@ if __name__ == "__main__":
         '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d:%(funcName)s] - %(message)s'
     )
     
-    # Console handler
+    # Console handler only
     console_handler = logging.StreamHandler()
     console_handler.setLevel(LOG_LEVEL)
     console_handler.setFormatter(detailed_formatter)
     
-    # File handler with rotation
-    log_file = 'philips_rf_parser.log'
-    file_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=100 * 1024 * 1024,  # 100 MB
-        backupCount=5,
-        mode='a'
-    )
-    file_handler.setLevel(LOG_LEVEL)
-    file_handler.setFormatter(detailed_formatter)
-    
-    # Clear any existing handlers and add our handlers
+    # Clear any existing handlers and add only console handler
     root_logger.handlers.clear()
     root_logger.addHandler(console_handler)
-    root_logger.addHandler(file_handler)
     
     # Log system information for diagnostic purposes
     logging.debug("==== Logging Activated ====")
@@ -2998,15 +3026,14 @@ if __name__ == "__main__":
     logging.debug(f"Python version: {platform.python_version()}")
     logging.debug(f"Platform: {platform.platform()}")
     logging.debug(f"Current directory: {os.getcwd()}")
-    logging.debug(f"Log file location: {os.path.abspath(log_file)}")
     
     # Hardcoded file path - no command line arguments needed
-    filepath = r"D:\Omid\0_samples\Philips\David\sample.rf"
-    #filepath = r"C:\0_Main\2_Quantitative_ultrasound\2_github\test\3d.rf"
-    
+    #filepath = r"D:\Omid\0_samples\Philips\David\sample.rf"
+    filepath = r"D:\Omid\0_samples\Philips\UKDFIBEPIC003\UKDFIBEPIC003INTER4D_20250424_094124.rf"
+
     logging.info(f"Starting main execution with file: {filepath}")
     parser = PhilipsRfParser()
-    parser.philipsRfParser(filepath, save_numpy=True)
+    parser.philipsRfParser(filepath, save_numpy=False)
     logging.info("Main execution complete")
       
     ###################################################################################

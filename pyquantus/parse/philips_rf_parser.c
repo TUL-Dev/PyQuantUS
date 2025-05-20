@@ -102,6 +102,7 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
         exit(errno);
     }
     printf("[get_partA] Seeked to offset: %d\n", offset_bytes);
+    printf("[get_partA] Processing data: 0%%\n");
 
     int* partA = calloc(12*num_clumps, sizeof(int));
     char* bytes_read = calloc(256, 1);
@@ -110,7 +111,16 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
     int bit_offset = 4;
     unsigned char first, second, third, mask, temp;
     char* full_num = calloc(4, sizeof(char));
+    int last_percentage = 0;
     while (j < num_clumps) {
+        // Calculate and print progress
+        int current_percentage = (j * 100) / num_clumps;
+        if (current_percentage > last_percentage) {
+            printf("[get_partA] Processing data: %d%%\r", current_percentage);
+            fflush(stdout);
+            last_percentage = current_percentage;
+        }
+
         if (!j || i == 31) {
             assert(bit_offset == 4);
             bit_offset = 8;
@@ -163,6 +173,7 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
         }
     }
 
+    printf("[get_partA] Processing data: 100%%\n");
     printf("[get_partA] Finished, returning partA pointer\n");
     free(bytes_read);
     free(full_num);
@@ -209,6 +220,7 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
         exit(errno);
     }
     printf("[get_partB] Seeked to offset: %d\n", offset_bytes);
+    printf("[get_partB] Processing data: 0%%\n");
 
     int* partB = calloc(num_clumps, sizeof(int));
     char* bytes_read = calloc(256, 1);
@@ -217,7 +229,16 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
     unsigned char cur_num, mask;
     char* full_num = calloc(4, sizeof(char));
     mask = ~((uint32_t)(~0)<<4);
+    int last_percentage = 0;
     while (j < num_clumps) {
+        // Calculate and print progress
+        int current_percentage = (j * 100) / num_clumps;
+        if (current_percentage > last_percentage) {
+            printf("[get_partB] Processing data: %d%%\r", current_percentage);
+            fflush(stdout);
+            last_percentage = current_percentage;
+        }
+
         ssize_t num_bytes_read = read(fd, bytes_read, 32);
         if (num_bytes_read == -1) {
             perror("read");
@@ -237,6 +258,7 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
         ++x;
     }
 
+    printf("[get_partB] Processing data: 100%%\n");
     printf("[get_partB] Finished, returning partB pointer\n");
     free(bytes_read);
     free(full_num);
