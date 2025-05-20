@@ -1413,8 +1413,8 @@ class PhilipsRfParser:
             zeros = self._get_filler_zeros(remainingZeros)
             packedHeader = str(zeros + packedHeader)
         
-        # Add data from remaining elements in forward order to match little-endian
-        for i in range(12):
+        # Add data from remaining elements in reverse order
+        for i in np.arange(11, -1, -1):
             curBin = bin(int(rawrfdata[i, iHeader[m]]))[2:]
             remainingZeros = 21 - len(curBin)
             if remainingZeros > 0:
@@ -1775,25 +1775,31 @@ class PhilipsRfParser:
         """Find indices of echo data in the dataset."""
         xmit_events = len(header_info.Data_Type)
         
-        # log header_info.Data_Type
-        logging.debug(f"header_info.Data_Type first 10 elements: {header_info.Data_Type[:10]}")
-        logging.debug(f"header_info.Data_Type last 10 elements: {header_info.Data_Type[-10:]}")
-        logging.debug(f"Number of transmit events: {xmit_events}")
+        # More detailed logging of Data_Type contents
+        logging.info(f"Looking for echo data types {self.DataType_ECHO}")
+        logging.info(f"Total number of transmit events: {xmit_events}")
+        
+        # Log unique data types found
+        unique_data_types = np.unique(header_info.Data_Type & 255)
+        logging.info(f"Unique data types found in file: {unique_data_types}")
         
         # Build index of echo data types
         echo_index = np.zeros(xmit_events).astype(np.int32)
         for dt in self.DataType_ECHO:
             index = ((header_info.Data_Type & 255) == dt)
+            count_for_type = np.sum(index)
+            if count_for_type > 0:
+                logging.info(f"Found {count_for_type} entries of echo data type {dt}")
             echo_index = np.bitwise_or(echo_index, np.array(index).astype(np.int32))
         
         echo_count = np.sum(echo_index)
-        logging.debug(f"Found {echo_count} echo data entries")
+        logging.info(f"Total echo data entries found: {echo_count}")
         
         # Fallback to Data_Type=1 if no echo data found
         if echo_count == 0 and np.any(header_info.Data_Type == 1):
             echo_index = (header_info.Data_Type == 1).astype(np.int32)
             echo_count = np.sum(echo_index)
-            logging.debug(f"Fallback: Found {echo_count} entries with Data_Type=1")
+            logging.info(f"Fallback: Found {echo_count} entries with Data_Type=1")
         
         return echo_index, echo_count
 
@@ -2714,11 +2720,20 @@ class PhilipsRfParser:
         
         has_valid_data = data_to_save is not None and (not hasattr(data_to_save, 'size') or data_to_save.size > 0)
         if not has_valid_data:
-            error_msg = f"No supported data found in RF file. Data_Type values: {np.unique(self.rfdata.headerInfo.Data_Type) if hasattr(self.rfdata.headerInfo, 'Data_Type') else 'N/A'}. lineData shape: {self.rfdata.lineData.shape if hasattr(self.rfdata, 'lineData') else 'N/A'}"
-            logging.error(f"{error_msg}")
-            raise RuntimeError(error_msg)
+            # Extract base data type by masking with 0xFF
+            base_data_types = np.unique(self.rfdata.headerInfo.Data_Type & 0xFF)
+            # If no recognized data types, treat the data as raw RF data
+            if len(base_data_types) > 0:
+                data_to_save = self.rfdata.lineData
+                data_type_label = 'rawRfData'
+                has_valid_data = True
+                logging.info(f"Using raw RF data with base data types: {base_data_types}")
+            else:
+                error_msg = f"No supported data found in RF file. Data_Type values: {np.unique(self.rfdata.headerInfo.Data_Type) if hasattr(self.rfdata.headerInfo, 'Data_Type') else 'N/A'}. lineData shape: {self.rfdata.lineData.shape if hasattr(self.rfdata, 'lineData') else 'N/A'}"
+                logging.error(f"{error_msg}")
+                raise RuntimeError(error_msg)
         
-        logging.info(f"Saving data type: {data_type_label} as 'echoData'")
+        logging.info(f"Saving data type: {data_type_label}")
         return data_to_save, data_type_label
     
     ###################################################################################
@@ -2990,6 +3005,15 @@ class PhilipsRfParser:
             logging.debug("Logging configuration restored to original state")
   
   
+  
+###################################################################################
+# 
+###################################################################################
+def philipsRfParser(imagePath):
+     
+    parser = PhilipsRfParser()
+    parser.philipsRfParser(imagePath, save_numpy=False)
+  
 ###################################################################################
 # Main Execution
 ###################################################################################
@@ -3029,11 +3053,11 @@ if __name__ == "__main__":
     
     # Hardcoded file path - no command line arguments needed
     #filepath = r"D:\Omid\0_samples\Philips\David\sample.rf"
-    filepath = r"D:\Omid\0_samples\Philips\UKDFIBEPIC003\UKDFIBEPIC003INTER4D_20250424_094124.rf"
+    filepath = r"D:\Omid\0_samples\Philips\David\4d.rf"
 
     logging.info(f"Starting main execution with file: {filepath}")
     parser = PhilipsRfParser()
-    parser.philipsRfParser(filepath, save_numpy=False)
+    parser.philipsRfParser(filepath, save_numpy=True)
     logging.info("Main execution complete")
       
     ###################################################################################
