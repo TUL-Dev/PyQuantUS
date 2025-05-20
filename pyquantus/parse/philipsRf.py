@@ -1,6 +1,7 @@
 import logging
 import os
 import platform
+from logging.handlers import RotatingFileHandler
 from typing import Any, List, Tuple
 
 import numpy as np
@@ -2953,30 +2954,51 @@ class PhilipsRfParser:
 # Main Execution
 ###################################################################################
 if __name__ == "__main__":
-    # === Logging Configuration for Complete Debug Output ===
-    # Configure the root logger to capture absolutely everything
+    # === Single Logging Level Control ===
+    # Set to True for debug mode (more detailed logs), False for info mode (less detailed)
+    DEBUG_MODE = True
+    
+    # Set logging levels based on DEBUG_MODE
+    LOG_LEVEL = logging.DEBUG if DEBUG_MODE else logging.INFO
+    
+    # Configure the root logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)  # Capture all levels
+    root_logger.setLevel(LOG_LEVEL)
     
     # Create a detailed formatter that includes function names
     detailed_formatter = logging.Formatter(
         '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d:%(funcName)s] - %(message)s'
     )
     
-    # Console handler with full debug output
+    # Console handler
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)  # Show everything, including DEBUG
+    console_handler.setLevel(LOG_LEVEL)
     console_handler.setFormatter(detailed_formatter)
     
-    # Clear any existing handlers and add our handler
+    # File handler with rotation
+    log_file = 'philips_rf_parser.log'
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=100 * 1024 * 1024,  # 100 MB
+        backupCount=5,
+        mode='a'
+    )
+    file_handler.setLevel(LOG_LEVEL)
+    file_handler.setFormatter(detailed_formatter)
+    
+    # Clear any existing handlers and add our handlers
     root_logger.handlers.clear()
     root_logger.addHandler(console_handler)
+    root_logger.addHandler(file_handler)
     
     # Log system information for diagnostic purposes
-    logging.debug("==== Debug Logging Activated ====")
+    logging.debug("==== Logging Activated ====")
+    logging.debug(f"Debug Mode: {'ON' if DEBUG_MODE else 'OFF'}")
+    logging.debug(f"Log Level: {logging.getLevelName(LOG_LEVEL)}")
     logging.debug(f"Python version: {platform.python_version()}")
     logging.debug(f"Platform: {platform.platform()}")
     logging.debug(f"Current directory: {os.getcwd()}")
+    logging.debug(f"Log file location: {os.path.abspath(log_file)}")
     
     # Hardcoded file path - no command line arguments needed
     filepath = r"D:\Omid\0_samples\Philips\David\sample.rf"
