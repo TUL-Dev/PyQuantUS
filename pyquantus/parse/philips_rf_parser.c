@@ -10,6 +10,13 @@
 #include <time.h>
 
 #ifdef _WIN32 // Windows-specific includes and definitions
+/*
+ * Windows requires specific handling for file operations:
+ * - io.h provides Windows-specific file I/O functions
+ * - Windows prefixes standard POSIX functions with underscore (_)
+ * - O_BINARY flag is required for proper binary file handling on Windows
+ * - ssize_t type needs to be defined as it's not provided by Windows
+ */
 #include <io.h>
 #define open _open
 #define close _close
@@ -18,13 +25,21 @@
 #define O_BINARY _O_BINARY
 typedef long ssize_t;
 #else // Unix-like includes and definitions
+/*
+ * Unix/Linux systems:
+ * - unistd.h provides standard POSIX file I/O functions
+ * - No distinction between binary and text files, but O_BINARY is defined
+ *   as 0 (no-op) for cross-platform compatibility
+ * - This ensures the same code works on both Windows and Unix without modification
+ */
 #include <unistd.h>
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
 #endif
 
-// Helper to get file size
+/////////////////////////////////////////////////////////////////////////////////////
+
 long long get_file_size(const char* fn) {
     struct stat st;
     if (stat(fn, &st) == 0) {
@@ -32,6 +47,8 @@ long long get_file_size(const char* fn) {
     }
     return -1;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
 
 int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
     printf("[get_array_shape] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
@@ -69,6 +86,8 @@ int get_array_shape(long long num_clumps, char* fn, int offset_bytes){
     return i;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////
+
 int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
     printf("[get_partA] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
     long long fsize = get_file_size(fn);
@@ -83,6 +102,7 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
         exit(errno);
     }
     printf("[get_partA] Seeked to offset: %d\n", offset_bytes);
+    printf("[get_partA] Processing data: 0%%\n");
 
     int* partA = calloc(12*num_clumps, sizeof(int));
     char* bytes_read = calloc(256, 1);
@@ -91,7 +111,16 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
     int bit_offset = 4;
     unsigned char first, second, third, mask, temp;
     char* full_num = calloc(4, sizeof(char));
+    int last_percentage = 0;
     while (j < num_clumps) {
+        // Calculate and print progress
+        int current_percentage = (j * 100) / num_clumps;
+        if (current_percentage > last_percentage) {
+            printf("[get_partA] Processing data: %d%%\r", current_percentage);
+            fflush(stdout);
+            last_percentage = current_percentage;
+        }
+
         if (!j || i == 31) {
             assert(bit_offset == 4);
             bit_offset = 8;
@@ -144,6 +173,7 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
         }
     }
 
+    printf("[get_partA] Processing data: 100%%\n");
     printf("[get_partA] Finished, returning partA pointer\n");
     free(bytes_read);
     free(full_num);
@@ -151,6 +181,8 @@ int* get_partA(long long num_clumps, char* fn, int offset_bytes) {
 
     return partA;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
 
 static PyObject* py_get_partA(PyObject* self, PyObject* args) {
     printf("[py_get_partA] Called\n");
@@ -172,6 +204,8 @@ static PyObject* py_get_partA(PyObject* self, PyObject* args) {
     return list;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////
+
 int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
     printf("[get_partB] Called with num_clumps=%lld, fn=%s, offset_bytes=%d\n", num_clumps, fn, offset_bytes);
     long long fsize = get_file_size(fn);
@@ -186,6 +220,7 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
         exit(errno);
     }
     printf("[get_partB] Seeked to offset: %d\n", offset_bytes);
+    printf("[get_partB] Processing data: 0%%\n");
 
     int* partB = calloc(num_clumps, sizeof(int));
     char* bytes_read = calloc(256, 1);
@@ -194,7 +229,16 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
     unsigned char cur_num, mask;
     char* full_num = calloc(4, sizeof(char));
     mask = ~((uint32_t)(~0)<<4);
+    int last_percentage = 0;
     while (j < num_clumps) {
+        // Calculate and print progress
+        int current_percentage = (j * 100) / num_clumps;
+        if (current_percentage > last_percentage) {
+            printf("[get_partB] Processing data: %d%%\r", current_percentage);
+            fflush(stdout);
+            last_percentage = current_percentage;
+        }
+
         ssize_t num_bytes_read = read(fd, bytes_read, 32);
         if (num_bytes_read == -1) {
             perror("read");
@@ -214,6 +258,7 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
         ++x;
     }
 
+    printf("[get_partB] Processing data: 100%%\n");
     printf("[get_partB] Finished, returning partB pointer\n");
     free(bytes_read);
     free(full_num);
@@ -221,6 +266,8 @@ int* get_partB(long long num_clumps, char* fn, int offset_bytes) {
 
     return partB;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
 
 static PyObject* py_get_partB(PyObject* self, PyObject* args) {
     printf("[py_get_partB] Called\n");
@@ -242,14 +289,16 @@ static PyObject* py_get_partB(PyObject* self, PyObject* args) {
     return list;
 }
 
-// Define methods
+/////////////////////////////////////////////////////////////////////////////////////
+
 static PyMethodDef MyMethods[] = {
     {"getPartA", py_get_partA, METH_VARARGS, "Get part A data from file"},
     {"getPartB", py_get_partB, METH_VARARGS, "Get part B data from file"},
     {NULL, NULL, 0, NULL}
 };
 
-// Define module
+/////////////////////////////////////////////////////////////////////////////////////
+
 static struct PyModuleDef mymodule = {
     PyModuleDef_HEAD_INIT,
     "philipsRfParser",
@@ -258,6 +307,10 @@ static struct PyModuleDef mymodule = {
     MyMethods
 };
 
+/////////////////////////////////////////////////////////////////////////////////////
+
 PyMODINIT_FUNC PyInit_philipsRfParser(void) {
     return PyModule_Create(&mymodule);
 }
+
+/////////////////////////////////////////////////////////////////////////////////////
