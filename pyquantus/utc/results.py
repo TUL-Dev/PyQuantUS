@@ -479,3 +479,37 @@ class UtcData:
         if hasattr(self, "scConfig"):
             return self.scWindowIdxMap
         return self.windowIdxMap
+    
+    
+    
+###################################################################################
+# H-scan post-processing
+###################################################################################
+class HscanPostProcessing:
+    """Class for post-processing the H-scan data."""
+
+    def __init__(self):
+        pass
+    
+###################################################################################
+# BSC post-processing
+###################################################################################
+class BSCPostProcessing:
+    """Class for post-processing the BSC data."""
+
+    def __init__(self):
+        pass
+
+###################################################################################
+# Central frequency shift post-processing
+###################################################################################
+class CentralFrequencyShiftPostProcessing:
+    """Class for post-processing the central frequency shift data."""
+
+    def __init__(self):
+        pass
+
+###################################################################################
+# 
+###################################################################################
+    

@@ -39,6 +39,9 @@ class UtcAnalysis:
         splineY (np.ndarray): Spline y-coordinates in pre-scan converted coordinates.
     """
     
+    ###################################################################################
+    # Initialize analysis config
+    ###################################################################################
     def __init__(self):
         self.ultrasoundImage: UltrasoundImage
         self.config: AnalysisConfig
@@ -56,6 +59,9 @@ class UtcAnalysis:
         self.splineY: np.ndarray # pix
         self.computeExtraParamaps = False
 
+    ###################################################################################
+    # Initialize analysis config
+    ###################################################################################
     def initAnalysisConfig(self):
         """Compute the wavelength of the ultrasound signal and 
         set default config values if not pre-loaded.
@@ -70,11 +76,17 @@ class UtcAnalysis:
             self.config.axialOverlap = 0.5; self.config.lateralOverlap = 0.5
             self.config.windowThresh = 0.95
 
+    ###################################################################################
+    # 
+    ###################################################################################
     def splineToPreSc(self):
         """Convert spline coordinates from scan converted to pre-scan converted."""
         self.splineX = np.array([self.ultrasoundImage.xmap[int(y), int(x)] for x, y in zip(self.scSplineX, self.scSplineY)])
         self.splineY = np.array([self.ultrasoundImage.ymap[int(y), int(x)] for x, y in zip(self.scSplineX, self.scSplineY)])
 
+    ###################################################################################
+    # Generate windows for UTC analysis based on user-defined spline
+    ###################################################################################
     def generateRoiWindows(self):
         """Generate windows for UTC analysis based on user-defined spline."""
         # Some axial/lateral dims
@@ -136,7 +148,10 @@ class UtcAnalysis:
                     newWindow.top = int(axial[axialInd])
                     newWindow.bottom = int(axial[axialInd + axialPixSize - 1])
                     self.roiWindows.append(newWindow)
-    
+
+    ###################################################################################
+    # Compute UTC parameters for each window in the ROI
+    ###################################################################################
     def computeUtcWindows(self, extraParams=True, bscFreq=None, extraParamapParams=False) -> int:
         """Compute UTC parameters for each window in the ROI.
         
@@ -209,6 +224,9 @@ class UtcAnalysis:
         
         return 0
     
+    ###################################################################################
+    # Compute local attenuation coefficient
+    ###################################################################################
     def computeAttenuationCoef(self, rfData: np.ndarray, refRfData: np.ndarray, overlap=50, windowDepth=100) -> float:
         """Compute the local attenuation coefficient of the ROI using the Spectral Difference
         Method for Local Attenuation Estimation. This method computes the attenuation coefficient
@@ -263,6 +281,9 @@ class UtcAnalysis:
         attenuationCoef=np.mean(attenuationCoefficients)
         return attenuationCoef
     
+    ###################################################################################
+    # 
+    ###################################################################################
     def computeBackscatterCoefficient(self, freqArr: np.ndarray, scanPs: np.ndarray, refPs: np.ndarray, attCoef: float,
                                       frequency: int, roiDepth: int) -> float:
         
@@ -298,7 +319,10 @@ class UtcAnalysis:
         bsc = sRatio*self.refBackScatterCoef*attComp
             
         return bsc
-        
+    
+    ###################################################################################
+    # 
+    ###################################################################################
     def computeNakagamiParams(self, rfData: np.ndarray) -> Tuple[float, float]:
         """Compute Nakagami parameters for the ROI.
         source: Tsui, P. H., Wan, Y. L., Huang, C. C. & Wang, M. C. 
@@ -323,6 +347,9 @@ class UtcAnalysis:
 
         return w, u
     
+    ###################################################################################
+    # 
+    ###################################################################################
     def computeEsdac(self, rfData: np.ndarray, refRfData: np.ndarray, apertureRadiusCm: float) -> Tuple[float, float]:
         """Compute the effective scatterer diameter and concentration of the ROI.
         source: Muleki-Seya et al. https://doi.org/10.1177/0161734617729159
@@ -362,3 +389,75 @@ class UtcAnalysis:
         ) # dB/mm^3
 
         return esd, eac
+    
+    
+    
+    
+    
+    
+###################################################################################
+# H-scan
+###################################################################################
+class Hscan:
+    """Class for computing the H-scan parameters for the ROI.
+    """
+    def __init__(self):
+        pass
+    
+    def compute_Hscan(self):
+        """Compute the H-scan parameters for the ROI.
+        """
+        pass
+
+###################################################################################
+# 
+###################################################################################
+class BSC:
+    """Class for computing the backscatter coefficient for the ROI.
+    """
+    def __init__(self):
+        pass
+    
+    def compute_BSC(self):
+        """Compute the backscatter coefficient for the ROI.
+        """
+        pass
+
+###################################################################################
+# Central frequency shift
+###################################################################################
+class CentralFrequencyShift:
+    """Class for computing the central frequency shift for the ROI.
+    """
+    def __init__(self):
+        pass
+    
+    def compute_central_frequency_shift(self):
+        """Compute the central frequency shift for the ROI.
+        """
+        pass
+
+###################################################################################
+# attenuation coefficient estimation
+###################################################################################
+class AttenuationCoefficientEstimation:
+    """Class for computing the attenuation coefficient based on central frequency shift for the ROI.
+    """
+    def __init__(self):
+        pass
+    
+    def compute_ac_central_frequency_shift(self):
+        """Compute the attenuation coefficient based on central frequency shift for the ROI.
+        """
+        pass
+    
+    def compute_ac_signal_energy_slope(self):
+        """Compute the attenuation coefficient based on signal energy slope for the ROI.
+        """
+        pass
+
+
+
+
+
+    
