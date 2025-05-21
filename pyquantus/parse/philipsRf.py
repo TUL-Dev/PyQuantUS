@@ -747,8 +747,8 @@ def parseRF(filepath: str, readOffset: int, readSize: int) -> Rfdata:
             return partB.reshape((1, -1))
 
         
-        partA = get_partA(numClumps, filepath, offset)
-        partB = get_partB(numClumps, filepath, offset)
+        partA = callGetPartA(numClumps, filepath, offset)
+        partB = callGetPartB(numClumps, filepath, offset)
         rawrfdata = np.concatenate((partA, partB), axis=0)
 
     # Reshape Raw RF Dawta
