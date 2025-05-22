@@ -406,8 +406,6 @@ class UtcAnalysis:
     
     
     
-    
-    
 ###################################################################################
 # H-scan
 ###################################################################################
@@ -580,17 +578,218 @@ class Hscan:
             else:
                 logging.info("Visualization is disabled; no plots will be shown.")
 
-        ###################################################################################
+    ###################################################################################
+    # Constructor
+    ###################################################################################
+    def __init__(self,
+                 signal_nd: np.ndarray,
+                 signal_axis: int,
+                 wavelet_GH1_params: dict,
+                 wavelet_GH2_params: dict,
+                 visualize: bool) -> None:
         
-    def __init__(self, wavelet_GH1_params: dict, wavelet_GH2_params: dict):
+        # input arguments
+        self.signal_nd = signal_nd
+        self.signal_axis = signal_axis
+        self.wavelet_GH1_params = wavelet_GH1_params
+        self.wavelet_GH2_params = wavelet_GH2_params
+        self.visualize = visualize
+            
+        # initialize
+        self.wavelet_1 = None
+        self.wavelet_2 = None
+                    
+        self.convolved_signal_with_ghx_1_3d = None
+        self.convolved_signal_with_ghx_2_3d = None
+        self.convolved_signal_with_ghx_1_envelope_3d = None
+        self.convolved_signal_with_ghx_2_envelope_3d = None
+        self.convolved_signal_with_ghx_1_2d = None
+        self.convolved_signal_with_ghx_2_2d = None
+        self.convolved_signal_with_ghx_1_envelope_2d = None
+        self.convolved_signal_with_ghx_2_envelope_2d = None
+        self.convolved_signal_with_ghx_1_1d = None
+        self.convolved_signal_with_ghx_2_1d = None
+        self.convolved_signal_with_ghx_1_envelope_1d = None
+        self.convolved_signal_with_ghx_2_envelope_1d = None
+
+        self.__run()
+
+    ###################################################################################
+    # Compute H-scan
+    ###################################################################################
+    def __run(self):
         
-        self.wavelet_GH1 = self.GaussinaHermiteWavelet(**wavelet_GH1_params)
-        self.wavelet_GH2 = self.GaussinaHermiteWavelet(**wavelet_GH2_params)
-    
-    def compute_Hscan(self):
-        """Compute the H-scan parameters for the ROI.
+        # build wavelet
+        self.build_wavelet()
+        
+        # convolved signals
+        self.convolve_signal_with_wavelets_3d()
+        self.get_envelope_of_convolved_signal_3d()
+        
+        self.convolve_signal_with_wavelets_2d()
+        self.get_envelope_of_convolved_signal_2d()
+        
+        self.convolve_signal_with_wavelets_1d()
+        self.get_envelope_of_convolved_signal_1d() 
+        
+    ###################################################################################
+    # Build wavelet
+    ###################################################################################
+    def build_wavelet(self):
+        
+        logging.info("Building wavelet 1 with parameters: %s", self.wavelet_GH1_params)
+        self.wavelet_1 = self.GaussinaHermiteWavelet(**self.wavelet_GH1_params)
+        logging.info("Wavelet 1 built successfully.")
+
+        logging.info("Building wavelet 2 with parameters: %s", self.wavelet_GH2_params)
+        self.wavelet_2 = self.GaussinaHermiteWavelet(**self.wavelet_GH2_params)
+        logging.info("Wavelet 2 built successfully.")
+            
+    ###################################################################################
+    # Convolve 3D signal
+    ###################################################################################
+    def convolve_signal_with_wavelet_3d(self,
+                           signal_nd: np.ndarray,
+                           wavelet_1d: np.ndarray,
+                           signal_axis: int):
         """
-        pass
+        Convolve a signal with a 1D wavelet along the specified axis. Supports signals of 1 to 4 dimensions.
+
+        Parameters:
+        - signal: np.ndarray
+            A 1D, 2D, 3D, or 4D array representing the signal to be convolved.
+        - wavelet: np.ndarray
+            A 1D array representing the wavelet to convolve with.
+        - axis: int
+            The axis along which to convolve.
+
+        Returns:
+        - np.ndarray
+            The convolved signal with the same dimensions as the input signal.
+        """
+        # Get the number of dimensions of the input signal
+        ndim = signal_nd.ndim
+        
+        if ndim not in [1, 2, 3, 4]:
+            raise ValueError(f"Input signal must be 1D, 2D, 3D, or 4D. Got {ndim}D signal.")
+            
+        if signal_axis >= ndim:
+            raise ValueError(f"Axis {signal_axis} is out of bounds for {ndim}D signal.")
+
+        logging.info(f"Starting convolution along axis {signal_axis} for {ndim}D signal")
+
+        # Handle 1D signal
+        if ndim == 1:
+            convolved_signal = np.convolve(signal_nd, wavelet_1d, mode='same')
+            
+        # Handle 2D signal
+        elif ndim == 2:
+            convolved_signal = np.apply_along_axis(
+                lambda x: np.convolve(x, wavelet_1d, mode='same'),
+                axis=signal_axis,
+                arr=signal_nd
+            )
+            
+        # Handle 3D signal
+        elif ndim == 3:
+            convolved_signal = np.apply_along_axis(
+                lambda x: np.convolve(x, wavelet_1d, mode='same'),
+                axis=signal_axis,
+                arr=signal_nd
+            )
+            
+        # Handle 4D signal
+        else:  # ndim == 4
+            convolved_signal = np.apply_along_axis(
+                lambda x: np.convolve(x, wavelet_1d, mode='same'),
+                axis=signal_axis,
+                arr=signal_nd
+            )
+
+        logging.info(f"Convolution completed for {ndim}D signal")
+        return convolved_signal
+
+    ###################################################################################
+    # Convolve signal with wavelets 3D
+    ###################################################################################
+    def convolve_signal_with_wavelets_3d(self):
+        logging.info("Starting convolution with wavelets")
+
+        # Convolve with the first wavelet
+        self.convolved_signal_with_ghx_1_3d = self.convolve_signal_with_wavelet_3d(
+            signal=self.signal_nd,
+            wavelet_1d=self.wavelet_1.wavelet,
+            signal_axis=self.signal_axis
+        )
+        logging.info("Convolution with wavelet 1 completed")
+        
+        # Convolve with the second wavelet
+        self.convolved_signal_with_ghx_2_3d = self.convolve_signal_with_wavelet_3d(
+            signal=self.signal_nd,
+            wavelet_1d=self.wavelet_2.wavelet,
+            signal_axis=self.signal_axis
+        )
+        logging.info("Convolution with wavelet 2 completed")
+                
+    ###################################################################################
+    # Get envelope of convolved signal 3D
+    ###################################################################################
+    def get_envelope_of_convolved_signal_3d(self):
+        """Get the envelope of the convolved signal 3D using Hilbert transform.
+        
+        This method computes the envelope of both convolved signals (GH1 and GH2) using the Hilbert transform.
+        The envelope is computed along the specified signal axis.
+        """
+        logging.info("Starting to compute the envelope of convolved signals in 3D.")
+
+        try:
+            # Compute envelope for first convolved signal (GH1)
+            logging.info("Calculating envelope for the first convolved signal (GH1).")
+            self.convolved_signal_with_ghx_1_envelope_3d = np.abs(hilbert(self.convolved_signal_with_ghx_1_3d, axis=self.signal_axis))
+            logging.info("Envelope for the first convolved signal computed successfully.")
+
+            # Compute envelope for second convolved signal (GH2)
+            logging.info("Calculating envelope for the second convolved signal (GH2).")
+            self.convolved_signal_with_ghx_2_envelope_3d = np.abs(hilbert(self.convolved_signal_with_ghx_2_3d, axis=self.signal_axis))
+            logging.info("Envelope for the second convolved signal computed successfully.")
+
+        except Exception as e:
+            logging.error(f"An error occurred while computing the envelopes: {e}")
+            raise  # Re-raise the exception after logging it
+        finally:
+            logging.info("Envelope computation process completed.")
+
+    def get_envelope_of_convolved_signal_2d(self):
+        """Get the envelope of the convolved signal 2D using Hilbert transform.
+        
+        This method computes the envelope of both convolved signals (GH1 and GH2) using the Hilbert transform.
+        The envelope is computed along the specified signal axis for 2D signals.
+        """
+        logging.info("Starting to compute the envelope of convolved signals in 2D.")
+
+        try:
+            # Compute envelope for first convolved signal (GH1)
+            logging.info("Calculating envelope for the first convolved signal (GH1) in 2D.")
+            self.convolved_signal_with_ghx_1_envelope_2d = np.abs(hilbert(self.convolved_signal_with_ghx_1_2d, axis=self.signal_axis))
+            logging.info("Envelope for the first convolved signal in 2D computed successfully.")
+
+            # Compute envelope for second convolved signal (GH2)
+            logging.info("Calculating envelope for the second convolved signal (GH2) in 2D.")
+            self.convolved_signal_with_ghx_2_envelope_2d = np.abs(hilbert(self.convolved_signal_with_ghx_2_2d, axis=self.signal_axis))
+            logging.info("Envelope for the second convolved signal in 2D computed successfully.")
+
+        except Exception as e:
+            logging.error(f"An error occurred while computing the 2D envelopes: {e}")
+            raise  # Re-raise the exception after logging it
+        finally:
+            logging.info("2D envelope computation process completed.")
+
+
+
+
+
+
+
 
 ###################################################################################
 # Backscatter coefficient
