@@ -19,6 +19,9 @@ from tqdm import tqdm
 from pyquantus.utc.objects import UltrasoundImage, AnalysisConfig, Window
 from pyquantus.utc.transforms import computeHanningPowerSpec, computeSpectralParams
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 class UtcAnalysis:
     """Complete ultrasound tissue characterization (UTC) analysis of an ultrasound image given 
     a corresponding phantom image.
@@ -454,7 +457,7 @@ class Hscan:
             # Ensure the wavelet duration is a float for np.arange
             half_duration = self.wavelet_duration / 2  # Use float division
             self.time = np.arange(-half_duration, half_duration, time_step_second)
-            
+                        
             logging.info(f"Time array created with length: {len(self.time)}")
             
         ###################################################################################
@@ -517,7 +520,7 @@ class Hscan:
         ###################################################################################
         # Plot
         ###################################################################################
-        def plot(self, show_negative_freqs=False):
+        def plot(self, show_negative_freqs=False, shift_time_positive=True):
             logging.info("Starting the plot process.")
             
             if self.visualize:
@@ -528,9 +531,20 @@ class Hscan:
 
                 # Plot the Hermite wavelet
                 plt.subplot(1, 2, 1)
-                plt.plot(self.time * 1e6, self.wavelet, label=f'GH{self.order}')  # Time in µs
-                plt.axvline(x=3 * self.sigma * 1e6, color='blue', linestyle='--', label='+3σ')
-                plt.axvline(x=-3 * self.sigma * 1e6, color='blue', linestyle='--', label='-3σ')
+                
+                # Shift time to positive if the option is enabled
+                time_to_plot = self.time * 1e6
+                if shift_time_positive:
+                    time_to_plot = (self.time - self.time.min()) * 1e6
+                    logging.info("Time shifted to positive values.")
+
+                plt.plot(time_to_plot, self.wavelet, label=f'GH{self.order}')  # Time in µs
+                
+                # Shift vertical lines if time is shifted
+                sigma_shift = self.time.min() if shift_time_positive else 0
+                plt.axvline(x=(3 * self.sigma - sigma_shift) * 1e6, color='blue', linestyle='--', label='+3\u03C3')
+                plt.axvline(x=(-3 * self.sigma - sigma_shift) * 1e6, color='blue', linestyle='--', label='-3\u03C3')
+                
                 plt.title('Hermite Wavelets')
                 plt.xlabel('Time [µs]')
                 plt.ylabel('Amplitude')
@@ -568,8 +582,10 @@ class Hscan:
 
         ###################################################################################
         
-    def __init__(self):
-        pass
+    def __init__(self, wavelet_GH1_params: dict, wavelet_GH2_params: dict):
+        
+        self.wavelet_GH1 = self.GaussinaHermiteWavelet(**wavelet_GH1_params)
+        self.wavelet_GH2 = self.GaussinaHermiteWavelet(**wavelet_GH2_params)
     
     def compute_Hscan(self):
         """Compute the H-scan parameters for the ROI.
