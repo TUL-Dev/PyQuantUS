@@ -1,11 +1,21 @@
 from typing import Tuple, List
 
+# Standard library imports
+import logging
+import os
+
+# Third-party imports
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 from scipy.signal import hilbert
 from scipy.optimize import curve_fit
+from scipy.special import hermite, factorial
+from scipy.fft import fft
 from tqdm import tqdm
 
+# Local application imports
 from pyquantus.utc.objects import UltrasoundImage, AnalysisConfig, Window
 from pyquantus.utc.transforms import computeHanningPowerSpec, computeSpectralParams
 
@@ -399,8 +409,165 @@ class UtcAnalysis:
 # H-scan
 ###################################################################################
 class Hscan:
-    """Class for computing the H-scan parameters for the ROI.
-    """
+    """Class for computing the H-scan parameters."""
+    
+    class GaussinaHermiteWavelet:
+        """Class for computing the Gaussian Hermite wavelet."""
+        
+        ###################################################################################
+        # Constructor method (initializer)
+        ###################################################################################
+        def __init__(self, order, fs, sigma, wavelet_duration, visualize) -> None:
+                    
+            self.order = order
+            self.fs = fs 
+            self.sigma = sigma
+            self.wavelet_duration = wavelet_duration
+            self.visualize = visualize
+        
+            self.time = None
+            self.wavelet = None
+
+            self.__run()
+            
+        ###################################################################################
+        # Run method
+        ###################################################################################
+        def __run(self):
+            
+            self.build_time_array()
+            self.build_wavelet()
+            self.get_central_freq_of_wavelet()
+            self.plot()
+        
+        ###################################################################################
+        # Build time array
+        ###################################################################################
+        def build_time_array(self):
+            logging.info("Building time array...")
+
+            # Get the sampling frequency rate
+            time_step_second = 1 / (self.fs)
+            logging.debug(f"Calculated time step (seconds): {time_step_second}")
+
+            # Create a time array for the wavelet
+            # Ensure the wavelet duration is a float for np.arange
+            half_duration = self.wavelet_duration / 2  # Use float division
+            self.time = np.arange(-half_duration, half_duration, time_step_second)
+            
+            logging.info(f"Time array created with length: {len(self.time)}")
+            
+        ###################################################################################
+        # Build wavelet
+        ###################################################################################
+        def build_wavelet(self):
+            logging.debug(f"Starting normalized_hermite_polynomial with order={self.order}, time={self.time}, sigma={self.sigma}")
+
+            # Physicists' Hermite polynomial
+            H_n = hermite(self.order)
+            logging.debug(f"Hermite polynomial of order {self.order} generated.")
+
+            # Normalization factor (assuming custom energy calculation)
+            energy = np.sqrt(np.pi / 2) * (factorial(2 * self.order) / (2**self.order * factorial(self.order)))
+            normalization_factor = 1.0 / np.sqrt(energy)
+            logging.debug(f"Calculated energy={energy} and normalization_factor={normalization_factor}")
+
+            # Gaussian window
+            gaussian_window = np.exp(-(self.time**2) / (1 * self.sigma**2))
+            logging.debug(f"Computed Gaussian window with values: {gaussian_window}")
+
+            # Construct the wavelet
+            self.wavelet = normalization_factor * H_n(self.time / self.sigma) * gaussian_window
+            logging.debug(f"Generated wavelet with values: {self.wavelet}")
+
+        ###################################################################################
+        # Get central frequency of wavelet
+        ###################################################################################
+        def get_central_freq_of_wavelet(self):
+            logging.info("Starting central frequency calculation.")
+            
+            # Perform Fourier Transform
+            fft_wavelet = np.fft.fft(self.wavelet)
+            logging.debug(f"FFT of wavelet: {fft_wavelet}")
+
+            # Convert sampling rate to Hz and calculate dt
+            dt = 1 / self.fs
+
+            # Compute the frequency bins
+            n = len(self.wavelet)
+            freq_bins = np.fft.fftfreq(n, d=dt)
+            logging.debug(f"Frequency bins: {freq_bins}")
+
+            # Compute the Power Spectrum
+            power_spectrum = np.abs(fft_wavelet) ** 2
+            logging.debug(f"Power Spectrum: {power_spectrum}")
+
+            # Limit to positive frequencies
+            positive_freqs = freq_bins > 0
+            positive_freq_bins = freq_bins[positive_freqs]
+            positive_power_spectrum = power_spectrum[positive_freqs]
+
+            # Find the frequency with maximum amplitude in the positive spectrum
+            max_amplitude_freq = positive_freq_bins[np.argmax(positive_power_spectrum)]
+            logging.info(f"Frequency with maximum amplitude: {max_amplitude_freq / 1e6:.2f} MHz")
+
+            # Replace print with logging
+            logging.info(f"Frequency with Maximum Amplitude: {max_amplitude_freq / 1e6:.2f} MHz")
+
+        ###################################################################################
+        # Plot
+        ###################################################################################
+        def plot(self, show_negative_freqs=False):
+            logging.info("Starting the plot process.")
+            
+            if self.visualize:
+                logging.info("Visualization is enabled.")
+                
+                plt.figure(figsize=(12, 4))
+                logging.info("Figure created with size 12x4.")
+
+                # Plot the Hermite wavelet
+                plt.subplot(1, 2, 1)
+                plt.plot(self.time * 1e6, self.wavelet, label=f'GH{self.order}')  # Time in µs
+                plt.axvline(x=3 * self.sigma * 1e6, color='blue', linestyle='--', label='+3σ')
+                plt.axvline(x=-3 * self.sigma * 1e6, color='blue', linestyle='--', label='-3σ')
+                plt.title('Hermite Wavelets')
+                plt.xlabel('Time [µs]')
+                plt.ylabel('Amplitude')
+                plt.legend()
+                plt.grid(True)
+                logging.info("Hermite wavelet plot created with time scaled to microseconds.")
+
+                # FFT and frequency response
+                logging.info("Starting FFT calculation.")
+                wavelet_fft = fft(self.wavelet)
+                freqs = np.fft.fftfreq(len(wavelet_fft), d=(self.time[1] - self.time[0]))  # Frequency vector
+                fft_magnitude = np.abs(wavelet_fft)  # Magnitude of FFT
+                logging.info("FFT calculation completed.")
+
+                plt.subplot(1, 2, 2)
+                if show_negative_freqs:
+                    plt.plot(freqs / 1e6, fft_magnitude, label=f'FFT of GH{self.order}')  # Full spectrum
+                    plt.title('Full Frequency Spectrum of Hermite Wavelets')
+                else:
+                    positive_mask = freqs >= 0
+                    plt.plot(freqs[positive_mask] / 1e6, fft_magnitude[positive_mask], label=f'FFT of GH{self.order}')  # Positive only
+                    plt.title('Positive Frequency Spectrum of Hermite Wavelets')
+                
+                plt.xlabel('Frequency [MHz]')
+                plt.ylabel('Magnitude')
+                plt.legend()
+                plt.grid()
+                logging.info("Frequency response plot created.")
+
+                plt.tight_layout()
+                plt.show()
+                logging.info("Plots displayed successfully.")
+            else:
+                logging.info("Visualization is disabled; no plots will be shown.")
+
+        ###################################################################################
+        
     def __init__(self):
         pass
     
@@ -410,7 +577,7 @@ class Hscan:
         pass
 
 ###################################################################################
-# 
+# Backscatter coefficient
 ###################################################################################
 class BSC:
     """Class for computing the backscatter coefficient for the ROI.
