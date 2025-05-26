@@ -13,6 +13,8 @@ from pyquantus.parse.transforms import scanConvert
 from pyquantus.utc.analysis import Hscan
 
 import logging
+from matplotlib.colors import LinearSegmentedColormap
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class UtcData:
@@ -497,6 +499,7 @@ class HscanPostProcessing:
     ###################################################################################
     def __init__(self,
                  hscan_obj: Hscan,
+                 method: str,
                  visualize: bool = False,
                  clip_fact: float = 1,
                  dyn_range: float = 100):
@@ -508,6 +511,7 @@ class HscanPostProcessing:
         
         # input arguments
         self.hscan_obj = hscan_obj
+        self.method = method
         self.visualize = visualize
         self.clip_fact = clip_fact
         self.dyn_range = dyn_range
@@ -528,6 +532,12 @@ class HscanPostProcessing:
         self.convolution_2d_2 = None
         self.convolution_envelope_2d_2 = None
         
+        # 3x2d
+        self.RGB_trimmed_3x2d = None
+        self.G_channel_2d = None
+        self.R_channel_2d = None
+        self.B_channel_2d = None
+        
         # run
         self.__run()
         
@@ -539,10 +549,28 @@ class HscanPostProcessing:
         # set 1D signal and envelope
         self.set_1d_signal_and_envelope()
         
+        # set 2D signal and envelope
+        self.set_2d_signal_and_envelope()
+        
+        # create color channels
+        self.create_color_channels_2d()
+        
+        self.prepare_R0B_3x2d()
+        self.prepare_RGB_3x2d()      
+          
+        # visualize
+        if self.visualize:
+            self.plot()
+        
+    ###################################################################################
+    # Visualize
+    ###################################################################################
+    def plot(self):
+        
         # plot original signal 1D
         self.plot_original_signal_1d(self.signal_1d,
-                                     self.envelope_1d,
-                                     sampling_frequency = self.hscan_obj.wavelet_GHx_params_1['fs'])
+                                    self.envelope_1d,
+                                    sampling_frequency = self.hscan_obj.wavelet_GHx_params_1['fs'])
 
         # plot GH1 wavelet
         self.hscan_obj.wavelet_GH1.visualize = True
@@ -564,55 +592,21 @@ class HscanPostProcessing:
                                             order = self.hscan_obj.wavelet_GHx_params_2['order'],
                                             sampling_frequency = self.hscan_obj.wavelet_GHx_params_2['fs'])  
 
-        # set 2D signal and envelope
-        self.set_2d_signal_and_envelope()
-
         # plot envelope
         self.image_envelope_2d(envelope_2d = self.envelope_2d,
                                title = "Original Envelope",
                                clip_fact = self.clip_fact,
                                dyn_range = self.dyn_range)
     
-        # self.image_RB_difference_in_RGB_2d(R0B_final_2d = self.R0B_trimmed_3x2d, 
-        #                                     additional_text="",
-        #                                     log=False)
+        self.image_RB_difference_in_RGB_2d(R0B_final_2d = self.R0B_trimmed_3x2d, 
+                                            additional_text="",
+                                            log=False)
         
-        # self.image_color_channel_2d(color_channel_2d = self.RGB_trimmed_3x2d, color="RGB", addtional_text="RGB_based on first frame", log=False)
-        # self.image_color_channel_2d(color_channel_2d = self.G_channel_2d, color="green", addtional_text="single channel", log=False)
-        # self.image_color_channel_2d(color_channel_2d = self.R_channel_2d, color="red",   addtional_text="single channel", log=False)
-        # self.image_color_channel_2d(color_channel_2d = self.B_channel_2d, color="blue",  addtional_text="single channel", log=False)
+        self.image_color_channel_2d(color_channel_2d = self.RGB_trimmed_3x2d, color="RGB", addtional_text="RGB_based on first frame", log=False)
+        self.image_color_channel_2d(color_channel_2d = self.G_channel_2d, color="green", addtional_text="single channel", log=False)
+        self.image_color_channel_2d(color_channel_2d = self.R_channel_2d, color="red",   addtional_text="single channel", log=False)
+        self.image_color_channel_2d(color_channel_2d = self.B_channel_2d, color="blue",  addtional_text="single channel", log=False)   
 
-        # # plot raw signal with wavelets
-        # self.plot_1d_signal_envelope_and_fft(signal = self.df_trimmed_signal_1d,
-        #                             envelope = self.df_trimmed_signal_envelope_1d)
-        
-        # self.plot_1d_signal_envelope_and_fft(signal = self.df_convolved_signal_with_ghx_1_1d,
-        #                             envelope = self.df_convolved_signal_with_ghx_1_envelope_1d)
-                
-        # self.plot_1d_signal_envelope_and_fft(signal = self.df_convolved_signal_with_ghx_2_1d,
-        #                             envelope = self.df_convolved_signal_with_ghx_2_envelope_1d)
-        
-        # self.plot_envelope(self.G_channel_2d[self.G_channel_2d.shape[0]//2, :], color = 'green')
-        # self.plot_envelope(self.R_channel_2d[self.G_channel_2d.shape[0]//2, :], color = 'red')
-        # self.plot_envelope(self.B_channel_2d[self.G_channel_2d.shape[0]//2, :], color = 'blue')
-
-    
-
-    ###################################################################################
-    # Rotate and flip
-    ###################################################################################
-    @staticmethod
-    def rotate_flip(
-                    two_dimension_array: np.ndarray) -> np.ndarray:
-
-        # Rotate the input array counterclockwise by 90 degrees
-        rotated_array = np.rot90(two_dimension_array)
-        
-        # Flip the rotated array horizontally
-        rotated_flipped_array = np.flipud(rotated_array)
-        
-        return rotated_flipped_array
-    
     ###################################################################################
     # Set 1D signal and envelope
     ###################################################################################
@@ -763,54 +757,28 @@ class HscanPostProcessing:
     # Create color channels 2D
     ###################################################################################
     def create_color_channels_2d(self):
-        
-        if self.method == "method_1":
-            # Implement logic for method_2
-            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_1(
-                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
-                green_xd=self.df_trimmed_signal_envelope_2d.values,
-                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
-            )
+        # Define a mapping of methods to their corresponding core functions
+        method_map = {
+            "method_1": self.hscan_core_method_1,
+            "method_2": self.hscan_core_method_2,
+            "method_3": self.hscan_core_method_3,
+            "method_4": self.hscan_core_method_4,
+            "method_5": self.hscan_core_method_5,
+            "method_6": self.hscan_core_method_6
+        }
 
-        elif self.method == "method_2":
-            # Implement logic for method_2
-            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_2(
-                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
-                green_xd=self.df_trimmed_signal_envelope_2d.values,
-                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
-            )
+        # Get the core function based on the method
+        core_function = method_map.get(self.method)
 
-        elif self.method == "method_3":
-            # Implement logic for method_3
-            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_3(
-                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
-                green_xd=self.df_trimmed_signal_envelope_2d.values,
-                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
+        if core_function:
+            # Call the core function with the appropriate arguments
+            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = core_function(
+                red_xd=self.convolution_envelope_2d_1,
+                green_xd=self.envelope_2d,
+                blue_xd=self.convolution_envelope_2d_2
             )
-
-        elif self.method == "method_4":
-            # Implement logic for method_4
-            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_4(
-                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
-                green_xd=self.df_trimmed_signal_envelope_2d.values,
-                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
-            )
-
-        elif self.method == "method_5":
-            # Implement logic for method_5
-            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_5(
-                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
-                green_xd=self.df_trimmed_signal_envelope_2d.values,
-                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
-            )
-            
-        elif self.method == "method_6":
-            # Implement logic for method_5
-            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_6(
-                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
-                green_xd=self.df_trimmed_signal_envelope_2d.values,
-                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
-            )
+        else:
+            raise ValueError(f"Unknown method: {self.method}")
             
     ###################################################################################   
     # Hscan core method 1
@@ -939,6 +907,75 @@ class HscanPostProcessing:
         blue_xd  = self.normalize_to_0_1(blue_xd)
                     
         return red_xd, green_xd, blue_xd
+            
+    ###################################################################################
+    # Normalize with min max
+    ###################################################################################
+    @staticmethod
+    def normalize_with_min_max(original_array, new_min, new_max):
+        min_value = np.min(original_array)
+        max_value = np.max(original_array)
+        normalized_array = ((original_array - min_value) / (max_value - min_value)) * (new_max - new_min) + new_min
+        return normalized_array
+
+    ###################################################################################
+    # Positive negative separator
+    ###################################################################################
+    @staticmethod
+    def positive_negative_separator_xd(arr_xd, limit=0):
+        positive_array = np.zeros_like(arr_xd)
+        negative_array = np.zeros_like(arr_xd)
+
+        # 2D array
+        if len(arr_xd.shape) == 2:
+            for i in range(arr_xd.shape[0]):
+                for j in range(arr_xd.shape[1]):
+                    if arr_xd[i, j] > limit:
+                        positive_array[i, j] = arr_xd[i, j]
+                    if arr_xd[i, j] < -limit:
+                        negative_array[i, j] = arr_xd[i, j]
+                        
+        # 3D array
+        elif len(arr_xd.shape) == 3:
+            for k in range(arr_xd.shape[2]):
+                for i in range(arr_xd.shape[0]):
+                    for j in range(arr_xd.shape[1]):
+                        if arr_xd[i, j, k] > limit:
+                            positive_array[i, j, k] = arr_xd[i, j, k]
+                        if arr_xd[i, j, k] < -limit:
+                            negative_array[i, j, k] = arr_xd[i, j, k]
+
+        return positive_array, negative_array
+    
+    ###################################################################################
+    # Shift to positive
+    ###################################################################################
+    @staticmethod
+    def shift_to_positive(arr_xd):
+        
+        # Find the minimum element in the array
+        min_val = np.min(arr_xd)
+        
+        # Calculate the shift value to make all elements positive
+        shift_val = abs(min_val) if min_val < 0 else 0
+        
+        # Shift all elements by the shift value
+        shifted_arr = arr_xd + shift_val
+        
+        return shifted_arr
+    
+    ###################################################################################
+    # Normalize to 0-1
+    ###################################################################################
+    @staticmethod
+    def normalize_to_0_1(
+                   original_array: np.ndarray,   # Input numpy array to be normalized (np.ndarray)
+                   ) -> np.ndarray:  # The maximum value of the new range (int)
+
+        # Normalizing the values of the original array to the new range.
+        normalized_array = original_array / np.max(original_array)
+
+        return normalized_array
         
     ###################################################################################
     # Prepare R0B 3x2D
@@ -1018,8 +1055,6 @@ class HscanPostProcessing:
         
         if log:
             R0B_final_2d = 20 * np.log10(np.abs(1 + R0B_final_2d))
-
-        R0B_final_2d = self.rotate_flip(R0B_final_2d)
         
         # Display the image
         plt.imshow(R0B_final_2d, aspect='auto', cmap=custom_cmap)
@@ -1053,25 +1088,25 @@ class HscanPostProcessing:
             color_channel_2d = 20 * np.log10(np.abs(1 + color_channel_2d))
 
             if color == "red":
-                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Reds')
+                plt.imshow(color_channel_2d, aspect='auto', cmap='Reds')
             elif color == "green":
-                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Greens')
+                plt.imshow(color_channel_2d, aspect='auto', cmap='Greens')
             elif color == "blue":
-                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Blues')
+                plt.imshow(color_channel_2d, aspect='auto', cmap='Blues')
             elif color == "RGB":
-                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto')
+                plt.imshow(color_channel_2d, aspect='auto')
                 #plt.colorbar().remove()
         
         else:    
             
             if color == "red":
-                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Reds')
+                plt.imshow(color_channel_2d, aspect='auto', cmap='Reds')
             elif color == "green":
-                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Greens')
+                plt.imshow(color_channel_2d, aspect='auto', cmap='Greens')
             elif color == "blue":
-                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Blues')
+                plt.imshow(color_channel_2d, aspect='auto', cmap='Blues')
             elif color == "RGB":
-                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto')
+                plt.imshow(color_channel_2d, aspect='auto')
                 #plt.colorbar().remove()
         
         # Add a color bar
