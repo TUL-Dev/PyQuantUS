@@ -12,6 +12,9 @@ from pyquantus.parse.objects import ScConfig
 from pyquantus.parse.transforms import scanConvert
 from pyquantus.utc.analysis import Hscan
 
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 class UtcData:
     """Class to store UTC data and images after analysis.
     
@@ -492,7 +495,11 @@ class HscanPostProcessing:
     ###################################################################################
     # Constructor
     ###################################################################################
-    def __init__(self, hscan_obj: Hscan):
+    def __init__(self,
+                 hscan_obj: Hscan,
+                 visualize: bool = False,
+                 clip_fact: float = 1,
+                 dyn_range: float = 100):
         """Constructor for the HscanPostProcessing class.
         
         Args:
@@ -501,14 +508,26 @@ class HscanPostProcessing:
         
         # input arguments
         self.hscan_obj = hscan_obj
+        self.visualize = visualize
+        self.clip_fact = clip_fact
+        self.dyn_range = dyn_range
         
-        # initialize
-        self.convolution_1d_1 = None
-        self.envelope_1d_1 = None
-        self.convolution_1d_2 = None
-        self.envelope_1d_2 = None
+        # 1d
         self.signal_1d = None
         self.envelope_1d = None
+        self.convolution_1d_1 = None
+        self.convolution_envelope_1d_1 = None
+        self.convolution_1d_2 = None
+        self.convolution_envelope_1d_2 = None
+        
+        # 2d       
+        self.signal_2d = None
+        self.envelope_2d = None
+        self.convolution_2d_1 = None
+        self.convolution_envelope_2d_1 = None
+        self.convolution_2d_2 = None
+        self.convolution_envelope_2d_2 = None
+        
         # run
         self.__run()
         
@@ -517,28 +536,83 @@ class HscanPostProcessing:
     ###################################################################################
     def __run(self):
         
+        # set 1D signal and envelope
         self.set_1d_signal_and_envelope()
         
+        # plot original signal 1D
         self.plot_original_signal_1d(self.signal_1d,
                                      self.envelope_1d,
                                      sampling_frequency = self.hscan_obj.wavelet_GHx_params_1['fs'])
-        
+
+        # plot GH1 wavelet
         self.hscan_obj.wavelet_GH1.visualize = True
         self.hscan_obj.wavelet_GH1.plot()
         
+        # plot GH1 signal and envelope
         self.plot_hscan_signal_and_envelope(self.convolution_1d_1,
-                                            self.envelope_1d_1,
+                                            self.convolution_envelope_1d_1,
                                             order = self.hscan_obj.wavelet_GHx_params_1['order'],
                                             sampling_frequency = self.hscan_obj.wavelet_GHx_params_1['fs'])   
         
+        # plot GH2 wavelet
         self.hscan_obj.wavelet_GH2.visualize = True
         self.hscan_obj.wavelet_GH2.plot()
 
+        # plot GH2 signal and envelope
         self.plot_hscan_signal_and_envelope(self.convolution_1d_2,
-                                            self.envelope_1d_2,
+                                            self.convolution_envelope_1d_2,
                                             order = self.hscan_obj.wavelet_GHx_params_2['order'],
                                             sampling_frequency = self.hscan_obj.wavelet_GHx_params_2['fs'])  
 
+        # set 2D signal and envelope
+        self.set_2d_signal_and_envelope()
+
+        # plot envelope
+        self.image_envelope_2d(envelope_2d = self.envelope_2d,
+                               title = "Original Envelope",
+                               clip_fact = self.clip_fact,
+                               dyn_range = self.dyn_range)
+    
+        # self.image_RB_difference_in_RGB_2d(R0B_final_2d = self.R0B_trimmed_3x2d, 
+        #                                     additional_text="",
+        #                                     log=False)
+        
+        # self.image_color_channel_2d(color_channel_2d = self.RGB_trimmed_3x2d, color="RGB", addtional_text="RGB_based on first frame", log=False)
+        # self.image_color_channel_2d(color_channel_2d = self.G_channel_2d, color="green", addtional_text="single channel", log=False)
+        # self.image_color_channel_2d(color_channel_2d = self.R_channel_2d, color="red",   addtional_text="single channel", log=False)
+        # self.image_color_channel_2d(color_channel_2d = self.B_channel_2d, color="blue",  addtional_text="single channel", log=False)
+
+        # # plot raw signal with wavelets
+        # self.plot_1d_signal_envelope_and_fft(signal = self.df_trimmed_signal_1d,
+        #                             envelope = self.df_trimmed_signal_envelope_1d)
+        
+        # self.plot_1d_signal_envelope_and_fft(signal = self.df_convolved_signal_with_ghx_1_1d,
+        #                             envelope = self.df_convolved_signal_with_ghx_1_envelope_1d)
+                
+        # self.plot_1d_signal_envelope_and_fft(signal = self.df_convolved_signal_with_ghx_2_1d,
+        #                             envelope = self.df_convolved_signal_with_ghx_2_envelope_1d)
+        
+        # self.plot_envelope(self.G_channel_2d[self.G_channel_2d.shape[0]//2, :], color = 'green')
+        # self.plot_envelope(self.R_channel_2d[self.G_channel_2d.shape[0]//2, :], color = 'red')
+        # self.plot_envelope(self.B_channel_2d[self.G_channel_2d.shape[0]//2, :], color = 'blue')
+
+    
+
+    ###################################################################################
+    # Rotate and flip
+    ###################################################################################
+    @staticmethod
+    def rotate_flip(
+                    two_dimension_array: np.ndarray) -> np.ndarray:
+
+        # Rotate the input array counterclockwise by 90 degrees
+        rotated_array = np.rot90(two_dimension_array)
+        
+        # Flip the rotated array horizontally
+        rotated_flipped_array = np.flipud(rotated_array)
+        
+        return rotated_flipped_array
+    
     ###################################################################################
     # Set 1D signal and envelope
     ###################################################################################
@@ -561,14 +635,62 @@ class HscanPostProcessing:
 
         # Extract 1D signal and envelope
         self.convolution_1d_1 = self.hscan_obj.convolved_signal_with_ghx_1_nd[indices]
-        self.envelope_1d_1 = self.hscan_obj.convolved_signal_with_ghx_1_envelope_nd[indices]
+        self.convolution_envelope_1d_1 = self.hscan_obj.convolved_signal_with_ghx_1_envelope_nd[indices]
 
         self.convolution_1d_2 = self.hscan_obj.convolved_signal_with_ghx_2_nd[indices]
-        self.envelope_1d_2 = self.hscan_obj.convolved_signal_with_ghx_2_envelope_nd[indices]
+        self.convolution_envelope_1d_2 = self.hscan_obj.convolved_signal_with_ghx_2_envelope_nd[indices]
         
         self.signal_1d = self.hscan_obj.signal_nd[indices]
         self.envelope_1d = self.hscan_obj.envelope_nd[indices]
 
+    ###################################################################################
+    # Set 2D signal and envelope
+    ###################################################################################
+    def set_2d_signal_and_envelope(self):
+        """
+        Extract a 2D signal and its envelope from the n-dimensional convolved H-scan data
+        along the axis specified by self.hscan_obj.signal_axis, self.hscan_obj.row_axis, using index 0 for all other axes.
+        """
+        logging.info("Starting extraction of 2D signal and envelope.")
+        
+        shape = self.hscan_obj.convolved_signal_with_ghx_1_nd.shape
+        axis = self.hscan_obj.signal_axis
+        row_axis = self.hscan_obj.row_axis
+        
+        logging.debug(f"Shape of convolved signal: {shape}")
+        logging.debug(f"Signal axis: {axis}, Row axis: {row_axis}")
+        
+        # Build indices: 0 for all axes except the signal axis and row axis
+        indices = []
+        for i in range(len(shape)):
+            if i == axis or i == row_axis:
+                indices.append(slice(None))
+            else:
+                indices.append(0)
+        indices = tuple(indices)
+        
+        logging.debug(f"Indices for extraction: {indices}")
+        
+        # Extract 2D signal and envelope
+        self.convolution_2d_1 = self.hscan_obj.convolved_signal_with_ghx_1_nd[indices]
+        self.convolution_envelope_2d_1 = self.hscan_obj.convolved_signal_with_ghx_1_envelope_nd[indices]
+        
+        self.convolution_2d_2 = self.hscan_obj.convolved_signal_with_ghx_2_nd[indices]
+        self.convolution_envelope_2d_2 = self.hscan_obj.convolved_signal_with_ghx_2_envelope_nd[indices]
+        
+        self.signal_2d = self.hscan_obj.signal_nd[indices]
+        self.envelope_2d = self.hscan_obj.envelope_nd[indices]
+        
+        # add logging of shapes
+        logging.info(f"Shape of signal: {self.signal_2d.shape}")
+        logging.info(f"Shape of envelope: {self.envelope_2d.shape}")
+        logging.info(f"Shape of convolution_2d_1: {self.convolution_2d_1.shape}")
+        logging.info(f"Shape of convolution_envelope_2d_1: {self.convolution_envelope_2d_1.shape}")
+        logging.info(f"Shape of convolution_2d_2: {self.convolution_2d_2.shape}")
+        logging.info(f"Shape of convolution_envelope_2d_2: {self.convolution_envelope_2d_2.shape}")
+        
+        logging.info("Completed extraction of 2D signal and envelope.")
+    
     ###################################################################################
     # Plot H-scan signal and envelope
     ###################################################################################
@@ -585,6 +707,7 @@ class HscanPostProcessing:
         1. GHx signal and its envelope
         2. FFT of GHx signal
         """
+        
         fig, axes = plt.subplots(1, 2, figsize=(12, 4))
         
         # Plot GHx signal and envelope
@@ -608,7 +731,6 @@ class HscanPostProcessing:
         plt.tight_layout()
         plt.show()
         
-    
     ###################################################################################
     # Plot original signal 1D
     ###################################################################################
@@ -638,13 +760,401 @@ class HscanPostProcessing:
         plt.show()
     
     ###################################################################################
-    # Plot H-scan image
+    # Create color channels 2D
     ###################################################################################
-    def plot_hscan_image(self):
-        """Plot the H-scan image."""
-        pass
+    def create_color_channels_2d(self):
+        
+        if self.method == "method_1":
+            # Implement logic for method_2
+            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_1(
+                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
+                green_xd=self.df_trimmed_signal_envelope_2d.values,
+                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
+            )
+
+        elif self.method == "method_2":
+            # Implement logic for method_2
+            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_2(
+                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
+                green_xd=self.df_trimmed_signal_envelope_2d.values,
+                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
+            )
+
+        elif self.method == "method_3":
+            # Implement logic for method_3
+            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_3(
+                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
+                green_xd=self.df_trimmed_signal_envelope_2d.values,
+                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
+            )
+
+        elif self.method == "method_4":
+            # Implement logic for method_4
+            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_4(
+                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
+                green_xd=self.df_trimmed_signal_envelope_2d.values,
+                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
+            )
+
+        elif self.method == "method_5":
+            # Implement logic for method_5
+            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_5(
+                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
+                green_xd=self.df_trimmed_signal_envelope_2d.values,
+                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
+            )
+            
+        elif self.method == "method_6":
+            # Implement logic for method_5
+            self.R_channel_2d, self.G_channel_2d, self.B_channel_2d = self.hscan_core_method_6(
+                red_xd=self.df_convolved_signal_with_ghx_1_envelope_2d.values,
+                green_xd=self.df_trimmed_signal_envelope_2d.values,
+                blue_xd=self.df_convolved_signal_with_ghx_2_envelope_2d.values
+            )
+            
+    ###################################################################################   
+    # Hscan core method 1
+    ###################################################################################   
+    def hscan_core_method_1(self,
+                            red_xd,
+                            green_xd,
+                            blue_xd):
+
+        # Normalize envelope for color channel and get log
+        red_xd   = self.normalize_with_min_max(red_xd, 1, 255)
+        green_xd = self.normalize_with_min_max(green_xd, 1, 255)
+        blue_xd  = self.normalize_with_min_max(blue_xd, 1, 255)
+        
+        # Log transformation
+        red_xd = np.log10(red_xd)
+        green_xd = np.log10(green_xd)
+        blue_xd = np.log10(blue_xd)
+                        
+        # Difference calculation
+        RB_difference_xd = red_xd - blue_xd
+        positive, negative = self.positive_negative_separator_xd(arr_xd=RB_difference_xd, limit=0)
+        
+        # Assign values based on the difference
+        red_xd = positive
+        green_xd = green_xd
+        blue_xd = np.abs(negative)
+        
+        return red_xd, green_xd, blue_xd
+        
+    ###################################################################################   
+    # Hscan core method 2
+    def hscan_core_method_2(self,
+                            red_xd,
+                            green_xd,
+                            blue_xd):
+        
+        # Normalize color channel 0-255
+        red_xd   = self.normalize_with_min_max(red_xd , 1, 255)
+        green_xd = self.normalize_with_min_max(green_xd, 1, 255)
+        blue_xd  = self.normalize_with_min_max(blue_xd, 1, 255)
+        
+        # log
+        red_xd   = np.log10(red_xd)
+        green_xd = np.log10(green_xd)
+        blue_xd  = np.log10(blue_xd)
+            
+        return red_xd, green_xd, blue_xd
+                
+    ###################################################################################   
+    # Hscan core method 3
+    ###################################################################################   
+    def hscan_core_method_3(self,
+                        red_xd,
+                        green_xd,
+                        blue_xd):
     
+        # Normalize color channel 0-255
+        red_xd   = self.normalize_with_min_max(red_xd , 1, 255)
+        green_xd = self.normalize_with_min_max(green_xd, 1, 255)
+        blue_xd  = self.normalize_with_min_max(blue_xd, 1, 255)
+                   
+        return red_xd, green_xd, blue_xd
     
+    ###################################################################################   
+    # Hscan core method 4
+    ###################################################################################   
+    def hscan_core_method_4(self,
+                            red_xd,
+                            green_xd,
+                            blue_xd):
+        
+        # Normalize color channel 0-255
+        red_xd   = self.normalize_with_min_max(red_xd , 1, 255)
+        green_xd = self.normalize_with_min_max(green_xd, 1, 255)
+        blue_xd  = self.normalize_with_min_max(blue_xd, 1, 255)
+        
+        # log
+        red_xd   = np.log10(red_xd)
+        green_xd = np.log10(green_xd)
+        blue_xd  = np.log10(blue_xd)
+            
+        # shift to positive
+        red_xd   = self.shift_to_positive(red_xd)
+        green_xd = self.shift_to_positive(green_xd)
+        blue_xd  = self.shift_to_positive(blue_xd)
+    
+        return red_xd, green_xd, blue_xd    
+    
+    ###################################################################################   
+    # Hscan core method 5
+    ###################################################################################   
+    def hscan_core_method_5(self,
+                            red_xd,
+                            green_xd,
+                            blue_xd):
+        
+        # log
+        red_xd   = 20 * np.log10(np.abs(1 + red_xd))
+        green_xd = 20 * np.log10(np.abs(1 + green_xd))
+        blue_xd  = 20 * np.log10(np.abs(1 + blue_xd))
+        
+        # shift to positive
+        red_xd   = self.shift_to_positive(red_xd)
+        green_xd = self.shift_to_positive(green_xd)
+        blue_xd  = self.shift_to_positive(blue_xd)
+        
+        # Normalize color channel 0-1
+        red_xd   = self.normalize_to_0_1(red_xd)
+        green_xd = self.normalize_to_0_1(green_xd)
+        blue_xd  = self.normalize_to_0_1(blue_xd)
+        
+        return red_xd, green_xd, blue_xd
+                        
+    ###################################################################################   
+    # Hscan core method 6
+    ###################################################################################   
+    def hscan_core_method_6(self,
+                            red_xd,
+                            green_xd,
+                            blue_xd):
+        
+        # Normalize color channel 0-1
+        red_xd   = self.normalize_to_0_1(red_xd)
+        green_xd = self.normalize_to_0_1(green_xd)
+        blue_xd  = self.normalize_to_0_1(blue_xd)
+                    
+        return red_xd, green_xd, blue_xd
+        
+    ###################################################################################
+    # Prepare R0B 3x2D
+    ###################################################################################
+    def prepare_R0B_3x2d(self):
+        
+        # create R0B channel with mask
+        self.R0B_trimmed_3x2d = np.stack([self.R_channel_2d,
+                                            np.zeros_like(self.G_channel_2d),
+                                            self.B_channel_2d], axis=-1)    
+        
+    ###################################################################################
+    # Prepare RGB 3x2D
+    ###################################################################################
+    def prepare_RGB_3x2d(self):
+
+        # full RGB image
+        self.RGB_trimmed_3x2d = np.stack([self.R_channel_2d,
+                                            self.G_channel_2d,
+                                            self.B_channel_2d], axis=-1)
+    
+    ###################################################################################
+    # Image envelope
+    ###################################################################################
+    def image_envelope_2d(self, envelope_2d: np.ndarray, title: str, clip_fact: float, dyn_range: float) -> None:
+        """
+        Plots a 2D signal envelope in decibels.
+
+        This function takes a 2D array representing a signal envelope, applies 
+        a rotation and flipping transformation, converts it to a logarithmic 
+        decibel scale, applies clipping and normalization, and displays it as an image plot.
+
+        Args:
+            envelope (np.ndarray): The 2D signal envelope array.
+            title (str): The title of the plot.
+            clip_fact (float): Clipping factor for dynamic range.
+            dyn_range (float): Dynamic range in dB.
+
+        Returns:
+            None
+        """
+        
+        log_envelope_2d = 20 * np.log10(np.abs(1 + envelope_2d))
+
+        # Step 2: Clip and normalize
+        clipped_max = clip_fact * np.amax(log_envelope_2d)
+        log_envelope_2d = np.clip(log_envelope_2d, clipped_max - dyn_range, clipped_max)
+        log_envelope_2d -= np.amin(log_envelope_2d)
+        log_envelope_2d *= (255 / np.amax(log_envelope_2d))
+
+        plt.figure(figsize=(8, 6))
+        plt.imshow(log_envelope_2d, cmap='gray', aspect='auto')
+        plt.title(title)
+        plt.colorbar()
+
+        plt.tight_layout()
+        plt.show()
+
+    ###################################################################################
+    # Image RB difference in RGB
+    ###################################################################################
+    def image_RB_difference_in_RGB_2d(self,
+                                        R0B_final_2d: np.ndarray,  # RB final image as a numpy array
+                                        additional_text: str = "",
+                                        log: bool = False,  # Set default to False
+                                        ) -> None:  # Default filename
+
+        # Define custom color points for the colormap
+        colors = [(1, 0, 0), (0, 0, 0), (0, 0, 1)]  # Red, Black, Blue
+        
+        # Create a custom colormap
+        cmap_name = 'my_custom_colorbar'
+        custom_cmap = LinearSegmentedColormap.from_list(cmap_name, colors)
+        
+        # Create a new figure
+        plt.figure(figsize=(8, 6))
+        
+        if log:
+            R0B_final_2d = 20 * np.log10(np.abs(1 + R0B_final_2d))
+
+        R0B_final_2d = self.rotate_flip(R0B_final_2d)
+        
+        # Display the image
+        plt.imshow(R0B_final_2d, aspect='auto', cmap=custom_cmap)
+
+        plt.title(f'RB image zero G in RGB, {additional_text}')
+        
+        # Add a color bar with dynamic ticks
+        cbar = plt.colorbar()
+        cbar.set_ticks([0, 0.5, 1])
+        cbar.set_ticklabels(['Large', 'Medium', 'Small'])
+
+        # Adjust layout for better display
+        plt.tight_layout()
+        plt.show()
+  
+    ###################################################################################
+    # Image color channel 2D
+    ###################################################################################
+    def image_color_channel_2d(self,
+                                color_channel_2d: np.ndarray,   # Red channel without RGB as a numpy array
+                                color = None,
+                                addtional_text = None,
+                                log: bool = None, 
+                                ) -> None:         # Flag indicating whether to save the image
+
+        # Create a new figure
+        plt.figure(figsize=(8, 6))
+        
+        if log:
+            
+            color_channel_2d = 20 * np.log10(np.abs(1 + color_channel_2d))
+
+            if color == "red":
+                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Reds')
+            elif color == "green":
+                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Greens')
+            elif color == "blue":
+                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Blues')
+            elif color == "RGB":
+                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto')
+                #plt.colorbar().remove()
+        
+        else:    
+            
+            if color == "red":
+                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Reds')
+            elif color == "green":
+                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Greens')
+            elif color == "blue":
+                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto', cmap='Blues')
+            elif color == "RGB":
+                plt.imshow(self.rotate_flip(color_channel_2d), aspect='auto')
+                #plt.colorbar().remove()
+        
+        # Add a color bar
+        plt.colorbar()
+
+        # Set the title of the plot
+        plt.title(f'{addtional_text}')  
+        
+        # Adjust layout for better display
+        plt.tight_layout()
+
+        plt.show()
+
+    ###################################################################################
+    # Plot 1D signal envelope and fft
+    ###################################################################################
+    def plot_1d_signal_envelope_and_fft(self, signal, envelope):
+        # Generate time axis based on the length of the signal
+        num_samples = len(signal)
+        time_microseconds = np.arange(num_samples)  # Use sample indices as time in microseconds
+
+        # Calculate FFT
+        fft_signal = np.fft.fft(signal)
+        fft_magnitude = np.abs(fft_signal)
+
+        # Frequency axis in MHz using the sampling frequency
+        freq_MHz = np.fft.fftfreq(num_samples, d=(1 / (self.sampling_rate_MHz)))  # Frequency in Hz
+
+        # Only take positive frequencies
+        positive_freq_indices = freq_MHz >= 0
+        freq_positive = freq_MHz[positive_freq_indices]
+        fft_magnitude_positive = fft_magnitude[positive_freq_indices]
+
+        # Create figure
+        plt.figure(figsize=(14, 4))
+
+        # Plot the original signal and its envelope
+        plt.subplot(1, 2, 1)  # 1 row, 2 columns, first subplot
+        plt.plot(time_microseconds, signal, color='blue', label='Signal')  # Original signal
+        plt.plot(time_microseconds, envelope, color='orange', linestyle='--', label='Envelope')  # Envelope
+        plt.title('1D Signal Plot')
+        plt.xlabel('samples')  # Label for microseconds
+        plt.ylabel('Amplitude')
+        plt.legend()
+        plt.grid(True)
+
+        # Plot the positive FFT
+        plt.subplot(1, 2, 2)  # 1 row, 2 columns, second subplot
+        plt.plot(freq_positive, fft_magnitude_positive, color='green')  # Frequency in MHz
+        plt.title('FFT of Signal')
+        plt.xlabel('Frequency (MHz)')  # Label for MHz
+        plt.ylabel('Magnitude')
+        plt.grid(True)
+
+        plt.tight_layout()  # Adjust layout
+        plt.show()
+        
+    ###################################################################################
+    # Plot envelope
+    ###################################################################################
+    def plot_envelope(self, envelope, color):
+        # Generate time axis based on the length of the envelope
+        num_samples = len(envelope)
+        time_microseconds = np.arange(num_samples)  # Use sample indices as time in microseconds
+
+        # Create figure
+        plt.figure(figsize=(7, 4))
+
+        # Plot the envelope with the specified color
+        plt.plot(time_microseconds, envelope, color=color, linestyle='--', label='Envelope')  # Envelope
+        plt.title('Envelope of the Signal')
+        plt.xlabel('Samples')  # Label for microseconds
+        plt.ylabel('Amplitude')
+        plt.legend()
+        plt.grid(True)
+
+        plt.tight_layout()  # Adjust layout
+        plt.show()
+
+    
+
+    
+       
     
     
 ###################################################################################

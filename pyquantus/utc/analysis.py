@@ -583,7 +583,9 @@ class Hscan:
     ###################################################################################
     def __init__(self,
                  signal_nd: np.ndarray,
+                 row_axis: int,
                  signal_axis: int,
+                 frame_axis: int,
                  wavelet_GHx_params_1: dict,
                  wavelet_GHx_params_2: dict,
                  ) -> None:
@@ -591,6 +593,8 @@ class Hscan:
         # input arguments
         self.signal_nd = signal_nd
         self.signal_axis = signal_axis
+        self.row_axis = row_axis
+        self.frame_axis = frame_axis
         self.wavelet_GHx_params_1 = wavelet_GHx_params_1
         self.wavelet_GHx_params_2 = wavelet_GHx_params_2
         self.wavelet_GH1 = self.GaussinaHermiteWavelet(**wavelet_GHx_params_1)
