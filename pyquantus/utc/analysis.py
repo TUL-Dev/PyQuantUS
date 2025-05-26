@@ -584,25 +584,25 @@ class Hscan:
     def __init__(self,
                  signal_nd: np.ndarray,
                  signal_axis: int,
-                 wavelet_GH1_params: dict,
-                 wavelet_GH2_params: dict,
+                 wavelet_GHx_params_1: dict,
+                 wavelet_GHx_params_2: dict,
                  ) -> None:
         
         # input arguments
         self.signal_nd = signal_nd
         self.signal_axis = signal_axis
-        self.wavelet_GH1 = self.GaussinaHermiteWavelet(**wavelet_GH1_params)
-        self.wavelet_GH2 = self.GaussinaHermiteWavelet(**wavelet_GH2_params)
-            
-        # initialize
-        self.wavelet_1 = None
-        self.wavelet_2 = None
-                    
+        self.wavelet_GHx_params_1 = wavelet_GHx_params_1
+        self.wavelet_GHx_params_2 = wavelet_GHx_params_2
+        self.wavelet_GH1 = self.GaussinaHermiteWavelet(**wavelet_GHx_params_1)
+        self.wavelet_GH2 = self.GaussinaHermiteWavelet(**wavelet_GHx_params_2)
+                                
         self.convolved_signal_with_ghx_1_nd = None
         self.convolved_signal_with_ghx_2_nd = None
         self.convolved_signal_with_ghx_1_envelope_nd = None
         self.convolved_signal_with_ghx_2_envelope_nd = None
         
+        self.envelope_nd = None
+
         self.__run()
 
     ###################################################################################
@@ -612,7 +612,8 @@ class Hscan:
                 
         # convolved signals
         self.convolve_signal_with_wavelets_nd()
-        self.get_envelope_of_convolved_signals_nd()
+        self.set_envelope_of_convolved_signals_nd() 
+        self.set_envelope_of_signals_nd()
         
     ###################################################################################
     # Convolve 3D signal
@@ -684,7 +685,7 @@ class Hscan:
     ###################################################################################
     # Get envelope of convolved signal 3D
     ###################################################################################
-    def get_envelope_of_convolved_signals_nd(self):
+    def set_envelope_of_convolved_signals_nd(self):
         """Get the envelope of the convolved signal 3D using Hilbert transform.
         
         This method computes the envelope of both convolved signals (GH1 and GH2) using the Hilbert transform.
@@ -711,8 +712,12 @@ class Hscan:
         finally:
             logging.info("Envelope computation process completed.")
 
-
-
+    ###################################################################################
+    # Get envelope of signals 3D
+    ###################################################################################
+    def set_envelope_of_signals_nd(self):
+        """Get the envelope of the signals 3D."""
+        self.envelope_nd = np.abs(hilbert(self.signal_nd, axis=self.signal_axis))
 
 
 ###################################################################################

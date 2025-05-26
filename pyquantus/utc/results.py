@@ -10,6 +10,7 @@ from pyquantus.utc.analysis import UtcAnalysis
 from pyquantus.utc.transforms import condenseArr, expandArr
 from pyquantus.parse.objects import ScConfig
 from pyquantus.parse.transforms import scanConvert
+from pyquantus.utc.analysis import Hscan
 
 class UtcData:
     """Class to store UTC data and images after analysis.
@@ -488,8 +489,163 @@ class UtcData:
 class HscanPostProcessing:
     """Class for post-processing the H-scan data."""
 
-    def __init__(self):
+    ###################################################################################
+    # Constructor
+    ###################################################################################
+    def __init__(self, hscan_obj: Hscan):
+        """Constructor for the HscanPostProcessing class.
+        
+        Args:
+            hscan_obj (Hscan): The Hscan object to be post-processed.
+        """
+        
+        # input arguments
+        self.hscan_obj = hscan_obj
+        
+        # initialize
+        self.convolution_1d_1 = None
+        self.envelope_1d_1 = None
+        self.convolution_1d_2 = None
+        self.envelope_1d_2 = None
+        self.signal_1d = None
+        self.envelope_1d = None
+        # run
+        self.__run()
+        
+    ###################################################################################
+    # Run
+    ###################################################################################
+    def __run(self):
+        
+        self.set_1d_signal_and_envelope()
+        
+        self.plot_original_signal_1d(self.signal_1d,
+                                     self.envelope_1d,
+                                     sampling_frequency = self.hscan_obj.wavelet_GHx_params_1['fs'])
+        
+        self.hscan_obj.wavelet_GH1.visualize = True
+        self.hscan_obj.wavelet_GH1.plot()
+        
+        self.plot_hscan_signal_and_envelope(self.convolution_1d_1,
+                                            self.envelope_1d_1,
+                                            order = self.hscan_obj.wavelet_GHx_params_1['order'],
+                                            sampling_frequency = self.hscan_obj.wavelet_GHx_params_1['fs'])   
+        
+        self.hscan_obj.wavelet_GH2.visualize = True
+        self.hscan_obj.wavelet_GH2.plot()
+
+        self.plot_hscan_signal_and_envelope(self.convolution_1d_2,
+                                            self.envelope_1d_2,
+                                            order = self.hscan_obj.wavelet_GHx_params_2['order'],
+                                            sampling_frequency = self.hscan_obj.wavelet_GHx_params_2['fs'])  
+
+    ###################################################################################
+    # Set 1D signal and envelope
+    ###################################################################################
+    def set_1d_signal_and_envelope(self):
+        """
+        Extract a 1D signal and its envelope from the n-dimensional convolved H-scan data
+        along the axis specified by self.hscan_obj.signal_axis, using index 0 for all other axes.
+        """
+        shape = self.hscan_obj.convolved_signal_with_ghx_1_nd.shape
+        axis = self.hscan_obj.signal_axis
+
+        # Build indices: 0 for all axes except the signal axis
+        indices = []
+        for i in range(len(shape)):
+            if i == axis:
+                indices.append(slice(None))
+            else:
+                indices.append(0)
+        indices = tuple(indices)
+
+        # Extract 1D signal and envelope
+        self.convolution_1d_1 = self.hscan_obj.convolved_signal_with_ghx_1_nd[indices]
+        self.envelope_1d_1 = self.hscan_obj.convolved_signal_with_ghx_1_envelope_nd[indices]
+
+        self.convolution_1d_2 = self.hscan_obj.convolved_signal_with_ghx_2_nd[indices]
+        self.envelope_1d_2 = self.hscan_obj.convolved_signal_with_ghx_2_envelope_nd[indices]
+        
+        self.signal_1d = self.hscan_obj.signal_nd[indices]
+        self.envelope_1d = self.hscan_obj.envelope_nd[indices]
+
+    ###################################################################################
+    # Plot H-scan signal and envelope
+    ###################################################################################
+    def plot_hscan_signal_and_envelope(self, signal_1d, envelope_1d, order: int, sampling_frequency: int):
+        """Plot the H-scan signals and their envelopes.
+        
+        Args:
+            signal_1d (np.ndarray): The 1D signal to plot
+            envelope_1d (np.ndarray): The 1D envelope to plot
+            order (int): The order of the Hermite polynomial used for the wavelet
+            sampling_frequency (int): The sampling frequency of the signal
+
+        This function creates a figure with subplots showing:
+        1. GHx signal and its envelope
+        2. FFT of GHx signal
+        """
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+        
+        # Plot GHx signal and envelope
+        axes[0].plot(signal_1d, 'b-', label=f'GH{order} Signal', alpha=0.5)
+        axes[0].plot(envelope_1d, 'r-', label=f'GH{order} Envelope')
+        axes[0].set_title(f'GH{order} Signal and Envelope')
+        axes[0].set_xlabel('Sample')
+        axes[0].set_ylabel('Amplitude')
+        axes[0].legend()
+        axes[0].grid(True)
+
+        # Calculate and plot FFT of GHx signal
+        fft_signal_1 = np.fft.fft(signal_1d)
+        freq_signal_1 = np.fft.fftfreq(len(fft_signal_1), d=1/sampling_frequency)
+        axes[1].plot(freq_signal_1[:len(freq_signal_1)//2] / 1e6, np.abs(fft_signal_1)[:len(fft_signal_1)//2], 'b-')
+        axes[1].set_title(f'FFT of GH{order} Signal')
+        axes[1].set_xlabel('Frequency [MHz]')
+        axes[1].set_ylabel('Magnitude')
+        axes[1].grid(True)
+
+        plt.tight_layout()
+        plt.show()
+        
+    
+    ###################################################################################
+    # Plot original signal 1D
+    ###################################################################################
+    def plot_original_signal_1d(self, signal_1d, envelope_1d, sampling_frequency: int):
+        """Plot the original signal 1D with fft."""
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+        
+        # Plot original signal
+        axes[0].plot(signal_1d, 'b-', label='Original Signal', alpha=0.5)
+        axes[0].plot(envelope_1d, 'r-', label='Envelope')
+        axes[0].set_title('Original Signal')
+        axes[0].set_xlabel('Sample')
+        axes[0].set_ylabel('Amplitude')
+        axes[0].legend()
+        axes[0].grid(True)
+        
+        # Calculate and plot FFT of original signal
+        fft_signal_1 = np.fft.fft(signal_1d)
+        freq_signal_1 = np.fft.fftfreq(len(fft_signal_1), d=1/sampling_frequency)
+        axes[1].plot(freq_signal_1[:len(freq_signal_1)//2] / 1e6, np.abs(fft_signal_1)[:len(fft_signal_1)//2], 'b-')
+        axes[1].set_title('FFT of Original Signal')
+        axes[1].set_xlabel('Frequency [MHz]')
+        axes[1].set_ylabel('Magnitude')
+        axes[1].grid(True)
+
+        plt.tight_layout()
+        plt.show()
+    
+    ###################################################################################
+    # Plot H-scan image
+    ###################################################################################
+    def plot_hscan_image(self):
+        """Plot the H-scan image."""
         pass
+    
+    
+    
     
 ###################################################################################
 # BSC post-processing
