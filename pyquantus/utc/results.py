@@ -574,6 +574,7 @@ class HscanPostProcessing:
         self.G_channel_2d = None
         self.R_channel_2d = None
         self.B_channel_2d = None
+        self.RB_channels_ratio_2d = None
         
         # Run the processing pipeline
         logging.info("Starting H-scan post-processing pipeline")
@@ -605,6 +606,10 @@ class HscanPostProcessing:
         # Process color channels
         logging.info("Creating color channels")
         self.create_color_channels_2d()
+        
+        # Set color channels ratio
+        logging.info("Setting color channels ratio")
+        self.set_RB_channels_ratio()
         
         # Prepare final images
         logging.info("Preparing final RGB and R0B images")
@@ -948,6 +953,13 @@ class HscanPostProcessing:
         return red_xd, green_xd, blue_xd
        
     ###################################################################################
+    # Set color channels ratio
+    ###################################################################################
+    def set_RB_channels_ratio(self):
+        """Set the ratio of the color channels."""
+        self.RB_channels_ratio_2d = self.R_channel_2d / self.B_channel_2d
+        
+    ###################################################################################
     # Prepare R0B 3x2D
     ###################################################################################
     def prepare_R0B_3x2d(self):
@@ -1033,7 +1045,7 @@ class HscanPostProcessing:
         
             # plot RB difference in RGB
             self.image_RB_difference_in_RGB_2d(R0B_final_2d = self.R0B_trimmed_3x2d, 
-                                                additional_text="no Log",
+                                                additional_text="No Log",
                                                 log=False,
                                                 rotate_flip = self.visualize_rotated_flip)
             
@@ -1051,15 +1063,15 @@ class HscanPostProcessing:
             # plot single channels
             self.image_color_channel_2d(color_channel_2d = self.G_channel_2d,
                                         color="green",
-                                        addtional_text="single channel",
+                                        addtional_text="Single channel",
                                         rotate_flip = self.visualize_rotated_flip)
             self.image_color_channel_2d(color_channel_2d = self.R_channel_2d,
                                         color="red",
-                                        addtional_text="single channel",
+                                        addtional_text="Single channel",
                                         rotate_flip = self.visualize_rotated_flip)
             self.image_color_channel_2d(color_channel_2d = self.B_channel_2d,
                                         color="blue",
-                                        addtional_text="single channel",
+                                        addtional_text="Single channel",
                                         rotate_flip = self.visualize_rotated_flip)   
         
         logging.info("Visualization generation completed")
