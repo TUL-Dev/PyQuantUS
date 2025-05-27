@@ -623,18 +623,18 @@ class HscanPostProcessing:
     def set_1d_signal_and_envelope(self):
         """
         Extract a 1D signal and its envelope from the n-dimensional convolved H-scan data
-        along the axis specified by self.hscan_obj.signal_axis, using index 0 for all other axes.
+        along the axis specified by self.hscan_obj.signal_axis, using middle index for all other axes.
         """
         shape = self.hscan_obj.convolved_signal_with_ghx_1_nd.shape
         axis = self.hscan_obj.signal_axis
 
-        # Build indices: 0 for all axes except the signal axis
+        # Build indices: middle index for all axes except the signal axis
         indices = []
         for i in range(len(shape)):
             if i == axis:
                 indices.append(slice(None))
             else:
-                indices.append(0)
+                indices.append(shape[i] // 2)  # Use middle index instead of 0
         indices = tuple(indices)
 
         # Extract 1D signal and envelope
@@ -803,7 +803,7 @@ class HscanPostProcessing:
             tuple: Processed (red_xd, green_xd, blue_xd) channels
         """
         logging.debug("Applying method 2 processing")
-        
+                
         # Normalize color channel 0-255
         red_xd   = self.normalize_with_min_max(red_xd , 1, 255)
         green_xd = self.normalize_with_min_max(green_xd, 1, 255)
@@ -1033,9 +1033,15 @@ class HscanPostProcessing:
         
             # plot RB difference in RGB
             self.image_RB_difference_in_RGB_2d(R0B_final_2d = self.R0B_trimmed_3x2d, 
-                                                additional_text="",
+                                                additional_text="no Log",
                                                 log=False,
                                                 rotate_flip = self.visualize_rotated_flip)
+            
+            self.image_RB_difference_in_RGB_2d(R0B_final_2d = self.R0B_trimmed_3x2d, 
+                                                additional_text="Log",
+                                                log=True,
+                                                rotate_flip = self.visualize_rotated_flip)
+            
             # plot RGB
             self.image_color_channel_2d(color_channel_2d = self.RGB_trimmed_3x2d,
                                         color="RGB",
@@ -1328,44 +1334,32 @@ class HscanPostProcessing:
     ###################################################################################
     @staticmethod
     def shift_to_positive(arr_xd):
-        """Shift all elements of an array to the positive range.
-        """
-        # Find the minimum element in the array
+        """Ensure all elements in the array are non-negative by shifting."""
         min_val = np.min(arr_xd)
-        
-        # Calculate the shift value to make all elements positive
-        shift_val = abs(min_val) if min_val < 0 else 0
-        
-        # Shift all elements by the shift value
-        shifted_arr = arr_xd + shift_val
-        
-        return shifted_arr
+        if min_val < 0:
+            arr_xd += abs(min_val)
+        return arr_xd
     
     ###################################################################################
     # Normalize to 0-1
     ###################################################################################
     @staticmethod
-    def normalize_to_0_1(original_array: np.ndarray,   # Input numpy array to be normalized (np.ndarray)
-                        ) -> np.ndarray:  # The maximum value of the new range (int)
-
-        # Normalizing the values of the original array to the new range.
-        normalized_array = original_array / np.max(original_array)
-
-        return normalized_array
+    def normalize_to_0_1(original_array: np.ndarray) -> np.ndarray:
+        """Normalize the input array to a range of 0 to 1."""
+        
+        max_value = np.max(original_array)
+        if max_value == 0:
+            return np.zeros_like(original_array)
+        
+        return original_array / max_value
 
     ###################################################################################
     # Rotate flip
     ###################################################################################
     @staticmethod
     def rotate_flip(array_2d: np.ndarray) -> np.ndarray:
-
-        # Rotate the input array counterclockwise by 90 degrees
-        rotated_array = np.rot90(array_2d)
-        
-        # Flip the rotated array horizontally
-        rotated_flipped_array = np.flipud(rotated_array)
-        
-        return rotated_flipped_array
+        """Rotate and flip a 2D array."""
+        return np.flipud(np.rot90(array_2d))
     
 
     

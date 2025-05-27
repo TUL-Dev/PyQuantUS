@@ -622,7 +622,10 @@ class Hscan:
     ###################################################################################
     # Convolve 3D signal
     ###################################################################################
-    def _convolve_signal_nd(self, signal_nd: np.ndarray, wavelet_1d: np.ndarray, signal_axis: int) -> np.ndarray:
+    def _convolve_signal_nd(self,
+                            signal_nd: np.ndarray,
+                            wavelet_1d: np.ndarray,
+                            signal_axis: int) -> np.ndarray:
         """
         Convolve an n-dimensional signal with a 1D wavelet along the specified axis.
         This method is dimension-independent and works for any signal dimension.
@@ -722,6 +725,7 @@ class Hscan:
     def set_envelope_of_signals_nd(self):
         """Get the envelope of the signals 3D."""
         self.envelope_nd = np.abs(hilbert(self.signal_nd, axis=self.signal_axis))
+
 
 
 ###################################################################################
