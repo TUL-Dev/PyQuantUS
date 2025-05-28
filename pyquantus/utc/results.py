@@ -14,6 +14,8 @@ from pyquantus.utc.analysis import Hscan
 
 import logging
 from matplotlib.colors import LinearSegmentedColormap
+from scipy.signal import stft
+from scipy.optimize import curve_fit
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -1393,9 +1395,11 @@ class BSCPostProcessing:
 # Central frequency shift post-processing
 ###################################################################################
 class CentralFrequencyShiftPostProcessing:
-    """Class for post-processing the central frequency shift data."""
-
+    
     def __init__(self):
+        pass
+    
+    def new_method(self):
         pass
 
 ###################################################################################
