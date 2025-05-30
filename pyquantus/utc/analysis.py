@@ -828,7 +828,8 @@ class CentralFrequencyShift:
                  time_array_s: np.ndarray, 
                  depth_array_cm: np.ndarray,
                  speed_of_sound_m_s: float = 1540,
-                 stft_params: dict = None):
+                 stft_params: dict = None,
+                 use_fft: bool = False):
         """Initialize the CentralFrequencyShift class.
         
         Args:
@@ -837,6 +838,7 @@ class CentralFrequencyShift:
             time_array (np.ndarray): Time values corresponding to the signal
             speed_of_sound (float, optional): Speed of sound in m/s. Defaults to 1540.
             stft_params (dict, optional): Parameters for STFT computation. If None, uses defaults.
+            use_fft (bool, optional): Whether to use FFT instead of STFT. Defaults to False.
         """
         # input arguments
         self.signal_1d = signal_1d
@@ -845,6 +847,7 @@ class CentralFrequencyShift:
         self.depth_array_cm = depth_array_cm
         self.speed_of_sound_m_s = speed_of_sound_m_s
         self.stft_params = stft_params
+        self.use_fft = use_fft
             
         # Initialize computed attributes
         self.frequencies_stft = None
@@ -862,13 +865,21 @@ class CentralFrequencyShift:
     ###################################################################################
     def __run(self):
 
+        self.set_signal_zero_mean()
         self.compute_stft()
         self.adjust_depth_array()
         self.fit_gaussian_peaks()    
         self.plot_stft_spectrogram()
+        self.plot_signal_segments(use_gaussian_fit=False)
         self.plot_frequency_shift()
-        self.plot_signal_segments()
-        
+
+    ###################################################################################
+    # Set signal zero mean
+    ###################################################################################
+    def set_signal_zero_mean(self):
+        """Set the signal zero mean."""
+        self.signal_1d = self.signal_1d - np.mean(self.signal_1d)
+
     ###################################################################################
     # Compute STFT
     ###################################################################################
@@ -912,7 +923,7 @@ class CentralFrequencyShift:
 
         for i in range(len(self.depth_array_cm)):
             spectrum = self.amplitudes_stft[:, i]
-            
+                        
             # Initial guesses for Gaussian fit
             initial_guess = [
                 np.max(spectrum),
@@ -953,13 +964,13 @@ class CentralFrequencyShift:
     ###################################################################################
     # Plot STFT spectrogram
     ###################################################################################
-    def plot_stft_spectrogram(self):
+    def plot_stft_spectrogram(self, log_scale=True):
         """Plot the STFT spectrogram."""
         plt.figure(figsize=(10, 6))
         plt.pcolormesh(
             self.times_stft,
             self.frequencies_stft / 1e6,
-            np.log(self.amplitudes_stft),
+            np.log(self.amplitudes_stft) if log_scale else self.amplitudes_stft,
             shading='gouraud',
             cmap='jet'
         )
@@ -971,79 +982,52 @@ class CentralFrequencyShift:
         plt.show()
 
     ###################################################################################
-    # Plot frequency shift
-    ###################################################################################
-    def plot_frequency_shift(self):
-        """Plot frequency shift results with curve fitting."""
-        plt.figure(figsize=(10, 6))
-        
-        # Filter out invalid data points
-        valid_indices = [i for i in range(len(self.fitted_sigmas)) 
-                        if self.fitted_sigmas[i] is not None]
-        z_values_filtered = np.array(self.depth_array_cm)[valid_indices]
-        center_frequencies_filtered = np.array(self.center_frequencies)[valid_indices]
-        
-        # Plot observed center frequencies
-        plt.scatter(
-            z_values_filtered,
-            center_frequencies_filtered,
-            label="Observed Center Frequencies",
-            color="red",
-            marker="o"
-        )
-        
-        # Define and plot linear model
-        def linear_model(z, alpha):
-            return self.center_frequencies[0] - 4 * alpha * z * (
-                np.array(self.fitted_sigmas[:len(z)])**2
-            ) / 1e12
-        
-        plt.plot(
-            z_values_filtered,
-            linear_model(z_values_filtered, 1.0),  # Using alpha=1.0 as example
-            linestyle="--",
-            color="blue",
-            label="Linear Model Fit"
-        )
-        
-        plt.xlabel("Depth (cm)")
-        plt.ylabel("Center Frequency (MHz)")
-        plt.title("Curve Fitting to Estimate Attenuation Coefficient")
-        plt.legend()
-        plt.grid()
-        plt.show()
-
-    ###################################################################################
     # Plot signal segments
     ###################################################################################
-    def plot_signal_segments(self):
-        """Plot individual signal segments with their frequency spectra."""
-        for i, t in enumerate(self.times_stft):
+    def plot_signal_segments(self, use_gaussian_fit: bool = False):
+        """Plot individual signal segments with their frequency spectra.
+        
+        Args:
+            use_gaussian_fit (bool): Whether to use Gaussian fitting before finding maximum frequency.
+                If False, directly finds the frequency with maximum amplitude.
+        """
+        for i, t in enumerate(self.times_stft[:-1]):
             fig, axes = plt.subplots(1, 2, figsize=(14, 4))
             
-            # Plot signal segment
+            # Extract signal segment in time domain
             segment = self.signal_1d[int(t * self.fs): 
                                 int((t + self.stft_params['nperseg'] / self.fs) * self.fs)]
+            
+            # Make segment zero mean
+            segment = segment - np.mean(segment)
+            
+            # Plot time domain signal
             axes[0].plot(segment, color='blue')
             axes[0].set_title(f"Signal Segment at Depth {self.depth_array_cm[i]:.2f} cm")
             axes[0].set_xlabel("Sample Index")
             axes[0].set_ylabel("Amplitude")
             
-            # Plot frequency spectrum
+            # Get positive frequencies only for STFT
+            positive_mask = self.frequencies_stft >= 0
+            frequencies = self.frequencies_stft[positive_mask]
+            amplitudes = self.amplitudes_stft[positive_mask, i]
+            
+            # Plot frequency spectrum from STFT
             axes[1].plot(
-                self.frequencies_stft / 1e6,
-                self.amplitudes_stft[:, i],
+                frequencies / 1e6,
+                amplitudes,
                 color='green',
-                label="Observed Spectrum"
+                label="STFT Spectrum"
             )
             
-            if self.gaussian_fits[i] is not None:
+            if use_gaussian_fit and self.gaussian_fits[i] is not None:
+                # Ensure we're using positive frequencies for the fit
                 fitted_curve = self.gaussian(
-                    self.frequencies_stft,
+                    frequencies,
                     *self.gaussian_fits[i]
                 )
                 axes[1].plot(
-                    self.frequencies_stft / 1e6,
+                    frequencies / 1e6,
                     fitted_curve,
                     color='red',
                     linestyle="--",
@@ -1055,6 +1039,18 @@ class CentralFrequencyShift:
                     linestyle=":",
                     label=f"Peak @ {self.center_frequencies[i]:.2f} MHz"
                 )
+            else:
+                # Directly find maximum frequency without Gaussian fit
+                peak_freq = frequencies[np.argmax(amplitudes)]
+                axes[1].axvline(
+                    peak_freq / 1e6,
+                    color='blue',
+                    linestyle=":",
+                    label=f"Peak @ {peak_freq/1e6:.2f} MHz"
+                )
+                self.center_frequencies[i] = peak_freq / 1e6
+                self.fitted_sigmas[i] = None
+                self.gaussian_fits[i] = None
             
             axes[1].set_title(f"Frequency Spectrum at Depth {self.depth_array_cm[i]:.2f} cm")
             axes[1].set_xlabel("Frequency (MHz)")
@@ -1064,7 +1060,52 @@ class CentralFrequencyShift:
             plt.tight_layout()
             plt.show()
 
-
+    ###################################################################################
+    # Plot frequency shift
+    ###################################################################################
+    def plot_frequency_shift(self, show_linear_fit: bool = False):
+        """Plot frequency shift results.
+        
+        Args:
+            show_linear_fit (bool): Whether to show the linear fit line. Defaults to False.
+        """
+        plt.figure(figsize=(10, 6))
+        
+        # Filter out invalid data points
+        valid_indices = [i for i in range(len(self.center_frequencies)) 
+                        if self.center_frequencies[i] is not None]
+        z_values = self.depth_array_cm[valid_indices]
+        center_frequencies = self.center_frequencies[valid_indices]
+        
+        # Plot observed center frequencies
+        plt.scatter(
+            z_values,
+            center_frequencies,
+            label="Observed Center Frequencies",
+            color="red",
+            marker="o"
+        )
+        
+        # Fit and plot linear model if requested
+        if show_linear_fit and len(z_values) > 1:  # Only fit if we have enough points
+            slope, intercept = np.polyfit(z_values, center_frequencies, 1)
+            linear_fit = slope * z_values + intercept
+            
+            # Plot linear fit
+            plt.plot(
+                z_values,
+                linear_fit,
+                linestyle="--",
+                color="blue",
+                label=f"Linear Fit (slope: {slope:.3f} MHz/cm)"
+            )
+        
+        plt.xlabel("Depth (cm)")
+        plt.ylabel("Center Frequency (MHz)")
+        plt.title("Frequency Shift with Depth")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
 ###################################################################################
 # attenuation coefficient estimation
