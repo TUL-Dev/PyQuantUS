@@ -62,7 +62,7 @@ def seg_loading_step(seg_type: str, image_data: UltrasoundRfImage, seg_path: str
     try:
         seg_loader = seg_loaders[seg_type]['func']
         assertions = [seg_path.endswith(ext) for ext in seg_loaders[seg_type]['exts']]
-        assert max(assertions), f"Segmentation file must end with {', '.join(seg_loaders[seg_type]['exts'])}"
+        assert not len(assertions) or max(assertions), f"Segmentation file must end with {', '.join(seg_loaders[seg_type]['exts'])}"
     except KeyError:
         print(f'Segmentation loader "{seg_type}" is not available!')
         print(f"Available segmentation loaders: {', '.join(seg_loaders.keys())}")
@@ -89,7 +89,7 @@ def analysis_config_step(config_type: str, config_path: str, scan_path: str, pha
     try:
         config_loader = config_loaders[config_type]['func']
         assertions = [config_path.endswith(ext) for ext in config_loaders[config_type]['exts']]
-        assert max(assertions), f"Config file must end with {', '.join(config_loaders[config_type]['exts'])}"
+        assert not len(assertions) or max(assertions), f"Config file must end with {', '.join(config_loaders[config_type]['exts'])}"
     except KeyError:
         print(f'Analysis config loader "{config_type}" is not available!')
         print(f"Available analysis config loaders: {', '.join(config_loaders.keys())}")
