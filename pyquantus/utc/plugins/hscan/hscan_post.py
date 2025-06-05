@@ -1,6 +1,10 @@
 # Standard library imports
 import logging
+
+# Third-party library imports
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 
 # Local application imports
 from pyquantus.utc.plugins.hscan.hscan import Hscan
