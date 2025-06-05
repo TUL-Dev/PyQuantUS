@@ -1,22 +1,12 @@
 # Standard library imports
 import logging
-import os
-from typing import Tuple, List
 
 # Third-party imports
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw
-from scipy.signal import hilbert, stft
-from scipy.optimize import curve_fit
+from scipy.signal import hilbert
 from scipy.special import hermite, factorial
 from scipy.fft import fft
-from tqdm import tqdm
-
-# Local application imports
-from pyquantus.utc.objects import UltrasoundImage, AnalysisConfig, Window
-from pyquantus.utc.transforms import computeHanningPowerSpec, computeSpectralParams
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -218,8 +208,8 @@ class Hscan:
         self.frame_axis = frame_axis
         self.wavelet_GHx_params_1 = wavelet_GHx_params_1
         self.wavelet_GHx_params_2 = wavelet_GHx_params_2
-        self.wavelet_GH1 = self.GaussinaHermiteWavelet(**wavelet_GHx_params_1)
-        self.wavelet_GH2 = self.GaussinaHermiteWavelet(**wavelet_GHx_params_2)
+        self.wavelet_GH1 = GaussinaHermiteWavelet(**wavelet_GHx_params_1)
+        self.wavelet_GH2 = GaussinaHermiteWavelet(**wavelet_GHx_params_2)
                                 
         self.convolved_signal_with_ghx_1_nd = None
         self.convolved_signal_with_ghx_2_nd = None
