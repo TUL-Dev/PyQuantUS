@@ -10,6 +10,14 @@ from pyquantus.utc.analysis import UtcAnalysis
 from pyquantus.utc.transforms import condenseArr, expandArr
 from pyquantus.parse.objects import ScConfig
 from pyquantus.parse.transforms import scanConvert
+from pyquantus.utc.analysis import Hscan
+
+import logging
+from matplotlib.colors import LinearSegmentedColormap
+from scipy.signal import stft
+from scipy.optimize import curve_fit
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class UtcData:
     """Class to store UTC data and images after analysis.
@@ -479,3 +487,8 @@ class UtcData:
         if hasattr(self, "scConfig"):
             return self.scWindowIdxMap
         return self.windowIdxMap
+    
+    
+        
+       
+    

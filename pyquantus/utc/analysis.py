@@ -1,11 +1,14 @@
+# Standard library imports
+
 from typing import Tuple, List
 
+# Third-party imports
 import numpy as np
 from PIL import Image, ImageDraw
 from scipy.signal import hilbert
-from scipy.optimize import curve_fit
 from tqdm import tqdm
 
+# Local application imports
 from pyquantus.utc.objects import UltrasoundImage, AnalysisConfig, Window
 from pyquantus.utc.transforms import computeHanningPowerSpec, computeSpectralParams
 
@@ -136,7 +139,7 @@ class UtcAnalysis:
                     newWindow.top = int(axial[axialInd])
                     newWindow.bottom = int(axial[axialInd + axialPixSize - 1])
                     self.roiWindows.append(newWindow)
-    
+
     def computeUtcWindows(self, extraParams=True, bscFreq=None, extraParamapParams=False) -> int:
         """Compute UTC parameters for each window in the ROI.
         
@@ -262,7 +265,7 @@ class UtcAnalysis:
             attenuationCoefficients.append( localAttenuation / f[fIdx])  # dB/cm/MHz
         attenuationCoef=np.mean(attenuationCoefficients)
         return attenuationCoef
-    
+
     def computeBackscatterCoefficient(self, freqArr: np.ndarray, scanPs: np.ndarray, refPs: np.ndarray, attCoef: float,
                                       frequency: int, roiDepth: int) -> float:
         
@@ -298,7 +301,7 @@ class UtcAnalysis:
         bsc = sRatio*self.refBackScatterCoef*attComp
             
         return bsc
-        
+
     def computeNakagamiParams(self, rfData: np.ndarray) -> Tuple[float, float]:
         """Compute Nakagami parameters for the ROI.
         source: Tsui, P. H., Wan, Y. L., Huang, C. C. & Wang, M. C. 
@@ -322,7 +325,7 @@ class UtcAnalysis:
         u = np.nanmean(u)
 
         return w, u
-    
+
     def computeEsdac(self, rfData: np.ndarray, refRfData: np.ndarray, apertureRadiusCm: float) -> Tuple[float, float]:
         """Compute the effective scatterer diameter and concentration of the ROI.
         source: Muleki-Seya et al. https://doi.org/10.1177/0161734617729159
@@ -362,3 +365,15 @@ class UtcAnalysis:
         ) # dB/mm^3
 
         return esd, eac
+    
+    
+    
+
+
+
+   
+
+
+
+
+

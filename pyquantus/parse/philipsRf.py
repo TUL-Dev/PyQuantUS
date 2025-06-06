@@ -1472,7 +1472,7 @@ class PhilipsRfParser:
         iBit += 16
         HeaderInfo.Data_Format[m] = int(packedHeader[iBit:iBit+16], 2)
         iBit += 16
-        HeaderInfo.Data_Type[m] = int(packedHeader[iBit:iBit+16], 2)
+        HeaderInfo.Data_Type[m] = int(packedHeader[iBit: iBit+16], 2)
         iBit += 16
         HeaderInfo.Header_Tag[m] = int(packedHeader[iBit:iBit+16], 2)
         iBit += 16
