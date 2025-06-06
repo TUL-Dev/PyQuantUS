@@ -8,9 +8,9 @@ from sklearn.linear_model import LinearRegression
 from scipy.stats import pearsonr
 
 class MaximumCorrelationDenoising:
-    """Class for computing the attenuation coefficient based on central frequency shift for the ROI.
-    
-    This class implements a signal denoising method using STFT-based correlation analysis and ISTFT reconstruction.
+    """
+    This class implements a signal denoising method using STFT-based correlation
+    analysis and ISTFT reconstruction.
     """
     
     ###################################################################################
