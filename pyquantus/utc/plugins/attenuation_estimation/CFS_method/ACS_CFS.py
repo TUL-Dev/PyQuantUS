@@ -11,7 +11,7 @@ class AttenuationCoefficientEstimationCFS:
     Compute the local attenuation coefficient of the ROI using the Spectral Difference Method for Local Attenuation Estimation.
     Note this method cannot be used to estimate attenuation when the scattering properties change within the ROI. This method assumes a tissue-mimicking phantom with a sound speed similar to the expected sound speed of the analyzed tissue. Assuming linear dependency on depth, the local attenuation coefficient computed here is equivalent to the total attenuation coefficient.
     
-    Source: Mamou & Oelze, page 78-79: https://doi.org/10.1007/978-94-007-6952-6
+    Source: Mamou & Oelze, page 70-71: https://doi.org/10.1007/978-94-007-6952-6
 
     Args:
         rfData (np.ndarray): RF data of the ROI (n lines x m samples).
