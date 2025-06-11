@@ -1,26 +1,45 @@
 from pathlib import Path
 from typing import Tuple
+import os
 
 import numpy as np
 from scipy.signal import firwin, lfilter, hilbert
 from scipy.ndimage import correlate
 
 from pyquantus.parse.objects import DataOutputStruct, InfoStruct
-from pyquantus.parse.philipsRf import Rfdata, PhilipsRfParser
+from pyquantus.parse.philipsRf import PhilipsRfParser
 from pyquantus.parse.philipsSipVolumeParser import ScParams, readSIPscVDBParams, scanConvert3dVolumeSeries, formatVolumePix
 
-def QbpFilter(rfData: np.ndarray, Fc1: float, Fc2: float, FiltOrd: int) -> Tuple[np.ndarray, np.ndarray]:
+def QbpFilter(rfData: np.ndarray, Fc1: float, Fc2: float, FiltOrd: int, chunk_size: int = 100) -> Tuple[np.ndarray, np.ndarray]:
     FiltCoef = firwin(FiltOrd+1, [Fc1*2, Fc2*2], window="hamming", pass_zero="bandpass") # type: ignore
-    FiltRfDat = np.transpose(lfilter(np.transpose(FiltCoef),1,np.transpose(rfData)))
-
-    # Do Hilbert Transform on each column
-    IqDat = np.zeros(FiltRfDat.shape).astype(np.complex128)
-    DbEnvDat = np.zeros(FiltRfDat.shape)
-    for i in range(FiltRfDat.shape[1]):
-        IqDat[:,i] = hilbert(FiltRfDat[:,i])
-        DbEnvDat[:,i] = 20*np.log10(abs(IqDat[:,i])+1)
-    
-    return IqDat, DbEnvDat
+    n_rows, n_cols = rfData.shape
+    IqDat_path = 'IqDat_tmp.dat'
+    DbEnvDat_path = 'DbEnvDat_tmp.dat'
+    IqDat = np.memmap(IqDat_path, dtype=np.complex128, mode='w+', shape=(n_rows, n_cols))
+    DbEnvDat = np.memmap(DbEnvDat_path, dtype=np.float64, mode='w+', shape=(n_rows, n_cols))
+    for start in range(0, n_cols, chunk_size):
+        end = min(start + chunk_size, n_cols)
+        chunk = rfData[:, start:end]
+        # Filtering
+        FiltRfDat_chunk = np.transpose(lfilter(np.transpose(FiltCoef), 1, np.transpose(chunk)))
+        # Hilbert transform
+        IqChunk = np.zeros(FiltRfDat_chunk.shape, dtype=np.complex128)
+        DbEnvChunk = np.zeros(FiltRfDat_chunk.shape)
+        for i in range(FiltRfDat_chunk.shape[1]):
+            IqChunk[:, i] = hilbert(FiltRfDat_chunk[:, i])
+            DbEnvChunk[:, i] = 20 * np.log10(np.abs(IqChunk[:, i]) + 1)
+        IqDat[:, start:end] = IqChunk
+        DbEnvDat[:, start:end] = DbEnvChunk
+    # Convert memmap to ndarray and clean up temp files
+    IqDat_np = np.array(IqDat)
+    DbEnvDat_np = np.array(DbEnvDat)
+    del IqDat
+    del DbEnvDat
+    if os.path.exists(IqDat_path):
+        os.remove(IqDat_path)
+    if os.path.exists(DbEnvDat_path):
+        os.remove(DbEnvDat_path)
+    return IqDat_np, DbEnvDat_np
 
 def bandpassFilterEnvLog(rfData: np.ndarray, scParams: ScParams) -> Tuple[np.ndarray, np.ndarray]:
     # Below params are from Philips trial & error
@@ -31,12 +50,13 @@ def bandpassFilterEnvLog(rfData: np.ndarray, scParams: ScParams) -> Tuple[np.nda
     QbpFcB2 = 0.072
     QbpFcC1 = 0.020
     QbpFcC2 = 0.064
+    chunk_size = 100  # Set chunk size for QbpFilter
 
     R, M, C = rfData.shape
     rfDat2 = rfData.reshape(R, -1, order='F')
-    IqDatA, DbEnvDatA = QbpFilter(rfDat2, QbpFcA1, QbpFcA2, QbpFiltOrd)
-    IqDatB, DbEnvDatB = QbpFilter(rfDat2, QbpFcB1, QbpFcB2, QbpFiltOrd)
-    IqDatC, DbEnvDatC = QbpFilter(rfDat2, QbpFcC1, QbpFcC2, QbpFiltOrd)
+    IqDatA, DbEnvDatA = QbpFilter(rfDat2, QbpFcA1, QbpFcA2, QbpFiltOrd, chunk_size=chunk_size)
+    IqDatB, DbEnvDatB = QbpFilter(rfDat2, QbpFcB1, QbpFcB2, QbpFiltOrd, chunk_size=chunk_size)
+    IqDatC, DbEnvDatC = QbpFilter(rfDat2, QbpFcC1, QbpFcC2, QbpFiltOrd, chunk_size=chunk_size)
     DbEnvDat = (DbEnvDatA + DbEnvDatB + DbEnvDatC)/3
     QbpDecimFct = int(np.ceil(DbEnvDat.shape[0]/512))
     DbEnvDat = correlate(DbEnvDat, np.ones((QbpDecimFct,1))/QbpDecimFct, mode='nearest')
@@ -52,8 +72,7 @@ def bandpassFilterEnvLog(rfData: np.ndarray, scParams: ScParams) -> Tuple[np.nda
     DbEnvDat_FullVol = DbEnvDat[:,:scParams.NumRcvCols*NumPlanes].reshape(NumSamples,scParams.NumRcvCols,NumPlanes, order='F')
     return DbEnvDat_FullVol, rfFullVol
 
-
-def sort3DData(dataIn: Rfdata, scParams: ScParams) -> Tuple[np.ndarray, ScParams]:
+def sort3DData(dataIn, scParams: ScParams) -> Tuple[np.ndarray, ScParams]:
     dataOut = dataIn.echoData[0]
 
     # Compute the number of columns and receive beams for use later
@@ -73,9 +92,9 @@ def getVolume(rfPath: Path, sipNumOutBits: int = 8, DRlowerdB: int = 20, DRupper
     # TODO: implement handling for IQ data (see scParams.removeGapsFlag in Dave Duncan MATLAB code)
 
     #Read in the interleaved SIP volume data time series (both linear/non-linear parts) 
-    parser = PhilipsRfParser()
-    rawData = parser.parse_rf(f"{rfPath.absolute()}", 0, 2000)
-
+    rfParser = PhilipsRfParser()
+    rawData = rfParser.parse_rf(f"{rfPath.absolute()}", 0, 2000)
+        
     rfDataArr, scParams = sort3DData(rawData, scParams)
 
     #Bandpass Filtering + Envelope Det + Log Compression
@@ -116,3 +135,5 @@ def getVolume(rfPath: Path, sipNumOutBits: int = 8, DRlowerdB: int = 20, DRupper
     Info.axialRes = Info.depth/SC_Vol.shape[1] # mm/pix
 
     return Data, Info
+  
+  
