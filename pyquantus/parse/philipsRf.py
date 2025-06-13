@@ -9,6 +9,10 @@ import numpy as np
 from scipy.io import savemat
 from philipsRfParser import getPartA, getPartB
 
+FUSION_FORMAT_BOUND = 32  # Fusion format boundary for reading data
+VOYAGER_FORMAT_BOUND = 36  # Voyager format boundary for reading data
+READ_OFFSET_MB = 0  # Read offset in MB
+READ_SIZE_MB = 2000  # Read size in MB
 
 class HeaderInfoStruct:
     """Philips-specific structure containing information from the headers."""
@@ -1039,7 +1043,7 @@ class PhilipsRfParser:
         if save_format not in ['mat', 'npy']:
             raise ValueError("save_format must be either 'mat' or 'npy'")
 
-        rf = self.parse_rf(filepath, 0, 2000)
+        rf = self.parse_rf(filepath, READ_OFFSET_MB, READ_SIZE_MB)
 
         if (rf.headerInfo.Line_Index[249] == rf.headerInfo.Line_Index[250]):
             rf.lineData = rf.lineData[:,np.arange(2, rf.lineData.shape[1], 2)]
