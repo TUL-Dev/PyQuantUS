@@ -173,7 +173,6 @@ class PhilipsRfParser:
 
     def pruneData(self, lineData, lineHeader, ML_Capture):
         """Remove false gate data at beginning and end of the line."""
-        # Remove false gate data at beginning of the line
         numSamples = lineData.shape[0]
         referenceLine = int(np.ceil(lineData.shape[1]*0.2))-1    
         startPoint = int(np.ceil(numSamples*0.015))-1
@@ -1143,7 +1142,14 @@ class PhilipsRfParser:
                 np.save(os.path.join(npy_folder, 'misc_data.npy'), rf.miscData)
         
         return np.array(rf_data_all_fund).shape
-
+ 
+def philipsRfParser(filepath: str, ML_out=2, ML_in=32, used_os=2256, save_format='mat') -> np.ndarray:
+    """
+    Parse Philips RF data file, extract fundamental and harmonic RF frames, 
+    save data to a .mat file, and return shape of fundamental RF data.
+    """
+    parser = PhilipsRfParser()
+    return parser.parse_and_save(filepath, ML_out=ML_out, ML_in=ML_in, used_os=used_os, save_format=save_format)
 
 if __name__ == "__main__":
     parser = PhilipsRfParser()
