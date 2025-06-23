@@ -532,7 +532,7 @@ class ClariusParser():
     ###################################################################################
     
     def __init__(self, rf_raw_path: str, env_tgc_yml_path: str, rf_yml_path: str, 
-                visualize: bool=False):
+                visualize: bool=False, use_tgc: bool=False):
         # Make sure all inputted files exist
         assert Path(rf_raw_path).exists() and Path(rf_yml_path).exists(), \
                 "One or more input files do not exist. Please check the paths."
@@ -541,6 +541,7 @@ class ClariusParser():
         assert rf_raw_path.endswith("_rf.raw"), "The rf_raw_path must end with .raw"
         self.rf_raw_path = rf_raw_path
         self.visualize = visualize
+        self.use_tgc = use_tgc
         
         # yml files path
         assert rf_yml_path.endswith("_rf.yml"), "The rf_yml_path must end with .yml or .yaml"
@@ -876,8 +877,13 @@ class ClariusParser():
     ###################################################################################
     
     def reconstruct_bmode(self):
-        bmode = 20*np.log10(self.no_tgc_envelope_3d)
-        rf_atgc = self.rf_raw_data_3d
+        if self.use_tgc:
+            rf_atgc = self.rf_raw_data_3d
+            tgc_envelope_3d = get_signal_envelope_xd(self.rf_raw_data_3d, hilbert_transform_axis=self.hilbert_transform_axis)
+            bmode = 20 * np.log10(tgc_envelope_3d)
+        else:
+            rf_atgc = self.rf_no_tgc_raw_data_3d
+            bmode = 20 * np.log10(self.no_tgc_envelope_3d)
         bmode = np.transpose(bmode, (1, 0, 2))
         rf_atgc = np.transpose(rf_atgc, (1, 0, 2))
         
@@ -1312,12 +1318,13 @@ def clariusRfParser(imgFilename: str,
                     phantomFilename: str,
                     phantomTgcFilename: str,
                     phantomInfoFilename: str,
-                    visualize: bool = False) -> tuple:
+                    visualize: bool = False,
+                    use_tgc: bool = False) -> tuple:
 
-    main_sample_obj    = ClariusParser(imgFilename, imgTgcFilename, infoFilename, visualize=visualize)
-    phantom_sample_obj = ClariusParser(phantomFilename, phantomTgcFilename, phantomInfoFilename, visualize=visualize)
-      
-    imgData       = main_sample_obj.clarius_data_struct   
+    main_sample_obj    = ClariusParser(imgFilename, imgTgcFilename, infoFilename, visualize=visualize, use_tgc=use_tgc)
+    phantom_sample_obj = ClariusParser(phantomFilename, phantomTgcFilename, phantomInfoFilename, visualize=visualize, use_tgc=use_tgc)
+
+    imgData       = main_sample_obj.clarius_data_struct
     imgInfo       = main_sample_obj.clarius_info_struct
     scanConverted = main_sample_obj.scan_converted
     
