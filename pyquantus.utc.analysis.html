@@ -1,0 +1,448 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyquantus.utc.analysis module &mdash; QuantUS 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="pyquantus.utc.objects module" href="pyquantus.utc.objects.html" />
+    <link rel="prev" title="pyquantus.utc package" href="pyquantus.utc.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/index.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developers</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation/index.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">PyQuantUS API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="pyquantus.html">pyquantus package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="pyquantus.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.html">pyquantus.parse package</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="pyquantus.utc.html">pyquantus.utc package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.html#module-pyquantus">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuantUS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">pyquantus</a></li>
+          <li class="breadcrumb-item"><a href="pyquantus.html">pyquantus package</a></li>
+          <li class="breadcrumb-item"><a href="pyquantus.utc.html">pyquantus.utc package</a></li>
+      <li class="breadcrumb-item active">pyquantus.utc.analysis module</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/TUL-Dev/PyQuantUS/blob/main/docs/source/pyquantus.utc.analysis.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pyquantus.utc.analysis">
+<span id="pyquantus-utc-analysis-module"></span><h1>pyquantus.utc.analysis module<a class="headerlink" href="#module-pyquantus.utc.analysis" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.utc.analysis.</span></span><span class="sig-name descname"><span class="pre">UtcAnalysis</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Complete ultrasound tissue characterization (UTC) analysis of an ultrasound image given
+a corresponding phantom image.</p>
+<p>This class supports both scan converted and non-scan converted images. UTC analysis
+is performed on each window generated by the <cite>generateRoiWindows</cite> method. Utc
+analysis corresponds to the computation of tissue characterization-related parameters.
+The midband fit, spectral slope, and spectral intercept parameters have been validated using
+the frequency domain of each window. The Nakagami parameters, attenuation coefficient,
+backscatter coefficient, effective scatterer diameter, and effective scatterer concentration
+all have been implemented and reviewed, but still have not been validated in practice.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.ultrasoundImage">
+<span class="sig-name descname"><span class="pre">ultrasoundImage</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.ultrasoundImage" title="Link to this definition"></a></dt>
+<dd><p>Stores image and RF info for image and phantom.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="pyquantus.utc.objects.html#pyquantus.utc.objects.UltrasoundImage" title="pyquantus.utc.objects.UltrasoundImage">UltrasoundImage</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.config">
+<span class="sig-name descname"><span class="pre">config</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.config" title="Link to this definition"></a></dt>
+<dd><p>Stores analysis configuration parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="pyquantus.utc.objects.html#pyquantus.utc.objects.AnalysisConfig" title="pyquantus.utc.objects.AnalysisConfig">AnalysisConfig</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.roiWindows">
+<span class="sig-name descname"><span class="pre">roiWindows</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.roiWindows" title="Link to this definition"></a></dt>
+<dd><p>List of windows generated by <cite>generateRoiWindows</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="pyquantus.utc.objects.html#pyquantus.utc.objects.Window" title="pyquantus.utc.objects.Window">Window</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.waveLength">
+<span class="sig-name descname"><span class="pre">waveLength</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.waveLength" title="Link to this definition"></a></dt>
+<dd><p>Wavelength of the ultrasound signal in mm.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.nakagamiParams">
+<span class="sig-name descname"><span class="pre">nakagamiParams</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.nakagamiParams" title="Link to this definition"></a></dt>
+<dd><p>Nakagami parameters (w, u) for the entire ROI.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.attenuationCoef">
+<span class="sig-name descname"><span class="pre">attenuationCoef</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.attenuationCoef" title="Link to this definition"></a></dt>
+<dd><p>Attenuation coefficient of the entire ROI at the center frequency (dB/cm/MHz).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.backScatterCoef">
+<span class="sig-name descname"><span class="pre">backScatterCoef</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.backScatterCoef" title="Link to this definition"></a></dt>
+<dd><p>Backscatter coefficient of the entire ROI at the center frequency (1/cm-sr).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.effectiveScattererDiameter">
+<span class="sig-name descname"><span class="pre">effectiveScattererDiameter</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.effectiveScattererDiameter" title="Link to this definition"></a></dt>
+<dd><p>Effective scatterer diameter of the entire ROI (µm).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.effectiveScattererConcentration">
+<span class="sig-name descname"><span class="pre">effectiveScattererConcentration</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.effectiveScattererConcentration" title="Link to this definition"></a></dt>
+<dd><p>Effective scatterer concentration of the entire ROI (dB/mm^3).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.refAttenuation">
+<span class="sig-name descname"><span class="pre">refAttenuation</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.refAttenuation" title="Link to this definition"></a></dt>
+<dd><p>Total attenuation coefficient of the reference phantom at the center frequency (dB/cm/MHz).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.refBackScatterCoef">
+<span class="sig-name descname"><span class="pre">refBackScatterCoef</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.refBackScatterCoef" title="Link to this definition"></a></dt>
+<dd><p>Backscatter coefficient of the reference phantom at the center frequency (1/cm-sr).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.scSplineX">
+<span class="sig-name descname"><span class="pre">scSplineX</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.scSplineX" title="Link to this definition"></a></dt>
+<dd><p>Spline x-coordinates in scan converted coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.splineX">
+<span class="sig-name descname"><span class="pre">splineX</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.splineX" title="Link to this definition"></a></dt>
+<dd><p>Spline x-coordinates in pre-scan converted coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.scSplineY">
+<span class="sig-name descname"><span class="pre">scSplineY</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.scSplineY" title="Link to this definition"></a></dt>
+<dd><p>Spline y-coordinates in scan converted coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.splineY">
+<span class="sig-name descname"><span class="pre">splineY</span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.splineY" title="Link to this definition"></a></dt>
+<dd><p>Spline y-coordinates in pre-scan converted coordinates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.computeAttenuationCoef">
+<span class="sig-name descname"><span class="pre">computeAttenuationCoef</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rfData</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refRfData</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overlap</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">windowDepth</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.computeAttenuationCoef" title="Link to this definition"></a></dt>
+<dd><p>Compute the local attenuation coefficient of the ROI using the Spectral Difference
+Method for Local Attenuation Estimation. This method computes the attenuation coefficient
+for multiple frequencies and returns the slope of the attenuation as a function of frequency.
+:param rfData: RF data of the ROI (n lines x m samples).
+:type rfData: np.ndarray
+:param refRfData: RF data of the phantom (n lines x m samples).
+:type refRfData: np.ndarray
+:param overlap: Overlap percentage for analysis windows.
+:type overlap: float
+:param windowDepth: Depth of each window in samples.
+:type windowDepth: int</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Local attenuation coefficient of the ROI for the central frequency (dB/cm/MHz).
+Updated and verified : Feb 2025 - IR</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.computeBackscatterCoefficient">
+<span class="sig-name descname"><span class="pre">computeBackscatterCoefficient</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">freqArr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scanPs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refPs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attCoef</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frequency</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">roiDepth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.computeBackscatterCoefficient" title="Link to this definition"></a></dt>
+<dd><p>Compute the backscatter coefficient of the ROI using the reference phantom method.
+Assumes instrumentation and beam terms have the same effect on the signal from both
+image and phantom.
+source: Yao et al. (1990) : <a class="reference external" href="https://doi.org/10.1177/016173469001200105">https://doi.org/10.1177/016173469001200105</a>. PMID: 2184569
+:param freqArr: Frequency array of power spectra (Hz).
+:type freqArr: np.ndarray
+:param scanPs: Power spectrum of the analyzed scan at the current region.
+:type scanPs: np.ndarray
+:param refPs: Power spectrum of the reference phantom at the currentn region.
+:type refPs: np.ndarray
+:param attCoef: Attenuation coefficient of the current region (dB/cm/MHz).
+:type attCoef: float
+:param frequency: Frequency on which to compute backscatter coefficient (should</p>
+<blockquote>
+<div><p>match frequency of self.refBackScatterCoefficient) (Hz).</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>roiDepth</strong> (<em>int</em>) – Depth of the start of the ROI in samples.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Backscatter coefficient of the ROI for the central frequency (1/cm-sr).
+Updated and verified : Feb 2025 - IR</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.computeEsdac">
+<span class="sig-name descname"><span class="pre">computeEsdac</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rfData</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refRfData</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">apertureRadiusCm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.computeEsdac" title="Link to this definition"></a></dt>
+<dd><p>Compute the effective scatterer diameter and concentration of the ROI.
+source: Muleki-Seya et al. <a class="reference external" href="https://doi.org/10.1177/0161734617729159">https://doi.org/10.1177/0161734617729159</a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>rfData</strong> (<em>np.ndarray</em>) – RF data of the ROI (n lines x m samples).</p></li>
+<li><p><strong>refRfData</strong> (<em>np.ndarray</em>) – RF data of the phantom (n lines x m samples).</p></li>
+<li><p><strong>apertureRadiusCm</strong> (<em>float</em>) – Aperture radius in cm.</p></li>
+<li><p><strong>roiDepth</strong> (<em>int</em>) – Depth of the start of the ROI in samples.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Effective scatterer diameter (µm) and concentration of the ROI (dB/mm^3).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.computeNakagamiParams">
+<span class="sig-name descname"><span class="pre">computeNakagamiParams</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rfData</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.computeNakagamiParams" title="Link to this definition"></a></dt>
+<dd><p>Compute Nakagami parameters for the ROI.
+source: Tsui, P. H., Wan, Y. L., Huang, C. C. &amp; Wang, M. C.
+Effect of adaptive threshold filtering on ultrasonic Nakagami
+parameter to detect variation in scatterer concentration. Ultrason.
+Imaging 32, 229–242 (2010). <a class="reference external" href="https://doi.org/10.1177%2F016173461003200403">https://doi.org/10.1177%2F016173461003200403</a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>rfData</strong> (<em>np.ndarray</em>) – RF data of the ROI (n lines x m samples).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Nakagami parameters (w, u) for the ROI.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.computeUtcWindows">
+<span class="sig-name descname"><span class="pre">computeUtcWindows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">extraParams</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bscFreq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extraParamapParams</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.computeUtcWindows" title="Link to this definition"></a></dt>
+<dd><p>Compute UTC parameters for each window in the ROI.</p>
+<p>extraParams (bool): Flag on whether to compute non-validated parameters.
+bscFreq (int): Frequency on which to compute backscatter coefficient (MHz).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>0 if successful, -1 if <cite>generateRoiWindows</cite> has not been
+run or if windows are too large for ROI.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.generateRoiWindows">
+<span class="sig-name descname"><span class="pre">generateRoiWindows</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.generateRoiWindows" title="Link to this definition"></a></dt>
+<dd><p>Generate windows for UTC analysis based on user-defined spline.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.initAnalysisConfig">
+<span class="sig-name descname"><span class="pre">initAnalysisConfig</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.initAnalysisConfig" title="Link to this definition"></a></dt>
+<dd><p>Compute the wavelength of the ultrasound signal and
+set default config values if not pre-loaded.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.utc.analysis.UtcAnalysis.splineToPreSc">
+<span class="sig-name descname"><span class="pre">splineToPreSc</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.utc.analysis.UtcAnalysis.splineToPreSc" title="Link to this definition"></a></dt>
+<dd><p>Convert spline coordinates from scan converted to pre-scan converted.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="pyquantus.utc.html" class="btn btn-neutral float-left" title="pyquantus.utc package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pyquantus.utc.objects.html" class="btn btn-neutral float-right" title="pyquantus.utc.objects module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, David Spector.
+      <span class="lastupdated">Last updated on Jun 23, 2025.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

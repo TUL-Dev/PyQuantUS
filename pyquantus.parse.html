@@ -1,0 +1,303 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyquantus.parse package &mdash; QuantUS 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="pyquantus.parse.canon module" href="pyquantus.parse.canon.html" />
+    <link rel="prev" title="pyquantus package" href="pyquantus.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/index.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developers</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation/index.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">PyQuantUS API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="pyquantus.html">pyquantus package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="pyquantus.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">pyquantus.parse package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.utc.html">pyquantus.utc package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.html#module-pyquantus">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuantUS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">pyquantus</a></li>
+          <li class="breadcrumb-item"><a href="pyquantus.html">pyquantus package</a></li>
+      <li class="breadcrumb-item active">pyquantus.parse package</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/TUL-Dev/PyQuantUS/blob/main/docs/source/pyquantus.parse.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="pyquantus-parse-package">
+<h1>pyquantus.parse package<a class="headerlink" href="#pyquantus-parse-package" title="Link to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="pyquantus.parse.canon.html">pyquantus.parse.canon module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.canon.html#pyquantus.parse.canon.canonIqParser"><code class="docutils literal notranslate"><span class="pre">canonIqParser()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.canon.html#pyquantus.parse.canon.findPreset"><code class="docutils literal notranslate"><span class="pre">findPreset()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.canon.html#pyquantus.parse.canon.readFileImg"><code class="docutils literal notranslate"><span class="pre">readFileImg()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.canon.html#pyquantus.parse.canon.readFileInfo"><code class="docutils literal notranslate"><span class="pre">readFileInfo()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.canon.html#pyquantus.parse.canon.readIQ"><code class="docutils literal notranslate"><span class="pre">readIQ()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pyquantus.parse.clarius.html">pyquantus.parse.clarius module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser"><code class="docutils literal notranslate"><span class="pre">ClariusParser</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct"><code class="docutils literal notranslate"><span class="pre">ClariusParser.ClariusInfoStruct</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct.samplesPerLine"><code class="docutils literal notranslate"><span class="pre">ClariusParser.ClariusInfoStruct.samplesPerLine</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct.numLines"><code class="docutils literal notranslate"><span class="pre">ClariusParser.ClariusInfoStruct.numLines</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct.sampleSize"><code class="docutils literal notranslate"><span class="pre">ClariusParser.ClariusInfoStruct.sampleSize</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.ParserVisualizations"><code class="docutils literal notranslate"><span class="pre">ClariusParser.ParserVisualizations</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.ParserVisualizations.image_envelope_2d"><code class="docutils literal notranslate"><span class="pre">ClariusParser.ParserVisualizations.image_envelope_2d()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.ParserVisualizations.plot_1d_signal_and_fft"><code class="docutils literal notranslate"><span class="pre">ClariusParser.ParserVisualizations.plot_1d_signal_and_fft()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.ParserVisualizations.rotate_flip"><code class="docutils literal notranslate"><span class="pre">ClariusParser.ParserVisualizations.rotate_flip()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.YmlParser"><code class="docutils literal notranslate"><span class="pre">ClariusParser.YmlParser</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.YmlParser.assess_software_version"><code class="docutils literal notranslate"><span class="pre">ClariusParser.YmlParser.assess_software_version()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.YmlParser.load_env_tgc_yml"><code class="docutils literal notranslate"><span class="pre">ClariusParser.YmlParser.load_env_tgc_yml()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.YmlParser.load_rf_yml"><code class="docutils literal notranslate"><span class="pre">ClariusParser.YmlParser.load_rf_yml()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.create_full_imaging_depth_array"><code class="docutils literal notranslate"><span class="pre">ClariusParser.create_full_imaging_depth_array()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.extract_first_num"><code class="docutils literal notranslate"><span class="pre">ClariusParser.extract_first_num()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.read_rf_raw"><code class="docutils literal notranslate"><span class="pre">ClariusParser.read_rf_raw()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.reconstruct_bmode"><code class="docutils literal notranslate"><span class="pre">ClariusParser.reconstruct_bmode()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.remove_tgc"><code class="docutils literal notranslate"><span class="pre">ClariusParser.remove_tgc()</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.self.clean_tgc_data"><code class="docutils literal notranslate"><span class="pre">ClariusParser.self.clean_tgc_data</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.set_data_of_clarius_info_struct"><code class="docutils literal notranslate"><span class="pre">ClariusParser.set_data_of_clarius_info_struct()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.set_default_tgc_data"><code class="docutils literal notranslate"><span class="pre">ClariusParser.set_default_tgc_data()</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusParser.self.default_tgc_data"><code class="docutils literal notranslate"><span class="pre">ClariusParser.self.default_tgc_data</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.tar_files_path"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.tar_files_path</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.extraction_mode"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.extraction_mode</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.lzo_py_file_path"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.lzo_py_file_path</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.check_input_path"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.check_input_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.delete_hidden_files_in_extracted_folders"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.delete_hidden_files_in_extracted_folders()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.extract_tar_files"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.extract_tar_files()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.get_folder_path_from_file_path"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.get_folder_path_from_file_path()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.read_lzo_files"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.read_lzo_files()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.set_path_of_extracted_folders"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.set_path_of_extracted_folders()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.set_path_of_lzo_files_inside_extracted_folders"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.set_path_of_lzo_files_inside_extracted_folders()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.ClariusTarUnpacker.set_path_of_raw_files_inside_extracted_folders"><code class="docutils literal notranslate"><span class="pre">ClariusTarUnpacker.set_path_of_raw_files_inside_extracted_folders()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.clariusRfParser"><code class="docutils literal notranslate"><span class="pre">clariusRfParser()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.clarius.html#pyquantus.parse.clarius.get_signal_envelope_xd"><code class="docutils literal notranslate"><span class="pre">get_signal_envelope_xd()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pyquantus.parse.objects.html">pyquantus.parse.objects module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.DataOutputStruct"><code class="docutils literal notranslate"><span class="pre">DataOutputStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.InfoStruct"><code class="docutils literal notranslate"><span class="pre">InfoStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.OutImStruct"><code class="docutils literal notranslate"><span class="pre">OutImStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.ScConfig"><code class="docutils literal notranslate"><span class="pre">ScConfig</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pyquantus.parse.philipsMat.html">pyquantus.parse.philipsMat module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.philipsMat.html#pyquantus.parse.philipsMat.philips2dRfMatParser"><code class="docutils literal notranslate"><span class="pre">philips2dRfMatParser()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.philipsMat.html#pyquantus.parse.philipsMat.readFileImg"><code class="docutils literal notranslate"><span class="pre">readFileImg()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.philipsMat.html#pyquantus.parse.philipsMat.readFileInfo"><code class="docutils literal notranslate"><span class="pre">readFileInfo()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pyquantus.parse.philipsRf.html">pyquantus.parse.philipsRf module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.HeaderInfoStruct"><code class="docutils literal notranslate"><span class="pre">HeaderInfoStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.SortRF"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.SortRF()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.callGetPartA"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.callGetPartA()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.callGetPartB"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.callGetPartB()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.findSignature"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.findSignature()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.getFillerZeros"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.getFillerZeros()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.parseDataF"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.parseDataF()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.parseDataV"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.parseDataV()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.parseFileHeader"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.parseFileHeader()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.parseHeaderF"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.parseHeaderF()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.parseHeaderV"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.parseHeaderV()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.parse_and_save"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.parse_and_save()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.parse_rf"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.parse_rf()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.PhilipsRfParser.pruneData"><code class="docutils literal notranslate"><span class="pre">PhilipsRfParser.pruneData()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.Rfdata"><code class="docutils literal notranslate"><span class="pre">Rfdata</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.dbParams"><code class="docutils literal notranslate"><span class="pre">dbParams</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.philipsRf.html#pyquantus.parse.philipsRf.philipsRfParser"><code class="docutils literal notranslate"><span class="pre">philipsRfParser()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pyquantus.parse.siemens.html">pyquantus.parse.siemens module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.AvihStruct"><code class="docutils literal notranslate"><span class="pre">AvihStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.Cfh0Struct"><code class="docutils literal notranslate"><span class="pre">Cfh0Struct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.Csh0Struct"><code class="docutils literal notranslate"><span class="pre">Csh0Struct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.Db00Struct"><code class="docutils literal notranslate"><span class="pre">Db00Struct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.FileHeaderStruct"><code class="docutils literal notranslate"><span class="pre">FileHeaderStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.FrameStruct"><code class="docutils literal notranslate"><span class="pre">FrameStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.Frh0Struct"><code class="docutils literal notranslate"><span class="pre">Frh0Struct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.Idx1Struct"><code class="docutils literal notranslate"><span class="pre">Idx1Struct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.RfamStruct"><code class="docutils literal notranslate"><span class="pre">RfamStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.RfbdStruct"><code class="docutils literal notranslate"><span class="pre">RfbdStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.RfbmStruct"><code class="docutils literal notranslate"><span class="pre">RfbmStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.RfcoStruct"><code class="docutils literal notranslate"><span class="pre">RfcoStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.RfdoStruct"><code class="docutils literal notranslate"><span class="pre">RfdoStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.RfgiStruct"><code class="docutils literal notranslate"><span class="pre">RfgiStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.RfmmStruct"><code class="docutils literal notranslate"><span class="pre">RfmmStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.RfsdStruct"><code class="docutils literal notranslate"><span class="pre">RfsdStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.RfsiStruct"><code class="docutils literal notranslate"><span class="pre">RfsiStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.SffmStruct"><code class="docutils literal notranslate"><span class="pre">SffmStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.StrfStruct"><code class="docutils literal notranslate"><span class="pre">StrfStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.StrhStruct"><code class="docutils literal notranslate"><span class="pre">StrhStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.StriStruct"><code class="docutils literal notranslate"><span class="pre">StriStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.TimestampStruct"><code class="docutils literal notranslate"><span class="pre">TimestampStruct</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.extractFrameData"><code class="docutils literal notranslate"><span class="pre">extractFrameData()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.findStartSubstring"><code class="docutils literal notranslate"><span class="pre">findStartSubstring()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.getData"><code class="docutils literal notranslate"><span class="pre">getData()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.getFourCCByteLocation"><code class="docutils literal notranslate"><span class="pre">getFourCCByteLocation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.getStartOffset"><code class="docutils literal notranslate"><span class="pre">getStartOffset()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.idxRelativeRead"><code class="docutils literal notranslate"><span class="pre">idxRelativeRead()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readFileImg"><code class="docutils literal notranslate"><span class="pre">readFileImg()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readFileInfo"><code class="docutils literal notranslate"><span class="pre">readFileInfo()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader"><code class="docutils literal notranslate"><span class="pre">readHeader()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_00db"><code class="docutils literal notranslate"><span class="pre">readHeader_00db()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_avih"><code class="docutils literal notranslate"><span class="pre">readHeader_avih()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_cfh0"><code class="docutils literal notranslate"><span class="pre">readHeader_cfh0()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_csh0"><code class="docutils literal notranslate"><span class="pre">readHeader_csh0()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_frh0"><code class="docutils literal notranslate"><span class="pre">readHeader_frh0()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_idx1"><code class="docutils literal notranslate"><span class="pre">readHeader_idx1()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_rfam"><code class="docutils literal notranslate"><span class="pre">readHeader_rfam()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_rfbd"><code class="docutils literal notranslate"><span class="pre">readHeader_rfbd()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_rfbm"><code class="docutils literal notranslate"><span class="pre">readHeader_rfbm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_rfco"><code class="docutils literal notranslate"><span class="pre">readHeader_rfco()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_rfdo"><code class="docutils literal notranslate"><span class="pre">readHeader_rfdo()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_rfgi"><code class="docutils literal notranslate"><span class="pre">readHeader_rfgi()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_rfmm"><code class="docutils literal notranslate"><span class="pre">readHeader_rfmm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_rfsd"><code class="docutils literal notranslate"><span class="pre">readHeader_rfsd()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_rfsi"><code class="docutils literal notranslate"><span class="pre">readHeader_rfsi()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_sffm"><code class="docutils literal notranslate"><span class="pre">readHeader_sffm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_strf"><code class="docutils literal notranslate"><span class="pre">readHeader_strf()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_strh"><code class="docutils literal notranslate"><span class="pre">readHeader_strh()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.readHeader_stri"><code class="docutils literal notranslate"><span class="pre">readHeader_stri()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.siemensRfParser"><code class="docutils literal notranslate"><span class="pre">siemensRfParser()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.splitData"><code class="docutils literal notranslate"><span class="pre">splitData()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.siemens.html#pyquantus.parse.siemens.tmpRead"><code class="docutils literal notranslate"><span class="pre">tmpRead()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pyquantus.parse.terason.html">pyquantus.parse.terason module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.terason.html#pyquantus.parse.terason.readFileImg"><code class="docutils literal notranslate"><span class="pre">readFileImg()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.terason.html#pyquantus.parse.terason.readFileInfo"><code class="docutils literal notranslate"><span class="pre">readFileInfo()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.terason.html#pyquantus.parse.terason.terasonRfParser"><code class="docutils literal notranslate"><span class="pre">terasonRfParser()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pyquantus.parse.transforms.html">pyquantus.parse.transforms module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.transforms.html#pyquantus.parse.transforms.iqToRf"><code class="docutils literal notranslate"><span class="pre">iqToRf()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="pyquantus.parse.transforms.html#pyquantus.parse.transforms.scanConvert"><code class="docutils literal notranslate"><span class="pre">scanConvert()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="module-pyquantus.parse">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-pyquantus.parse" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="pyquantus.html" class="btn btn-neutral float-left" title="pyquantus package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pyquantus.parse.canon.html" class="btn btn-neutral float-right" title="pyquantus.parse.canon module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, David Spector.
+      <span class="lastupdated">Last updated on Jun 23, 2025.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

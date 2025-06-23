@@ -1,0 +1,209 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2D UTC GUI Example &mdash; QuantUS 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="2D DCE-US GUI Example" href="guiDceus2d.html" />
+    <link rel="prev" title="2D UTC CLI Example" href="cliUtc.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html">
+            
+              <img src="../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Examples</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="cliUtc.html">2D UTC CLI Example</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">2D UTC GUI Example</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#image-selection">Image Selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#region-of-interest-selection">Region of Interest Selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#analysis-parameters-for-utc-parameterization">Analysis Parameters for UTC Parameterization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#utc-parameterization">UTC Parameterization</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="guiDceus2d.html">2D DCE-US GUI Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guiDceus3d.html">3D DCE-US GUI Example</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation/index.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules.html">PyQuantUS API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QuantUS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Examples</a></li>
+      <li class="breadcrumb-item active">2D UTC GUI Example</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/TUL-Dev/PyQuantUS/blob/main/docs/source/usage/guiUtc.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="d-utc-gui-example">
+<h1>2D UTC GUI Example<a class="headerlink" href="#d-utc-gui-example" title="Link to this heading"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>This tutorial is a sample walkthrough of UTC parametrization of scan converted IQ data from a Canon system.
+For reference, the sample data used in this example can be found here. In this context, UTC refers to the
+collection of quantitative ultrasound parameters QuantUS computes from the inputted image and phantom data.
+These parameters are used to characterize the tissue in the image and are displayed in the GUI.</p>
+</section>
+<section id="image-selection">
+<h2>Image Selection<a class="headerlink" href="#image-selection" title="Link to this heading"></a></h2>
+<p>After opening the QuantUS GUI, we can begin by selecting <cite>2D Ultrasound Tissue Characterization (UTC)</cite> from the main menu.
+From here, we can select the <cite>Canon IQ</cite> button to choose the appropriate parser for this set of analysis.
+Once we input the image and phantom data file path, we click <cite>Generate Image</cite> to parse the data.</p>
+<p>After the ultrasound parser loads, the image will be displayed in the main window, as shown below.</p>
+<a class="reference internal image-reference" href="../_images/loadedIm.png"><img alt="Loaded Image" class="align-center" src="../_images/loadedIm.png" style="width: 750px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>On this screen, the purple lines on top of the B-Mode image representing the underlying RF data are unique to
+an experiment we are currently conducting using the Canon parser. For all other data formats, no such delineation
+will be present.</p>
+</section>
+<section id="region-of-interest-selection">
+<h2>Region of Interest Selection<a class="headerlink" href="#region-of-interest-selection" title="Link to this heading"></a></h2>
+<p>Following the analysis progression on the left side of the GUI, we now move to Region of Interest (ROI) selection.
+The ROI determines which segmentation of the inputted image we will break into windows and run UTC parameterization on.</p>
+<p>On the GUI, the <cite>New ROI</cite> button enables us to draw a free-handed spline to define the ROI. Alternatively, the
+<cite>Draw Rectangle</cite> button allows us to draw a rectangle by dragging our cursor to define the ROI, and the <cite>Load ROI</cite>
+loads a pre-drawn ROI that has been saved externally.</p>
+<a class="reference internal image-reference" href="../_images/drawnRoi.png"><img alt="Drawn ROI on GUI" class="align-center" src="../_images/drawnRoi.png" style="width: 750px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Once the ROI has been defined (see above), we can click the <cite>Save ROI</cite> button to save the ROI for later use.</p>
+<p>To advance to analysis parameter selection, click <cite>Accept ROI</cite>.</p>
+</section>
+<section id="analysis-parameters-for-utc-parameterization">
+<h2>Analysis Parameters for UTC Parameterization<a class="headerlink" href="#analysis-parameters-for-utc-parameterization" title="Link to this heading"></a></h2>
+<p>On this screen, we start with a default set of analysis parameters for UTC parameterization.
+If need be, these can be customized to fit the specific needs of the experiment, and vary aspects
+such as window size and analysis frequency bandwidth. Specifics about the definitions of each of these
+parameters are located in the PyQuantUS API section of this documentation as well as the <strong>2D UTC CLI Example</strong>.
+The interface for customizing these parameters is below.</p>
+<a class="reference internal image-reference" href="../_images/analysisParams.png"><img alt="Analysis Parameters" class="align-center" src="../_images/analysisParams.png" style="width: 750px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>For the purposes of this example, we will proceed with the default parameters by pressing <cite>Continue</cite>.</p>
+</section>
+<section id="utc-parameterization">
+<h2>UTC Parameterization<a class="headerlink" href="#utc-parameterization" title="Link to this heading"></a></h2>
+<p>Finally, QuantUS performs UTC parameterization under the hood, and displays the results on the next page.
+As shown below, the averages of each parameter across all windows are displayed at the top of the screen.
+Parametric maps for the midband fit (MBF), spectral slope (SS), and spectral intercept (SI) can be activated
+and deactivated using their corresponding buttons above the B-Mode image.</p>
+<a class="reference internal image-reference" href="../_images/rfResults.png"><img alt="UTC Results" class="align-center" src="../_images/rfResults.png" style="width: 750px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>For more detailed information on the UTC parameterization process, we can also use the <cite>Display NPS</cite> button to
+show the normalized power spectrum (NPS) of each of the windows which contributed to our MBF, SS, and SI results.</p>
+<a class="reference internal image-reference" href="../_images/nps.png"><img alt="NPS Results" class="align-center" src="../_images/nps.png" style="width: 750px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>In the above plot, the each dark blue line corresponds to an NPS for an individual window while the red line corresponds
+to the average NPS across all windows. The orange line is the line of best fit of the average NPS for the given
+analysis frequency bandwidth as specified in our analysis parameters. Note that the slope, intercept, and median
+correspond to the SS, SI, and MBF respectively.</p>
+<p>Finally, we can save the analysis parameters we used for this analysis as a single configuration in an external file
+using the <cite>Save Analysis Config</cite> button. This will allow us to load these parameters in the future for similar analyses.</p>
+<p>From here, it is possible to save the numerical values at the top of the GUI into a CSV file using the <cite>Save Results</cite> button.
+However, for large sets of analysis, it is recommended for efficiency purposes to only use the GUI for drawing and saving ROIs
+before using the CLI for batch processing.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="cliUtc.html" class="btn btn-neutral float-left" title="2D UTC CLI Example" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="guiDceus2d.html" class="btn btn-neutral float-right" title="2D DCE-US GUI Example" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, David Spector.
+      <span class="lastupdated">Last updated on Jun 23, 2025.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,215 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D DCE-US GUI Example &mdash; QuantUS 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Installation" href="../installation/index.html" />
+    <link rel="prev" title="2D DCE-US GUI Example" href="guiDceus2d.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html">
+            
+              <img src="../_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Overview</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Examples</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="cliUtc.html">2D UTC CLI Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guiUtc.html">2D UTC GUI Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="guiDceus2d.html">2D DCE-US GUI Example</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">3D DCE-US GUI Example</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#image-selection">Image Selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#volume-of-interest-selection">Volume of Interest Selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tic-modification">TIC Modification</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#analysis-results">Analysis Results</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation/index.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules.html">PyQuantUS API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QuantUS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Examples</a></li>
+      <li class="breadcrumb-item active">3D DCE-US GUI Example</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/TUL-Dev/PyQuantUS/blob/main/docs/source/usage/guiDceus3d.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="d-dce-us-gui-example">
+<h1>3D DCE-US GUI Example<a class="headerlink" href="#d-dce-us-gui-example" title="Link to this heading"></a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>This tutorial is a sample walkthrough of time intensity curve (TIC) analysis of a bolus injection captured in a
+3D dynamic contrast enhanced ultrasound (DCE-US) cine loop. This example uses the optional motion compensation
+feature on data stored in NIfTI format. For reference, the sample data used in this example can be found here.</p>
+</section>
+<section id="image-selection">
+<h2>Image Selection<a class="headerlink" href="#image-selection" title="Link to this heading"></a></h2>
+<p>After opening the QuantUS GUI, we can begin by selecting <cite>3D Dynamic Contrast-Enhanced Ultrasound (DCE-US)</cite>
+from the main menu. From here, we can select the <cite>NIFTI</cite> button to choose the appropriate parser for this set of analysis.
+Once we input the B-Mode (optional) and DCE-US cine loops, we click <cite>Generate Image</cite> to parse the data.</p>
+<p>After the ultrasound parser loads, the cine loops will be displayed in the main window, as shown below.</p>
+<a class="reference internal image-reference" href="../_images/3dDceusLoaded.png"><img alt="Loaded Image" class="align-center" src="../_images/3dDceusLoaded.png" style="width: 750px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Each 3D frame can be navigated by pressing the GUI so that the label that says <cite>Observing!</cite> above moves to navigating
+and then scrolling around different locations of each axis. We recommend starting navigation with the yellow crosshair
+enabled as shown above, but it may be useful to turn this off as well using the <cite>Show/Hide Cross</cite> button.</p>
+</section>
+<section id="volume-of-interest-selection">
+<h2>Volume of Interest Selection<a class="headerlink" href="#volume-of-interest-selection" title="Link to this heading"></a></h2>
+<p>Following the analysis progression on the left side of the GUI, we now move to Volume of Interest (VOI) selection.
+The VOI determines which segmentation of the inputted image we will use to compute the TIC in our analysis.</p>
+<p>On the GUI, the <cite>Draw New VOI</cite> button enables us to draw a free-handed spline to define the VOI. This works by drawing at
+least one free-handed region of interest (ROI) in each axis, and then merging them together using the <cite>Interpolate VOI</cite>
+button.</p>
+<p>Individual ROIs can also be fine-tuned using the <cite>Advanced ROI Edit</cite> button for the relevant axis. Note
+this feature is only accessible when this button is green instead of red. As shown below, in this feature, the user
+can drag points used to define the ROI to adjust the ROI itself dynamically.</p>
+<a class="reference internal image-reference" href="../_images/editRoi3dDceus.png"><img alt="Editing ROI on GUI" class="align-center" src="../_images/editRoi3dDceus.png" style="width: 750px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Finally, once an original VOI has been drawn, the user can draw smaller VOIs within the original VOI to create holes
+in the VOI, excluding regions of the image that are not relevant to the analysis.</p>
+<p>Once we are satisfied with the VOI, it can be saved and reloaded during another analysis run using the  <cite>Save VOI</cite> and
+<cite>Load VOI</cite> buttons. To compute the TIC on this VOI, we can click the <cite>Continue</cite> button, as shown below.</p>
+<a class="reference internal image-reference" href="../_images/drawnVoi3dDceus.png"><img alt="Completed VOI on GUI" class="align-center" src="../_images/drawnVoi3dDceus.png" style="width: 750px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+</section>
+<section id="tic-modification">
+<h2>TIC Modification<a class="headerlink" href="#tic-modification" title="Link to this heading"></a></h2>
+<p>On this screen, we start with the option of manually selecting a t0 for the TIC analysis, or automatically selecting
+one later. In this context, t0 corresponds to the start point we use when we fit a lognormal curve to the TIC data to
+quantitatively model the bolus injection. In this case, we opt to automatically select t0 later, as this will be optimized
+for us.</p>
+<a class="reference internal image-reference" href="../_images/ticPointsSelected3d.png"><img alt="TIC Modification" class="align-center" src="../_images/ticPointsSelected3d.png" style="width: 750px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>In this case, since we don’t have the option of motion compensation, we can eliminate points from the TIC to exclude
+frames which most likely don’t follow the underlying tissue we selected in the original VOI. This can be checked clicking
+a point on the TIC plot in question, and then looking at the corresponding DCE-US frame in the cine loop above the TIC plot.
+Below, notice how excluding noisy points can help us isolate the bolus injection in the TIC, significantly improving the quality
+of our analysis.</p>
+<a class="reference internal image-reference" href="../_images/trimmedTic3d.png"><img alt="TIC Trimmed" class="align-center" src="../_images/trimmedTic3d.png" style="width: 750px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Finally, we can click the <cite>Accept TIC</cite> button to fit a lognormal curve to our modified TIC and view our results.</p>
+</section>
+<section id="analysis-results">
+<h2>Analysis Results<a class="headerlink" href="#analysis-results" title="Link to this heading"></a></h2>
+<p>After performing the lognormal curve fitting, the area under the curve (AUC), peak enhancement (PE), time to peak (TP),
+mean transit-time (MTT), t0, and ROI area are displayed by pressing the <cite>Show TIC</cite> button in the new screen. A visual
+of our curve fit is also displayed, as shown below.</p>
+<a class="reference internal image-reference" href="../_images/3dDceusResults.png"><img alt="TIC Results" class="align-center" src="../_images/3dDceusResults.png" style="width: 750px;" />
+</a>
+<p>Also, note an externally computed parametric map can be displayed using the <cite>Load Parametric Map</cite> button. This operation
+is too computationally demanding to be included in this GUI, but externally computed maps will break the VOI into voxels
+and run TIC analysis on each voxel to create a parametric map. Note the TIC for each of these voxels
+must be unmodified, so this feature is best used for non-noisy data. This feature is useful for visualizing the spatial
+relationships between the TIC parameters. For more resources to help with creating these maps, please reach out to our developers.</p>
+<p>Finally, we can save the TIC parameters for the entire ROI into a CSV file by first pressing the <cite>Export Data</cite> button and then
+linking a CSV file to our analysis runs, which can store data from multiple analyses.
+A CLI is also currently under development to streamline this pipeline using batch processing.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="guiDceus2d.html" class="btn btn-neutral float-left" title="2D DCE-US GUI Example" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../installation/index.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, David Spector.
+      <span class="lastupdated">Last updated on Jun 23, 2025.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

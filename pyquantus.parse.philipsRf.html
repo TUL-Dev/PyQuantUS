@@ -1,0 +1,275 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyquantus.parse.philipsRf module &mdash; QuantUS 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="pyquantus.parse.siemens module" href="pyquantus.parse.siemens.html" />
+    <link rel="prev" title="pyquantus.parse.philipsMat module" href="pyquantus.parse.philipsMat.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/index.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developers</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation/index.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">PyQuantUS API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="pyquantus.html">pyquantus package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="pyquantus.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4 current"><a class="reference internal" href="pyquantus.parse.html">pyquantus.parse package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.utc.html">pyquantus.utc package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.html#module-pyquantus">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuantUS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">pyquantus</a></li>
+          <li class="breadcrumb-item"><a href="pyquantus.html">pyquantus package</a></li>
+          <li class="breadcrumb-item"><a href="pyquantus.parse.html">pyquantus.parse package</a></li>
+      <li class="breadcrumb-item active">pyquantus.parse.philipsRf module</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/TUL-Dev/PyQuantUS/blob/main/docs/source/pyquantus.parse.philipsRf.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pyquantus.parse.philipsRf">
+<span id="pyquantus-parse-philipsrf-module"></span><h1>pyquantus.parse.philipsRf module<a class="headerlink" href="#module-pyquantus.parse.philipsRf" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.HeaderInfoStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.philipsRf.</span></span><span class="sig-name descname"><span class="pre">HeaderInfoStruct</span></span><a class="headerlink" href="#pyquantus.parse.philipsRf.HeaderInfoStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Philips-specific structure containing information from the headers.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.philipsRf.</span></span><span class="sig-name descname"><span class="pre">PhilipsRfParser</span></span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Class for parsing Philips RF data files.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.SortRF">
+<span class="sig-name descname"><span class="pre">SortRF</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">RFinput</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Stride</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ML</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">CRE</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isVoyager</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.SortRF" title="Link to this definition"></a></dt>
+<dd><p>Sort RF data based on various parameters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.callGetPartA">
+<span class="sig-name descname"><span class="pre">callGetPartA</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">numClumps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.callGetPartA" title="Link to this definition"></a></dt>
+<dd><p>Call getPartA function.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.callGetPartB">
+<span class="sig-name descname"><span class="pre">callGetPartB</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">numClumps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.callGetPartB" title="Link to this definition"></a></dt>
+<dd><p>Call getPartB function.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.findSignature">
+<span class="sig-name descname"><span class="pre">findSignature</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.findSignature" title="Link to this definition"></a></dt>
+<dd><p>Find signature in file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.getFillerZeros">
+<span class="sig-name descname"><span class="pre">getFillerZeros</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.getFillerZeros" title="Link to this definition"></a></dt>
+<dd><p>Get filler zeros string.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.parseDataF">
+<span class="sig-name descname"><span class="pre">parseDataF</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rawrfdata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">headerInfo</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.parseDataF" title="Link to this definition"></a></dt>
+<dd><p>Parse data for Fusion data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.parseDataV">
+<span class="sig-name descname"><span class="pre">parseDataV</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rawrfdata</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">headerInfo</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.parseDataV" title="Link to this definition"></a></dt>
+<dd><p>Parse data for Voyager data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.parseFileHeader">
+<span class="sig-name descname"><span class="pre">parseFileHeader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">endianness</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.parseFileHeader" title="Link to this definition"></a></dt>
+<dd><p>Parse file header.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.parseHeaderF">
+<span class="sig-name descname"><span class="pre">parseHeaderF</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rawrfdata</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.parseHeaderF" title="Link to this definition"></a></dt>
+<dd><p>Parse header for Fusion data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.parseHeaderV">
+<span class="sig-name descname"><span class="pre">parseHeaderV</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rawrfdata</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.parseHeaderV" title="Link to this definition"></a></dt>
+<dd><p>Parse header for Voyager data.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.parse_and_save">
+<span class="sig-name descname"><span class="pre">parse_and_save</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ML_out</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ML_in</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">used_os</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_format</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'mat'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.parse_and_save" title="Link to this definition"></a></dt>
+<dd><p>Parse Philips RF data file, save as .mat or .npy file, and return shape of data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filepath</strong> – Path to RF data file</p></li>
+<li><p><strong>ML_out</strong> – Output multiline factor (default: 2)</p></li>
+<li><p><strong>ML_in</strong> – Input multiline factor (default: 32)</p></li>
+<li><p><strong>used_os</strong> – Used offset samples (default: 2256)</p></li>
+<li><p><strong>save_format</strong> – Output file format, either ‘mat’ or ‘npy’ (default: ‘mat’)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Shape of the fundamental RF data array</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.parse_rf">
+<span class="sig-name descname"><span class="pre">parse_rf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">readOffset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">readSize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2000</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#pyquantus.parse.philipsRf.Rfdata" title="pyquantus.parse.philipsRf.Rfdata"><span class="pre">Rfdata</span></a></span></span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.parse_rf" title="Link to this definition"></a></dt>
+<dd><p>Open and parse RF data file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filepath</strong> – Path to RF data file</p></li>
+<li><p><strong>readOffset</strong> – Offset in MB to start reading from</p></li>
+<li><p><strong>readSize</strong> – Size in MB to read</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Parsed RF data structure</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#pyquantus.parse.philipsRf.Rfdata" title="pyquantus.parse.philipsRf.Rfdata">Rfdata</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.PhilipsRfParser.pruneData">
+<span class="sig-name descname"><span class="pre">pruneData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lineData</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lineHeader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ML_Capture</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.philipsRf.PhilipsRfParser.pruneData" title="Link to this definition"></a></dt>
+<dd><p>Remove false gate data at beginning and end of the line.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.Rfdata">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.philipsRf.</span></span><span class="sig-name descname"><span class="pre">Rfdata</span></span><a class="headerlink" href="#pyquantus.parse.philipsRf.Rfdata" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Philips-specific structure containing constructed RF data.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.dbParams">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.philipsRf.</span></span><span class="sig-name descname"><span class="pre">dbParams</span></span><a class="headerlink" href="#pyquantus.parse.philipsRf.dbParams" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Philips-specific structure containing signal properties of the scan.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.philipsRf.philipsRfParser">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.philipsRf.</span></span><span class="sig-name descname"><span class="pre">philipsRfParser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ML_out</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ML_in</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">used_os</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'mat'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#pyquantus.parse.philipsRf.philipsRfParser" title="Link to this definition"></a></dt>
+<dd><p>Parse Philips RF data file, extract fundamental and harmonic RF frames,
+save data to a .mat file, and return shape of fundamental RF data.</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="pyquantus.parse.philipsMat.html" class="btn btn-neutral float-left" title="pyquantus.parse.philipsMat module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pyquantus.parse.siemens.html" class="btn btn-neutral float-right" title="pyquantus.parse.siemens module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, David Spector.
+      <span class="lastupdated">Last updated on Jun 23, 2025.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

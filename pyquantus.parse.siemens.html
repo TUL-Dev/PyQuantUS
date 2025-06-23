@@ -1,0 +1,465 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyquantus.parse.siemens module &mdash; QuantUS 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="pyquantus.parse.terason module" href="pyquantus.parse.terason.html" />
+    <link rel="prev" title="pyquantus.parse.philipsRf module" href="pyquantus.parse.philipsRf.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/index.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developers</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation/index.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">PyQuantUS API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="pyquantus.html">pyquantus package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="pyquantus.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4 current"><a class="reference internal" href="pyquantus.parse.html">pyquantus.parse package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.utc.html">pyquantus.utc package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.html#module-pyquantus">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuantUS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">pyquantus</a></li>
+          <li class="breadcrumb-item"><a href="pyquantus.html">pyquantus package</a></li>
+          <li class="breadcrumb-item"><a href="pyquantus.parse.html">pyquantus.parse package</a></li>
+      <li class="breadcrumb-item active">pyquantus.parse.siemens module</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/TUL-Dev/PyQuantUS/blob/main/docs/source/pyquantus.parse.siemens.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pyquantus.parse.siemens">
+<span id="pyquantus-parse-siemens-module"></span><h1>pyquantus.parse.siemens module<a class="headerlink" href="#module-pyquantus.parse.siemens" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.AvihStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">AvihStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.AvihStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.Cfh0Struct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">Cfh0Struct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.Cfh0Struct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.Csh0Struct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">Csh0Struct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.Csh0Struct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.Db00Struct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">Db00Struct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.Db00Struct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.FileHeaderStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">FileHeaderStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.FileHeaderStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.FrameStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">FrameStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.FrameStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.Frh0Struct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">Frh0Struct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.Frh0Struct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.Idx1Struct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">Idx1Struct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.Idx1Struct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.RfamStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">RfamStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.RfamStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.RfbdStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">RfbdStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.RfbdStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.RfbmStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">RfbmStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.RfbmStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.RfcoStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">RfcoStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.RfcoStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.RfdoStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">RfdoStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.RfdoStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.RfgiStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">RfgiStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.RfgiStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.RfmmStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">RfmmStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.RfmmStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.RfsdStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">RfsdStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.RfsdStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.RfsiStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">RfsiStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.RfsiStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.SffmStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">SffmStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.SffmStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.StrfStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">StrfStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.StrfStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.StrhStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">StrhStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.StrhStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.StriStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">StriStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.StriStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.TimestampStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">TimestampStruct</span></span><a class="headerlink" href="#pyquantus.parse.siemens.TimestampStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.extractFrameData">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">extractFrameData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FileHeader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frameNum</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.extractFrameData" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.findStartSubstring">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">findStartSubstring</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shortString</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">longString</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.findStartSubstring" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.getData">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">getData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">imgPath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phantomPath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.getData" title="Link to this definition"></a></dt>
+<dd><p>Get the image and phantom data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>imgPath</strong> (<em>str</em>) – The file path of the Siemens RF data.</p></li>
+<li><p><strong>phantomPath</strong> (<em>str</em>) – The file path of the Siemens RF phantom data.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Image info, phantom info, image data, and phantom data.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.getFourCCByteLocation">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">getFourCCByteLocation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fourCC</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.getFourCCByteLocation" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.getStartOffset">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">getStartOffset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.getStartOffset" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.idxRelativeRead">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">idxRelativeRead</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fourCC</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frameNum</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.idxRelativeRead" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readFileImg">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readFileImg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">info</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.InfoStruct" title="pyquantus.parse.objects.InfoStruct"><span class="pre">InfoStruct</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">focus</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">imgPath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.DataOutputStruct" title="pyquantus.parse.objects.DataOutputStruct"><span class="pre">DataOutputStruct</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.InfoStruct" title="pyquantus.parse.objects.InfoStruct"><span class="pre">InfoStruct</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pyquantus.parse.siemens.readFileImg" title="Link to this definition"></a></dt>
+<dd><p>Read Siemens RF data and parse it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>info</strong> (<a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.InfoStruct" title="pyquantus.parse.objects.InfoStruct"><em>InfoStruct</em></a>) – Siemens RF file metadata</p></li>
+<li><p><strong>focus</strong> (<em>int</em>) – focus mode of the data</p></li>
+<li><p><strong>imgPath</strong> (<em>str</em>) – The file path of the Siemens RF data.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Image data and image metadata.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readFileInfo">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readFileInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readFileInfo" title="Link to this definition"></a></dt>
+<dd><p>Read values for Siemens RF file metadata.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filepath</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_00db">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_00db</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_00db" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_avih">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_avih</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_avih" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_cfh0">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_cfh0</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_cfh0" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_csh0">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_csh0</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_csh0" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_frh0">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_frh0</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">frameNum</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_frh0" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_idx1">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_idx1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">numFramesAcquired</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_idx1" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_rfam">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_rfam</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_rfam" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_rfbd">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_rfbd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_rfbd" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_rfbm">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_rfbm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_rfbm" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_rfco">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_rfco</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_rfco" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_rfdo">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_rfdo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_rfdo" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_rfgi">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_rfgi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_rfgi" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_rfmm">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_rfmm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_rfmm" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_rfsd">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_rfsd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fourCC</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_rfsd" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_rfsi">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_rfsi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_rfsi" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_sffm">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_sffm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_sffm" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_strf">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_strf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_strf" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_strh">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_strh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_strh" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.readHeader_stri">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">readHeader_stri</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.readHeader_stri" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.siemensRfParser">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">siemensRfParser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">imgPath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phantomPath</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.DataOutputStruct" title="pyquantus.parse.objects.DataOutputStruct"><span class="pre">DataOutputStruct</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.InfoStruct" title="pyquantus.parse.objects.InfoStruct"><span class="pre">InfoStruct</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.DataOutputStruct" title="pyquantus.parse.objects.DataOutputStruct"><span class="pre">DataOutputStruct</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.InfoStruct" title="pyquantus.parse.objects.InfoStruct"><span class="pre">InfoStruct</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#pyquantus.parse.siemens.siemensRfParser" title="Link to this definition"></a></dt>
+<dd><p>Parse Siemens RF data. Entry-point of entire parser.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>imgPath</strong> (<em>str</em>) – The file path of the Siemens RF data.</p></li>
+<li><p><strong>phantomPath</strong> (<em>str</em>) – The file path of the Siemens RF phantom data.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Image data, image info, phantom data, and phantom info.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.splitData">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">splitData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">imgData</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">focus</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.splitData" title="Link to this definition"></a></dt>
+<dd><p>Split the data into two channels based on the focus mode.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.siemens.tmpRead">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.siemens.</span></span><span class="sig-name descname"><span class="pre">tmpRead</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fourCC</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_obj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fileAsChars</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.siemens.tmpRead" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="pyquantus.parse.philipsRf.html" class="btn btn-neutral float-left" title="pyquantus.parse.philipsRf module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pyquantus.parse.terason.html" class="btn btn-neutral float-right" title="pyquantus.parse.terason module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, David Spector.
+      <span class="lastupdated">Last updated on Jun 23, 2025.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

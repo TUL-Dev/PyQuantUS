@@ -1,0 +1,595 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyquantus.parse.clarius module &mdash; QuantUS 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="pyquantus.parse.objects module" href="pyquantus.parse.objects.html" />
+    <link rel="prev" title="pyquantus.parse.canon module" href="pyquantus.parse.canon.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="usage/index.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developers</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation/index.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="modules.html">PyQuantUS API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="pyquantus.html">pyquantus package</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="pyquantus.html#subpackages">Subpackages</a><ul class="current">
+<li class="toctree-l4 current"><a class="reference internal" href="pyquantus.parse.html">pyquantus.parse package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="pyquantus.utc.html">pyquantus.utc package</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="pyquantus.html#module-pyquantus">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuantUS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="modules.html">pyquantus</a></li>
+          <li class="breadcrumb-item"><a href="pyquantus.html">pyquantus package</a></li>
+          <li class="breadcrumb-item"><a href="pyquantus.parse.html">pyquantus.parse package</a></li>
+      <li class="breadcrumb-item active">pyquantus.parse.clarius module</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/TUL-Dev/PyQuantUS/blob/main/docs/source/pyquantus.parse.clarius.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pyquantus.parse.clarius">
+<span id="pyquantus-parse-clarius-module"></span><h1>pyquantus.parse.clarius module<a class="headerlink" href="#module-pyquantus.parse.clarius" title="Link to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.clarius.</span></span><span class="sig-name descname"><span class="pre">ClariusParser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rf_raw_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">env_tgc_yml_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rf_yml_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">visualize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_tgc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ClariusInfoStruct</span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="pyquantus.parse.objects.html#pyquantus.parse.objects.InfoStruct" title="pyquantus.parse.objects.InfoStruct"><code class="xref py py-class docutils literal notranslate"><span class="pre">InfoStruct</span></code></a></p>
+<p>ClariusInfoStruct is a subclass of InfoStruct that represents information
+about an ultrasound scan’s data structure.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct.samplesPerLine">
+<span class="sig-name descname"><span class="pre">samplesPerLine</span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct.samplesPerLine" title="Link to this definition"></a></dt>
+<dd><p>The number of samples per line in the scan.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct.numLines">
+<span class="sig-name descname"><span class="pre">numLines</span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct.numLines" title="Link to this definition"></a></dt>
+<dd><p>The total number of lines in the scan.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct.sampleSize">
+<span class="sig-name descname"><span class="pre">sampleSize</span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.ClariusInfoStruct.sampleSize" title="Link to this definition"></a></dt>
+<dd><p>The size of each sample, typically represented as a string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.ParserVisualizations">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ParserVisualizations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rf_raw_data_3d</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rf_no_tgc_raw_data_3d</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_frame</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rf_sampling_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">full_depth_mm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delay_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hilbert_transform_axis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.ParserVisualizations" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>This class is responsible for visualizing the data processed by the ClariusParser.
+It includes methods to plot 1D signals, their FFTs, and 2D images of the envelope.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.ParserVisualizations.image_envelope_2d">
+<span class="sig-name descname"><span class="pre">image_envelope_2d</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">envelope_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">clip_fact</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dyn_range</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.ParserVisualizations.image_envelope_2d" title="Link to this definition"></a></dt>
+<dd><p>Plots a 2D signal envelope in decibels.</p>
+<p>This function takes a 2D array representing a signal envelope, applies
+a rotation and flipping transformation, converts it to a logarithmic
+decibel scale, applies clipping and normalization, and displays it as an image plot.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>envelope_type</strong> (<em>str</em>) – ‘TGC’ or ‘No TGC’</p></li>
+<li><p><strong>title</strong> (<em>str</em>) – The title of the plot.</p></li>
+<li><p><strong>clip_fact</strong> (<em>float</em>) – Clipping factor for dynamic range.</p></li>
+<li><p><strong>dyn_range</strong> (<em>float</em>) – Dynamic range in dB.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.ParserVisualizations.plot_1d_signal_and_fft">
+<span class="sig-name descname"><span class="pre">plot_1d_signal_and_fft</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">signal_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.ParserVisualizations.plot_1d_signal_and_fft" title="Link to this definition"></a></dt>
+<dd><p>Plots a 1D signal and its corresponding FFT.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>signal_type</strong> (<em>str</em>) – Type of the signal to be plotted (‘TGC’ or ‘No TGC’).</p></li>
+<li><p><strong>title</strong> (<em>str</em>) – Title for the plots.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.ParserVisualizations.rotate_flip">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">rotate_flip</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">two_dimension_array</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.ParserVisualizations.rotate_flip" title="Link to this definition"></a></dt>
+<dd><p>Rotates the input 2D array counterclockwise by 90 degrees and then flips it vertically.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>two_dimension_array</strong> (<em>np.ndarray</em>) – The input 2D array to be transformed.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The rotated and flipped 2D array.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.YmlParser">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">YmlParser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">yml_path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.YmlParser" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>This class reads YAML file data related to ultrasound imaging parameters.
+It extracts information from two YAML files:</p>
+<p>1. <cite>*rf.yml</cite> - Contains data such as sampling frequency, probe details, imaging parameters,
+and transmission settings.
+2. <cite>*env.tgc.yml</cite> - Contains time gain compensation (TGC) data.</p>
+<p>The extracted data is used to generate new imaging data without TGC,
+requiring TGC values for processing.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.YmlParser.assess_software_version">
+<span class="sig-name descname"><span class="pre">assess_software_version</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">software_version</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.YmlParser.assess_software_version" title="Link to this definition"></a></dt>
+<dd><p>Checks if the current software version (from env.yml or rf.yml)
+is in the list of valid versions.</p>
+<p>Logs an informational message if the version is valid and a warning if it is not.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.YmlParser.load_env_tgc_yml">
+<span class="sig-name descname"><span class="pre">load_env_tgc_yml</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.YmlParser.load_env_tgc_yml" title="Link to this definition"></a></dt>
+<dd><p>Loads and parses an environmental TGC YAML file if the file extension is “env.tgc.yml”.
+The method reads the YAML file, extracts relevant fields, and maps them to class attributes.</p>
+<p>Attributes Populated:
+- frames (int): Number of frames specified in the file.
+- timestamps (dict): Dictionary mapping timestamps to lists of depth and dB values.
+Each entry in the list is a dictionary with:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>depth (float): Depth value in millimeters.</p></li>
+<li><p>dB (float): Gain value in decibels.</p></li>
+</ul>
+</div></blockquote>
+<p>Raises:
+- Exception: If an error occurs while loading the YAML file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.YmlParser.load_rf_yml">
+<span class="sig-name descname"><span class="pre">load_rf_yml</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.YmlParser.load_rf_yml" title="Link to this definition"></a></dt>
+<dd><p>Loads and parses an RF YAML file if the file extension is “rf.yml”.
+The method reads the YAML file, extracts relevant fields, and maps them to class attributes.</p>
+<p>Attributes Populated:
+- software_version (str): Software version from the YAML file.
+- iso_time_date (str): ISO formatted timestamp.
+- probe_version (str): Version of the probe.
+- probe_elements (int): Number of probe elements.
+- probe_pitch (float): Probe pitch value.
+- probe_radius (float): Probe radius value.
+- frames (int): Number of frames in the file.
+- frame_rate (float): Frame rate value.
+- transmit_frequency (float): Transmit frequency.
+- imaging_depth (float): Imaging depth.
+- focal_depth (float): Focal depth.
+- auto_gain (bool): Whether auto gain is enabled.
+- mla (bool): Multi-line acquisition status.
+- tgc (dict): Time gain compensation settings.
+- size (dict): Size specifications.
+- type (str): Type information.
+- compression (str): Compression method.
+- sampling_rate (float): Sampling rate value.
+- delay_samples (int): Number of delay samples.
+- lines (dict): Line specifications.
+- focus (list): List of focus parameters.</p>
+<p>Raises:
+- Exception: If an error occurs while loading the YAML file.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.create_full_imaging_depth_array">
+<span class="sig-name descname"><span class="pre">create_full_imaging_depth_array</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.create_full_imaging_depth_array" title="Link to this definition"></a></dt>
+<dd><p>Generates an array representing the full imaging depth in millimeters.</p>
+<p>This function calculates the depth array based on the imaging depth and delay samples,
+ensuring accurate mapping of signal depth.</p>
+<section id="returns">
+<h2>Returns:<a class="headerlink" href="#returns" title="Link to this heading"></a></h2>
+<dl class="simple">
+<dt>tuple: (full_imaging_depth_array_1d_mm, trimmed_signal_length, delay_samples)</dt><dd><ul class="simple">
+<li><p>full_imaging_depth_array_1d_mm: 1D NumPy array of depth values in mm.</p></li>
+<li><p>trimmed_signal_length: Length of the trimmed RF signal.</p></li>
+<li><p>delay_samples: Number of delay samples before the valid signal starts.</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.extract_first_num">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">extract_first_num</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_string</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.extract_first_num" title="Link to this definition"></a></dt>
+<dd><p>Extracts the first number (integer or floating-point) from a string.
+Returns an int if the number is an integer, otherwise returns a float.
+If no number is found, returns None.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.read_rf_raw">
+<span class="sig-name descname"><span class="pre">read_rf_raw</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.read_rf_raw" title="Link to this definition"></a></dt>
+<dd><p>Reads raw RF data from a binary file, extracting header information, timestamps, and frame data.</p>
+<p>This function follows the format used by Clarius’ ultrasound raw data, as found in their GitHub repository:
+<a class="reference external" href="https://github.com/clariusdev/raw/blob/master/common/python/rdataread.py">https://github.com/clariusdev/raw/blob/master/common/python/rdataread.py</a></p>
+<p>The function parses:
+- A 5-field header (id, frames, lines, samples, samplesize)
+- Timestamps for each frame
+- RF data for each frame</p>
+<p>The loaded data is stored as instance attributes:
+- <cite>self.rf_raw_hdr</cite>: Dictionary containing header information
+- <cite>self.rf_raw_timestamps_1d</cite>: NumPy array of frame timestamps
+- <cite>self.rf_raw_data_3d</cite>: NumPy array of the RF data</p>
+<dl class="field-list simple">
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>FileNotFoundError</strong> – If the file is not found.</p></li>
+<li><p><strong>ValueError</strong> – If the file format is incorrect.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.reconstruct_bmode">
+<span class="sig-name descname"><span class="pre">reconstruct_bmode</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.reconstruct_bmode" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.remove_tgc">
+<span class="sig-name descname"><span class="pre">remove_tgc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">visualize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.remove_tgc" title="Link to this definition"></a></dt>
+<dd><p>Processes RF data to remove the time-gain compensation (TGC) effect.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.self.clean_tgc_data">
+<span class="sig-prename descclassname"><span class="pre">self.</span></span><span class="sig-name descname"><span class="pre">clean_tgc_data</span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.self.clean_tgc_data" title="Link to this definition"></a></dt>
+<dd><p>A dictionary where:
+- Keys (str): Timestamps from <cite>env_tgc_yml_obj.timestamps</cite>.
+- Values (list[dict]): Processed TGC data lists, falling back to
+previous valid data or default TGC data if necessary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.set_data_of_clarius_info_struct">
+<span class="sig-name descname"><span class="pre">set_data_of_clarius_info_struct</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.set_data_of_clarius_info_struct" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.set_default_tgc_data">
+<span class="sig-name descname"><span class="pre">set_default_tgc_data</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.set_default_tgc_data" title="Link to this definition"></a></dt>
+<dd><p>Extracts and processes TGC (Time Gain Compensation) data from the RF YAML object.</p>
+<p>This function parses key-value pairs from the RF TGC data, extracts depth and
+dB values, and stores them in a structured format within <cite>self.default_tgc_data</cite>.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusParser.self.default_tgc_data">
+<span class="sig-prename descclassname"><span class="pre">self.</span></span><span class="sig-name descname"><span class="pre">default_tgc_data</span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusParser.self.default_tgc_data" title="Link to this definition"></a></dt>
+<dd><p>A list of dictionaries, each containing:
+- ‘depth’ (float): The extracted depth value from the length key.
+- ‘dB’ (float): The extracted dB value from the dB key.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list[dict]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">pyquantus.parse.clarius.</span></span><span class="sig-name descname"><span class="pre">ClariusTarUnpacker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extraction_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>A class for extracting and processing <cite>.tar</cite> archives containing <cite>.lzo</cite> and <cite>.raw</cite> files.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.tar_files_path">
+<span class="sig-name descname"><span class="pre">tar_files_path</span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.tar_files_path" title="Link to this definition"></a></dt>
+<dd><p>The path to the directory containing <cite>.tar</cite> files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.extraction_mode">
+<span class="sig-name descname"><span class="pre">extraction_mode</span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.extraction_mode" title="Link to this definition"></a></dt>
+<dd><p>Extraction mode - either “single” or “multiple”.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.lzo_py_file_path">
+<span class="sig-name descname"><span class="pre">lzo_py_file_path</span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.lzo_py_file_path" title="Link to this definition"></a></dt>
+<dd><p>Path to the LZO executable for decompression (Windows only).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.check_input_path">
+<span class="sig-name descname"><span class="pre">check_input_path</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.check_input_path" title="Link to this definition"></a></dt>
+<dd><p>Validates the input path based on the specified extraction mode.</p>
+<p>This method checks whether the provided path exists and conforms to
+the expected format for different extraction modes:</p>
+<ul class="simple">
+<li><p>“single_sample”: The path must be a directory containing at least</p></li>
+</ul>
+<p>one <cite>.tar</cite> file.
+- “multiple_samples”: The path must be a directory containing at least
+one subdirectory.
+- “single_tar”: The path must be a valid <cite>.tar</cite> file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>True if the path is valid for the specified extraction mode,</dt><dd><p>otherwise False with a warning message.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.delete_hidden_files_in_extracted_folders">
+<span class="sig-name descname"><span class="pre">delete_hidden_files_in_extracted_folders</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.delete_hidden_files_in_extracted_folders" title="Link to this definition"></a></dt>
+<dd><p>Deletes hidden files (starting with a dot) in extracted folders.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.extract_tar_files">
+<span class="sig-name descname"><span class="pre">extract_tar_files</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.extract_tar_files" title="Link to this definition"></a></dt>
+<dd><p>Extracts all non-hidden tar files in the specified sample folder.
+If <cite>self.single_tar_extraction</cite> is True, <cite>self.path</cite> should be a <cite>.tar</cite> file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.get_folder_path_from_file_path">
+<em class="property"><span class="pre">static</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">get_folder_path_from_file_path</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.get_folder_path_from_file_path" title="Link to this definition"></a></dt>
+<dd><p>Returns the absolute directory path of the given file.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.read_lzo_files">
+<span class="sig-name descname"><span class="pre">read_lzo_files</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.read_lzo_files" title="Link to this definition"></a></dt>
+<dd><p>Detects the operating system and decompresses <cite>.lzo</cite> files accordingly.</p>
+<p><strong>Workflow:</strong>
+1. Determines whether the system is Windows or macOS.
+2. Logs the detected operating system.
+3. If running on <strong>Windows</strong>:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Constructs the path to the LZO executable.</p></li>
+<li><p>Checks if the executable exists.</p></li>
+<li><p>Iterates through the <cite>.lzo</cite> files and decompresses them using <cite>lzop.py</cite>.</p></li>
+</ul>
+</div></blockquote>
+<ol class="arabic simple" start="4">
+<li><dl class="simple">
+<dt>If running on <strong>macOS</strong>:</dt><dd><ul class="simple">
+<li><p>Attempts to decompress <cite>.lzo</cite> files using the <cite>lzop</cite> command.</p></li>
+<li><p>If <cite>lzop</cite> is missing, checks for Homebrew.</p></li>
+<li><p>Installs <cite>lzop</cite> via Homebrew if necessary.</p></li>
+<li><p>Decompresses <cite>.lzo</cite> files after ensuring <cite>lzop</cite> is installed.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Logs successes and failures, handling potential errors like:</dt><dd><ul class="simple">
+<li><p><cite>FileNotFoundError</cite></p></li>
+<li><p><cite>PermissionError</cite></p></li>
+<li><p><cite>subprocess.CalledProcessError</cite></p></li>
+<li><p>Other unexpected exceptions.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ol>
+<p><strong>Returns:</strong>
+- Logs the status of each decompression attempt.
+- Exits the program if <cite>lzop</cite> is missing on macOS and cannot be installed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.set_path_of_extracted_folders">
+<span class="sig-name descname"><span class="pre">set_path_of_extracted_folders</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.set_path_of_extracted_folders" title="Link to this definition"></a></dt>
+<dd><p>Finds and stores paths of extracted folders inside <cite>self.path</cite>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.set_path_of_lzo_files_inside_extracted_folders">
+<span class="sig-name descname"><span class="pre">set_path_of_lzo_files_inside_extracted_folders</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.set_path_of_lzo_files_inside_extracted_folders" title="Link to this definition"></a></dt>
+<dd><p>Finds and stores paths of .lzo files inside extracted folders.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.ClariusTarUnpacker.set_path_of_raw_files_inside_extracted_folders">
+<span class="sig-name descname"><span class="pre">set_path_of_raw_files_inside_extracted_folders</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyquantus.parse.clarius.ClariusTarUnpacker.set_path_of_raw_files_inside_extracted_folders" title="Link to this definition"></a></dt>
+<dd><p>Searches for .raw files inside extracted folders and stores their paths.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.clariusRfParser">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.clarius.</span></span><span class="sig-name descname"><span class="pre">clariusRfParser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">imgFilename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">imgTgcFilename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">infoFilename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phantomFilename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phantomTgcFilename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phantomInfoFilename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">visualize</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_tgc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="headerlink" href="#pyquantus.parse.clarius.clariusRfParser" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pyquantus.parse.clarius.get_signal_envelope_xd">
+<span class="sig-prename descclassname"><span class="pre">pyquantus.parse.clarius.</span></span><span class="sig-name descname"><span class="pre">get_signal_envelope_xd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">signal_xd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hilbert_transform_axis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="headerlink" href="#pyquantus.parse.clarius.get_signal_envelope_xd" title="Link to this definition"></a></dt>
+<dd><p>Computes the envelope of an x-dimensional signal using the Hilbert transform.</p>
+<p>This function mirrors the input signal along all its dimensions, applies the
+Hilbert transform along the specified axis, and then extracts the original
+signal envelope from the analytic signal.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>signal_xd</strong> (<em>np.ndarray</em>) – The input x-dimensional signal represented as a NumPy array.</p></li>
+<li><p><strong>hilbert_transform_axis</strong> (<em>int</em>) – The axis along which the Hilbert transform is applied.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The computed signal envelope of the input signal.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="pyquantus.parse.canon.html" class="btn btn-neutral float-left" title="pyquantus.parse.canon module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="pyquantus.parse.objects.html" class="btn btn-neutral float-right" title="pyquantus.parse.objects module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, David Spector.
+      <span class="lastupdated">Last updated on Jun 23, 2025.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,160 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Overview &mdash; QuantUS 1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=f2a433a1"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Examples" href="usage/index.html" />
+    <link rel="prev" title="QuantUS" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html">
+            
+              <img src="_static/logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Overview</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#utc-overview">UTC Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dce-us-overview">DCE-US Overview</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="usage/index.html">Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="installation/index.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">PyQuantUS API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuantUS</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Overview</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/TUL-Dev/PyQuantUS/blob/main/docs/source/overview.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="overview">
+<h1>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h1>
+<p>QuantUS is an open-source quantitative analysis tool designed for ultrasonic tissue characterization
+and contrast enhanced imaging analysis. This software provides an ultrasound system-independent platform
+for standardized, interactive, and scalable quantitative ultrasound research. QuantUS follows a two-tier
+architecture that separates core functionality in the [backend](<a class="reference external" href="https://github.com/TUL-Dev/PyQuantUS">https://github.com/TUL-Dev/PyQuantUS</a>)
+from user interaction support in the frontend. The software is compatible on Mac OS X, Windows, and Linux.</p>
+<p>The primary features of QuantUS include:</p>
+<ul class="simple">
+<li><p>2D Ultrasound Tissue Characterization (UTC) via spectral analysis of RF and IQ data</p></li>
+<li><p>2D Dynamic Contrast-Enhanced Ultrasound (DCE-US) Perfusion Imaging Analysis with optional Motion Compensation</p></li>
+<li><p>3D DCE-US Perfusion Imaging Analysis</p></li>
+</ul>
+<p>Notably, QuantUS addresses shortcomings in existing state-of-the-art tools by supporting 3D parametric map generation,
+motion compensation for 2D DCE-US analysis, an ultrasound system-independent approach, and by providing a standardized
+and reproducible platform for quantitative ultrasound research.</p>
+<section id="utc-overview">
+<h2>UTC Overview<a class="headerlink" href="#utc-overview" title="Link to this heading"></a></h2>
+<p>Given user-inputted RF or IQ ultrasound data, this feature runs spectral analysis to compute quantitative ultrasound
+parameters and parametric maps on a custom region of interest (ROI). In QuantUS, the midband fit (MBF), spectral
+slope (SS), and spectral intercept (SI) spectral parameters as described by <a class="reference external" href="https://pubmed.ncbi.nlm.nih.gov/26233222/">El Kaffas et al.</a> have been validated
+and used in numerous ultrasound studies. Additionally, the backscatter coefficient, attenuation coefficient,
+Nakagami parameter, effective scatterer size, and effecive scatterer concentration have all been implemented into
+the UI and are in the validation process.</p>
+<p>The UTC feature of QuantUS also supports a CLI for Terason and Canon transducers. More information and an example
+can be found in the Jupyter notebooks <a class="reference external" href="https://github.com/TUL-DEV/QuantUS/blob/main/CLI-Demos/scCanonUtc.ipynb">scCanonUtc.ipynb</a> and <a class="reference external" href="https://github.com/TUL-DEV/QUantUS/blob/main/CLI-Demos/terasonUtc.ipynb">terasonUtc.ipynb</a> within our codebase.</p>
+<a class="reference internal image-reference" href="_images/paramapIllustration.png"><img alt="MBF Parametric Map Example" class="align-center" src="_images/paramapIllustration.png" style="width: 600px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+</section>
+<section id="dce-us-overview">
+<h2>DCE-US Overview<a class="headerlink" href="#dce-us-overview" title="Link to this heading"></a></h2>
+<p>For both 2D and 3D cine loops, QuantUS performs quantitative analysis on bolus contrast injections by computing a time intensity curve (TIC) for a given ROI or volume of interest (VOI). 2D cine loops can optionally run a 2D motion compensation algorithm developed by <a class="reference external" href="https://pubmed.ncbi.nlm.nih.gov/35970658/">Tiyarattanachai et al.</a> before the TIC is computed to reduce motion-induced noise.</p>
+<p>From here, a lognormal curve is fitted, returning the area under the curve (AUC), peak enhancement (PE), mean transit time (MTT), time to peak (TP), normalization (TMPPV), and region area/volume values. For processors with high computational power, a parametric map of each parameter can be generated in both 2D and 3D as well.</p>
+<a class="reference internal image-reference" href="_images/3dDceusParamap.png"><img alt="3D DCE-US Parametric Map Example" class="align-center" src="_images/3dDceusParamap.png" style="width: 600px;" />
+</a>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="QuantUS" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="usage/index.html" class="btn btn-neutral float-right" title="Examples" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, David Spector.
+      <span class="lastupdated">Last updated on Jun 23, 2025.
+      </span></p>
+  </div>
+
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
