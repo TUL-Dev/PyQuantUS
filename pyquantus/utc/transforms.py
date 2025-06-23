@@ -111,3 +111,6 @@ def expandArr(image: np.ndarray) -> np.ndarray:
             fullArr[i,j] = int32torgb(image[i,j])
 
     return fullArr.astype('uint8')
+
+
+
