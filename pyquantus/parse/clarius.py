@@ -56,7 +56,7 @@ class ClariusTarUnpacker():
         self.extraction_mode = extraction_mode
         
         # Using lzop.exe file for Windows renamed to lzop.py to make it pip-accessible
-        self.lzo_py_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir)}\exe\lzop.py"
+        self.lzo_py_file_path = rf"{os.path.join(os.path.abspath(__file__), os.pardir, os.pardir, 'lzop', 'lzop.py')}"
         
         # single tar extraction attibutes
         self.single_tar_extraction: bool = None
