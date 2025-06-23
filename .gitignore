@@ -9,4 +9,3 @@ fixed_wheels/
 *.so
 *.pyd
 *.npy
-*.ipynb
